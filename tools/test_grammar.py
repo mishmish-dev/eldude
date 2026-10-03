@@ -24,7 +24,7 @@ class GrammarTests(unittest.TestCase):
             'module m; trait Source { type Item; type Map<U>; fn next(mut self)->Option<Self::Item>; }',
             'module m; impl<T> Eq for List<T> where T: Eq { fn eq(self, other: List<T>)->Bool { true } }',
             'module m; impl<T> Source for Box<T> { type Item=T; type Map<U> = (T,U); fn next(mut self)->Option<T> { Option::None } }',
-            'module m; fn f<T,F<_>,@r,!e,..C,#N>(view x:T, mut y:T, cb:fn(T)->{e}T captures {..C})->{state<@r>,e}T where e:NonAbandoning, ..C:Dup+Discard decreases N { cb(x) }',
+            'module m; fn f<T,F<_>,@r,!e,..C,#N>(view x:T, mut y:T, cb:fn(T)->{| e}T captures {..C})->{state<@r> | e}T where e:NonAbandoning, ..C:Dup+Discard { cb(x) }',
             'module m; fn f(x:Int)->Int { let y=-128i8; let z=1.25e-2f32; if x<0 { 0 } else { x+1 } }',
             'module m; fn f(xs:List<Int>)->Nat { for x in xs { use(x); }; while check() { continue; }; 0nat }',
             'module m; fn f(x:Option<Pair>)->Int { x.?left ?? 0 }',
@@ -67,10 +67,50 @@ class GrammarTests(unittest.TestCase):
         self.assertFalse(self.grammar.accepts(source, 'source_file'))
 
     def test_applied_effect_contracts_and_operations(self):
-        source = 'module m; effect Store<T> { tail put(value:T)->Unit; once get()->T; } fn put(value:Int)->{Store<Int>} Unit { !Store::<Int>::put(value); } fn run()->Int { handle { !Store::<Int>::get() } with store=handler Store<Int> { put(value)=>resume(()); get()=>resume(1); } }'
+        source = 'module m; effect Store<T> { tail put(value:T)->Unit; once get()->T; } fn put(value:Int)->{Store<Int>} Unit { !Store::<Int>::put(value); } fn run()->Int { handle { !Store::<Int>::get() } with store=handler Store<Int> { put(value)=>(); get()=>resume(1); } }'
         self.assertTrue(self.grammar.accepts(source))
-        self.assertTrue(self.grammar.accepts('module m; fn f<@r,!e>()->{Store<Ref<Int,@r>>,state<@r>,e} Unit;'))
+        self.assertTrue(self.grammar.accepts('module m; fn f<@r,!e>()->{Store<Ref<Int,@r>>,state<@r> | e} Unit;'))
         self.assertFalse(self.grammar.accepts(source.replace('Store::<Int>::put', 'Store<Int>::put')))
+
+    def test_single_tail_effect_rows(self):
+        for row in ('{}', '{Log}', '{Log, Log}', '{| e}', '{Log | e}',
+                    '{Store<Int>, Store<Bool>, suspend | e}'):
+            with self.subTest(row=row):
+                self.assertTrue(self.grammar.accepts(row, 'effect_row'))
+        for row in ('{|}', '{Log | e, f}', '{Log | e | f}', '{| e,}',
+                    '{Log, | e}', '{Log | Store<Int>}'):
+            with self.subTest(row=row):
+                self.assertFalse(self.grammar.accepts(row, 'effect_row'))
+
+    def test_tail_handler_return_syntax(self):
+        # Operation modes are resolved by typing, not by the grammar recognizer.
+        source = ('module m; effect Read { tail read()->Int; } '
+                  'fn f()->Int { handle { !Read::read() } with handler Read { '
+                  'read()=>{ if true { return 42; }; 0 } } }')
+        self.assertTrue(self.grammar.accepts(source))
+
+    def test_termination_measures_are_deferred(self):
+        for source in (
+            'module m; fn f(n:Nat)->Nat decreases n { n }',
+            'module m; trait T { fn f(self)->Unit decreases 0nat; }',
+            'module m; impl T { fn f(self)->Unit decreases 0nat {} }',
+            'module m; fn f()->Unit { while ready() decreases n {} }',
+            'module m; fn f(xs:List<Int>)->Unit { for x in xs decreases n {} }',
+        ):
+            for entry in ('source_file', 'interface_file'):
+                with self.subTest(source=source, entry=entry):
+                    self.assertFalse(self.grammar.accepts(source, entry))
+
+    def test_termination_contract_syntax(self):
+        # These check syntax; termination/effect validity requires a type checker.
+        for source in (
+            'module m; fn gcd(a:Nat,b:Nat)->{diverge} Nat { if b==0nat { a } else { gcd(b,a%b) } }',
+            'module m; fn f()->{diverge} Unit { while ready() {} }',
+            'module m; fn f(xs:List<Int>)->Unit { for x in xs { use(x); } }',
+            'module m; fn decreases(value:Int)->Int { value }',
+        ):
+            with self.subTest(source=source):
+                self.assertTrue(self.grammar.accepts(source))
 
     def test_nonfinal_loops_require_expression_separators(self):
         for loop in ('while condition {}', 'for x in xs {}'):
@@ -79,12 +119,24 @@ class GrammarTests(unittest.TestCase):
                 self.assertTrue(self.grammar.accepts('module m; fn f()->Unit { '+loop+' }'))
                 self.assertFalse(self.grammar.accepts('module m; fn f()->Int { '+loop+' 1 }'))
 
-    def test_component_capture_and_opaque_usage_interfaces(self):
-        interface = 'module m; pub struct Box<T>; semantic { representation=opaque; usage { Dup=(T:Dup); Discard=(T:Discard); } } pub enum Status { pub Ready, } semantic { representation=opaque; usage { Dup=true; Discard=true; } } pub fn first(pair:(any Show+Discard,any Show+Discard))->any Show+Discard; semantic { result-captures <= {captures(parameter(0).component(0))}; } pub fn field(view pair:Pair)->any Show+Discard; semantic { result-captures <= {captures(pair.member(m::Pair::first))}; }'
+    def test_whole_value_capture_and_opaque_usage_interfaces(self):
+        interface = 'module m; pub struct Box<T>; semantic { representation=opaque; usage { Dup=(T:Dup); Discard=(T:Discard); } } pub enum Status { pub Ready, } semantic { representation=opaque; usage { Dup=true; Discard=true; } } pub fn first(pair:(any Show+Discard,any Show+Discard))->any Show+Discard; semantic { result-captures <= {captures(parameter(0))}; } pub fn field(view pair:Pair)->any Show+Discard; semantic { result-captures <= {captures(pair)}; }'
         self.assertTrue(self.grammar.accepts(interface, 'interface_file'))
         self.assertFalse(self.grammar.accepts(interface, 'source_file'))
-        self.assertFalse(self.grammar.accepts(interface.replace('component(0)', 'component()'), 'interface_file'))
+        self.assertFalse(self.grammar.accepts(interface.replace('parameter(0)', 'parameter()'), 'interface_file'))
         self.assertFalse(self.grammar.accepts(interface.replace('Dup=(T:Dup)', 'Dup='), 'interface_file'))
+
+    def test_capture_projections_and_payload_contracts_are_deferred(self):
+        for bound in ('{captures(parameter(0).component(0))}',
+                      '{captures(pair.member(m::Pair::first))}',
+                      '{captures(parameter(0).payload)}'):
+            with self.subTest(bound=bound):
+                self.assertFalse(self.grammar.accepts(bound, 'capture_bound'))
+        for clause in ('payload-captures=tracked;',
+                       'payload-captures <= {captures(parameter(0))};'):
+            with self.subTest(clause=clause):
+                interface = 'module m; pub struct Box<T>; semantic { '+clause+' }'
+                self.assertFalse(self.grammar.accepts(interface, 'interface_file'))
 
     def test_member_and_nested_callable_interfaces(self):
         interface = 'module m; pub trait Factory<T> { fn first(self,x:T)->any Show; fn second(self,y:T)->any Show; } semantic { member(m::Factory::first) { result-captures <= {captures(x)}; } member(m::Factory::second) { result-captures <= {captures(y)}; } } impl<T> Factory<T> for Holder<T> { fn first(self,x:T)->any Show; fn second(self,y:T)->any Show; } semantic { member(m::Factory::first) { result-captures <= {captures(parameter(1))}; } member(m::Factory::second) { result-captures <= {captures(parameter(1)),captures(..)}; } } pub fn apply(f:fn(T)->U)->U; semantic { parameter(0) { result-captures <= {captures(parameter(0)),captures(..)}; } }'
@@ -92,11 +144,10 @@ class GrammarTests(unittest.TestCase):
         self.assertFalse(self.grammar.accepts(interface, 'source_file'))
         self.assertFalse(self.grammar.accepts(interface.replace('member(m::Factory::first)', 'member(0)'), 'interface_file'))
 
-    def test_owned_payload_and_finite_iteration_interfaces(self):
-        interface = 'module m; pub struct Buffer<T,@r>; semantic { representation=opaque; usage { Dup=false; Discard=(T:Discard); } payload-captures=tracked; mutable-owner-region=@r; } impl<T,@r> Buffer<T,@r> { pub fn freeze(self)->List<T>; pub fn push(mut self,value:T)->Unit; } semantic { member(m::Buffer::freeze) { result-captures <= {captures(parameter(0).payload)}; } member(m::Buffer::push) { parameter(0) { payload-captures <= {captures(parameter(0).payload),captures(parameter(1))}; } } } impl<T> Iterator for List<T> { type Item=T; fn next(self)->Next<List<T>,T>; } semantic { finite-iteration=true; }'
+    def test_mutable_owner_and_finite_iteration_interfaces(self):
+        interface = 'module m; pub struct Buffer<T,@r>; semantic { representation=opaque; usage { Dup=false; Discard=(T:Discard); } mutable-owner-region=@r; } impl<T,@r> Buffer<T,@r> { pub fn freeze(self)->List<T>; pub fn push(mut self,value:T)->Unit; } semantic { member(m::Buffer::freeze) { result-captures <= {captures(parameter(0))}; } member(m::Buffer::push) { result-captures <= {}; } } impl<T> Iterator for List<T> { type Item=T; fn next(self)->Next<List<T>,T>; } semantic { finite-iteration=true; }'
         self.assertTrue(self.grammar.accepts(interface, 'interface_file'))
         self.assertFalse(self.grammar.accepts(interface, 'source_file'))
-        self.assertFalse(self.grammar.accepts(interface.replace('.payload', '.payload(0)'), 'interface_file'))
         self.assertFalse(self.grammar.accepts(interface.replace('finite-iteration=true', 'finite-iteration=maybe'), 'interface_file'))
 
     def test_ffi_interface_forms(self):

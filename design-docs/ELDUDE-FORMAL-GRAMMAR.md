@@ -1,6 +1,6 @@
 # Eldude Formal Grammar
 
-**Version:** 0.0.3
+**Version:** 0.0.4
 
 **Status:** pre-implementation normative grammar
 
@@ -18,10 +18,10 @@ In EBNF, `::=` defines a production, `|` selects an alternative, parentheses gro
 
 ## Reserved words, sigils, and tokens
 
-The source grammar reserves the following words because they participate directly in 0.0.3 syntax:
+The source grammar reserves the following words because they participate directly in 0.0.4 syntax:
 
 ```text
-affine any as assert await break captures case const continue decreases
+affine any as assert await break captures case const continue
 effect else enum extern false fn for forall forward handle handler if impl
 import in intrinsic let linear match module mut once pub region resume return self spawn
 struct suspend taskgroup trait true try type unsafe using view where while
@@ -30,7 +30,7 @@ diverge
 
 `with`, `tail`, and `state` are contextual words: they introduce handler composition, tail-resumption declarations, and region-state row entries in those specific grammatical positions, and are ordinary identifiers elsewhere. This permits projection APIs named `with`, record fields named `tail`, and values named `state` without name-dependent parsing.
 
-`many`, `abort`, `error`, and `host` are not reserved words in 0.0.3. Many-shot resumption is deferred; abortive operations are expressed by `affine ... -> Never`; expected-error composition uses nominal enums; host selection is root/build metadata rather than source syntax. Primitive type names such as `Int`, `Bool`, and `Unit` are ordinary predefined type names rather than keywords.
+`many`, `abort`, `error`, and `host` are not reserved words in 0.0.4. Many-shot resumption is deferred; abortive operations are expressed by `affine ... -> Never`; expected-error composition uses nominal enums; host selection is root/build metadata rather than source syntax. Primitive type names such as `Int`, `Bool`, and `Unit` are ordinary predefined type names rather than keywords.
 
 The category sigils are context-free tokens:
 
@@ -41,7 +41,7 @@ The category sigils are context-free tokens:
 ..C    capture-row parameter/rest
 ```
 
-At expression level, `!Qualified::op(...)` is algebraic operation dispatch. `!` is not an ordinary general-purpose prefix operator in 0.0.3. This prevents `!Console::check()` from having a second parse as boolean negation of an ordinary call.
+At expression level, `!Qualified::op(...)` is algebraic operation dispatch. `!` is not an ordinary general-purpose prefix operator in 0.0.4. This prevents `!Console::check()` from having a second parse as boolean negation of an ordinary call.
 
 Lexing uses longest-token matching for multi-character punctuation, including at least:
 
@@ -49,7 +49,7 @@ Lexing uses longest-token matching for multi-character punctuation, including at
 ::  ->  =>  .?  ??  ..  ==  !=  <=  >=
 ```
 
-Turbofish is parsed as `::` followed by `<...>`; it is not a distinct semantic token. Nested generic closers are individual `>` tokens; 0.0.3 defines no `>>` shift operator.
+Turbofish is parsed as `::` followed by `<...>`; it is not a distinct semantic token. Nested generic closers are individual `>` tokens; 0.0.4 defines no `>>` shift operator.
 
 ## Lexical payloads and source forms
 
@@ -92,6 +92,7 @@ The normative grammar is context-free. Appendix F reproduces the complete checke
 - the parser chooses among the three method forms syntactically, before method lookup; the type checker later verifies that the selected method has the matching receiver mode;
 - `!path::op(args)` is always algebraic operation dispatch; explicit family arguments use `!path::<Args>::op(args)`, with the same expression-level turbofish convention as ordinary generic application;
 - `@name`, `#name`, `!name` in generic-parameter lists, and `..name` in capture-row positions are determined solely by grammatical context;
+- an effect row has fixed entries followed by at most one `| name` tail; `{| e}` is tail-only, and `{E | e}` extends that tail. Whether a fixed entry denotes an effect family rather than a row variable is checked by kinding, not parsing;
 - `semantic { ... }` is not ordinary source syntax; it belongs to the canonical-interface entry point of Appendix F;
 - an unparenthesized nominal construction is excluded from the outer condition/scrutinee/source expression of `if`, `while`, `match`, and `for`; parentheses permit it and prevent confusion with the following block;
 - `await` and `spawn` take the immediately following unary/postfix operand; use parentheses or a block to group a larger computation;
@@ -105,7 +106,7 @@ These rules select association among grammar derivations using syntax alone. The
 
 <!-- BEGIN GENERATED ELDUDE GRAMMAR -->
 ```ebnf
-# Normative Eldude 0.0.3 EBNF. Generated presentations: Appendix F and the Formal Grammar.
+# Normative Eldude 0.0.4 EBNF. Generated presentations: Appendix F and the Formal Grammar.
 # EBNF: ::= definition; | choice; () grouping; ? optional; * repetition; + one or more.
 # JSON strings quote terminals and lexical regular expressions; # begins a whole-line comment.
 %skip SPACE = "[ \\t\\r\\n]+";
@@ -116,7 +117,7 @@ These rules select association among grammar derivations using syntax alone. The
 %token STRING_LITERAL = "\"(?:[^\"\\\\\\x00-\\x1f]|\\\\(?:[\"\\'\\\\nrt0]|u\\{[0-9a-fA-F]{1,6}\\}))*\"";
 %token CHAR_LITERAL = "'(?:[^'\\\\\\x00-\\x1f]|\\\\(?:[\"\\'\\\\nrt0]|u\\{[0-9a-fA-F]{1,6}\\}))'";
 %token IDENT = "[A-Za-z_][A-Za-z_0-9]*";
-%keywords "affine any as assert await break captures case const continue decreases effect else enum extern false fn for forall forward handle handler if impl import in intrinsic let linear match module mut once pub region resume return self spawn struct suspend taskgroup trait true try type unsafe using view where while diverge";
+%keywords "affine any as assert await break captures case const continue effect else enum extern false fn for forall forward handle handler if impl import in intrinsic let linear match module mut once pub region resume return self spawn struct suspend taskgroup trait true try type unsafe using view where while diverge";
 
 # Files and declarations
 source_file ::= "module" path ";" module_item*;
@@ -125,7 +126,7 @@ import_decl ::= "pub"? "import" path "::" "{" import_names "}" ";";
 import_names ::= import_name ("," import_name)* ","?;
 import_name ::= IDENT ("as" IDENT)?;
 declaration ::= "pub"? (function_decl | let_decl | struct_decl | enum_decl | trait_decl | effect_decl | alias_decl) | impl_decl | extern_block;
-function_decl ::= "unsafe"? "fn" IDENT generic_params? parameters result_contract where_clause? decreases_clause? (block | ";");
+function_decl ::= "unsafe"? "fn" IDENT generic_params? parameters result_contract where_clause? (block | ";");
 let_decl ::= "let" pattern (":" type)? "=" expr ";";
 struct_decl ::= usage_modifier? "struct" IDENT generic_params? where_clause? ("{" fields? "}" | ";");
 usage_modifier ::= "linear" | "affine";
@@ -138,7 +139,7 @@ gadt_constructors ::= gadt_constructor ("," gadt_constructor)* ","?;
 gadt_constructor ::= "pub"? IDENT ":" type;
 trait_decl ::= "intrinsic"? "trait" IDENT generic_params? where_clause? "{" trait_member* "}";
 trait_member ::= method_decl | associated_decl;
-method_decl ::= "unsafe"? "fn" IDENT generic_params? parameters result_contract where_clause? decreases_clause? (block | ";");
+method_decl ::= "unsafe"? "fn" IDENT generic_params? parameters result_contract where_clause? (block | ";");
 associated_decl ::= "type" IDENT generic_params? where_clause? ";";
 associated_equation ::= "type" IDENT generic_params? where_clause? "=" type ";";
 impl_decl ::= "impl" generic_params? type ("for" type)? where_clause? "{" impl_member* "}";
@@ -156,7 +157,6 @@ where_clause ::= "where" constraint ("," constraint)* ","?;
 constraint ::= constraint_subject ":" constraint_bounds | type "=" type;
 constraint_subject ::= type | ".." IDENT;
 constraint_bounds ::= type ("+" type)*;
-decreases_clause ::= "decreases" condition_expr;
 
 # Types, binders, and category slots
 path ::= path_part ("::" path_part)*;
@@ -177,7 +177,8 @@ type_args ::= "<" type_arg ("," type_arg)* ","? ">";
 type_arg ::= type | region_ref | effect_row | capture_set | ".." IDENT | nat_expr | IDENT "=" type;
 type_list ::= type ("," type)* ","?;
 region_ref ::= "@" IDENT;
-effect_row ::= "{" (effect_entry ("," effect_entry)* ","?)? "}";
+effect_row ::= "{" (effect_entries ","? | effect_entries? "|" IDENT)? "}";
+effect_entries ::= effect_entry ("," effect_entry)*;
 effect_entry ::= applied_path | "suspend" | "diverge";
 capture_clause ::= "captures" capture_set;
 capture_set ::= "{" (capture_entry ("," capture_entry)* ","?)? "}";
@@ -216,8 +217,8 @@ statement ::= let_decl | "assert" expr ";" | expr ";";
 if_expr ::= "if" condition_expr block ("else" (block | if_expr))?;
 match_expr ::= "match" condition_expr "{" match_arm* "}";
 match_arm ::= "case" pattern ("if" condition_expr)? "=>" expr ";";
-while_expr ::= "while" condition_expr decreases_clause? block;
-for_expr ::= "for" pattern "in" condition_expr decreases_clause? block;
+while_expr ::= "while" condition_expr block;
+for_expr ::= "for" pattern "in" condition_expr block;
 scoped_expr ::= "region" IDENT block | ("try" | "taskgroup" | "unsafe") block;
 using_expr ::= "using" "(" acquisition ("," acquisition)* ","? ")" block;
 acquisition ::= binding_name "=" expr;
@@ -250,13 +251,12 @@ pattern_field ::= IDENT (":" pattern)?;
 interface_file ::= "module" path ";" interface_item*;
 interface_item ::= import_decl | declaration semantic_block?;
 semantic_block ::= "semantic" "{" semantic_clause* "}";
-semantic_clause ::= "result-captures" "<=" capture_bound ";" | "payload-captures" "=" "tracked" ";" | "payload-captures" "<=" capture_bound ";" | "mutable-owner-region" "=" region_ref ";" | "finite-positive-parameters" "=" "{" index_list? "}" ";" | "finite-iteration" "=" "true" ";" | "representation" "=" ("opaque" | "complete") ";" | "usage" "{" "Dup" "=" usage_condition ";" "Discard" "=" usage_condition ";" "}" | ffi_contract | ffi_protocol | semantic_selector "{" semantic_clause* "}";
+semantic_clause ::= "result-captures" "<=" capture_bound ";" | "mutable-owner-region" "=" region_ref ";" | "finite-positive-parameters" "=" "{" index_list? "}" ";" | "finite-iteration" "=" "true" ";" | "representation" "=" ("opaque" | "complete") ";" | "usage" "{" "Dup" "=" usage_condition ";" "Discard" "=" usage_condition ";" "}" | ffi_contract | ffi_protocol | semantic_selector "{" semantic_clause* "}";
 usage_condition ::= "true" | "false" | usage_conjunction ("|" usage_conjunction)*;
 usage_conjunction ::= "(" constraint ("," constraint)* ")";
 index_list ::= INT_LITERAL ("," INT_LITERAL)*;
 capture_bound ::= "{" (generated_capture ("," generated_capture)* ","?)? "}";
-generated_capture ::= "captures" "(" (binding_name | "parameter" "(" INT_LITERAL ")" | "..") capture_projection* ")" | capture_entry;
-capture_projection ::= "." ("component" "(" INT_LITERAL ")" | "member" "(" path ")" | "payload");
+generated_capture ::= "captures" "(" (binding_name | "parameter" "(" INT_LITERAL ")" | "..") ")" | capture_entry;
 semantic_selector ::= "parameter" "(" INT_LITERAL ")" | "result" | "member" "(" path ")" | "component" "(" INT_LITERAL ")";
 
 # Generated audited native contracts; scope/value consistency is checked semantically.
@@ -287,7 +287,7 @@ semantic {
 
 These clauses illustrate separate applicable subjects, not one declaration requiring every fact. `result-captures <= {...}` is the authoritative public upper-bound algebra of §13.6. `mutable-owner-region = @r` states the intrinsic `MutableOwner<T,@r>` fact when clients may form root `mut` grants. `finite-positive-parameters` lists the zero-based generic parameter positions certified by §8.5; `{}` certifies no positions. `finite-iteration = true` applies only to a concrete `Iterator` implementation certified under §35.5; omission offers no finite-completion guarantee. Storage positivity and finite iteration are distinct facts. FFI facts use the generated contracts and protocol descriptions of §72.9.
 
-On a nominal owning container, `payload-captures = tracked` publishes the abstract stored-payload component of §13.6. Omission offers no `.payload` selector; no further projection after `.payload` is permitted. On a callable result or `mut` parameter, `payload-captures <= {...}` uses the same capture-bound algebra to describe its returned/post-call payload, resolving sources in the enclosing callable's pre-call scope. The target must have the tracked profile. These bounds never authorize grant escape, unsafe aliasing, or retention past a provenance horizon. They are included in checking, rendering, and hashing just like result bounds.
+Capture bounds use whole values only (§13.6). Mutable arguments use the uniform conservative post-call rule; no per-callable mutation or stored-payload contract is exported. A capture-free return such as `Unit` does not suppress those mutation checks.
 
 `representation = complete` certifies that the rendered nominal fields/constructors are exhaustive. `representation = opaque` states that they are incomplete or unavailable: struct construction/decomposition cannot infer missing fields, and enum matching must account for the opaque remainder of §5.3. A semicolon struct implies `opaque`; a generated braced nominal declaration with omitted members MUST carry the marker. In the absence of a marker, a braced declaration is complete. An explicit contradictory marker is an interface error. Private member names and types are not serialized merely to explain this fact.
 
@@ -297,9 +297,9 @@ For example, an opaque `Box<T>` that stores `T` publishes `usage { Dup = (T: Dup
 
 Other future generated clauses MUST use source-level semantic terminology and MUST NOT expose implementation-specific solver state as the only representation of a client-relevant fact.
 
-A semantic block is attached to its preceding declaration. Nested `member(path) { ... }` clauses select individual methods, fields, associated declarations, or enum constructors by canonical identity; this includes trait and implementation methods and declarations in an `extern` block. Nested `parameter(n)`, `result`, and `component(n)` clauses select callable slots and stored tuple/payload components with the same zero-based rules as §72.9. All semantic clauses, including `result-captures`, may occur at the selected subject. Repeated selectors or facts in the same scope, invalid member/slot identities, or facts inappropriate to that subject are interface errors. Selectors use §72.9's canonical recursive ordering.
+A semantic block is attached to its preceding declaration. Nested `member(path) { ... }` clauses select individual methods, fields, associated declarations, or enum constructors by canonical identity; this includes trait and implementation methods and declarations in an `extern` block. Nested `parameter(n)`, `result`, and `component(n)` clauses select callable slots and stored tuple/payload components with the same zero-based rules as §72.9. They remain available for nested callable, usage, and FFI contracts, but do not refine stored-value capture summaries. `result-captures` applies only to a callable subject and bounds that callable's whole result. Repeated selectors or facts in the same scope, invalid member/slot identities, or facts inappropriate to that subject are interface errors. Selectors use §72.9's canonical recursive ordering.
 
-Within a selected callable contract, `captures(x)` refers to the named parameter/accessed-value summary. The positional spelling `captures(parameter(n))` refers to its zero-based parameter summary (counting a receiver), and `captures(..)` refers to the callable environment. A parameter source may append the public component/payload paths of §13.6. These spellings make nested anonymous function contracts renderable without inventing author-visible argument names; canonical rendering uses positional parameter sources. A bound attached to a stored result component refines that component's provenance and resolves its sources in the enclosing callable contract. Selecting a nested callable starts a new parameter/environment scope; it does not capture the outer callable's argument names implicitly. The bound's meaning and transitive provenance rules remain those of §13.6.
+Within a selected callable contract, `captures(x)` refers to the whole named parameter/accessed-value summary. The positional spelling `captures(parameter(n))` refers to its zero-based parameter summary (counting a receiver), and `captures(..)` refers to the whole callable environment. Sources have no projection suffix. Canonical rendering uses positional parameter sources. Selecting a nested callable starts a new parameter/environment scope; its bound describes its own return, and cannot refer implicitly to the enclosing callable's arguments. The bound's meaning and transitive provenance rules remain those of §13.6.
 
 Generated semantic clauses are interface/diagnostic notation. They belong to the canonical-interface grammar of Appendix F, not to the ordinary Eldude source grammar. A generated interface is therefore not promised to be a copy-pastable source stub unless those interface-only clauses are omitted. Tools MUST label/render canonical interface output distinctly enough that interface-only syntax is not presented as ordinary author-written source.
 
@@ -335,7 +335,7 @@ The following vocabulary is normative. Values in the table are bare generated wo
 | Callback | `delivery-domain` | `current_domain`, `registration_domain`, or `protocol(path)` |
 | Callback | `barrier` | `ordinary`, `stack_preserving`, `not_applicable`; `stack_preserving` requires the complete audited §56.1 protocol |
 | Callback | `suspension` | `forbidden`, `permitted`; permission does not authorize crossing an ordinary barrier |
-| Callback | `algebraic-crossing` | `forbidden` in 0.0.3 |
+| Callback | `algebraic-crossing` | `forbidden` in 0.0.4 |
 | Callback | `cancellation` | `deferred`, `ordinary_points`, or `protocol(path)` |
 | Callback | `defect` | `rendezvous` or `protocol(path)` describing the applicable Eldude-boundary/private-ABI protocol |
 | Callback | `pending-defect-entry` | `suppressed` for synchronous entry; `not_applicable` for independently posted delivery |
@@ -396,25 +396,25 @@ A deterministic formatter is part of the standard toolchain.
 
 Formatting is not parsing semantics. The parser must accept valid brace/semicolon syntax independent of indentation.
 
-Compiler-generated public signatures MUST use the same canonical surface conventions as the formatter, including bare effect-row variables inside `{...}` and ordinary `where e: NonAbandoning` spelling for the intrinsic effect-row constraint. They MUST also include the human-readable generated semantic clauses required by §72.7 whenever a client-validity fact such as result provenance or mutable-owner status is not otherwise visible in the ordinary signature.
+Compiler-generated public signatures MUST use the same canonical surface conventions as the formatter, including one final `| e` tail for an open effect row and ordinary `where e: NonAbandoning` spelling for the intrinsic effect-row constraint. They MUST also include the human-readable generated semantic clauses required by §72.7 whenever a client-validity fact such as result provenance or mutable-owner status is not otherwise visible in the ordinary signature.
 
 Generated canonical interfaces MUST render semantically unordered collections in one deterministic textual order:
 
 - applied algebraic effect families sort by canonical fully qualified identity and then recursively canonicalized generic arguments; nominal error alternatives sort by canonical identity;
 - `state<@r>` entries sort by canonical region-binder identity/order rather than incidental source spelling;
-- open row variables sort by binder order;
+- duplicate effect labels are preserved, with same-family instance evidence in lexical nearest-to-outer order; any open row has exactly one tail, rendered after `|` following all fixed entries;
 - intrinsic effect entries follow named/state entries in the fixed order `suspend`, then `diverge`;
-- generated capture/provenance unions sort sources by canonical source slot (callable environment, then arguments by position), then lexicographically by their projection path with component indices compared numerically and members by canonical identity; source names are replaced by positional parameter sources. Ancestor sources subsume their descendants. Explicit provenance atoms follow by category and canonical binder/identity order, then capture-row variables by binder order;
+- generated capture/provenance unions sort whole sources by canonical source slot (callable environment, then arguments by position); source names are replaced by positional parameter sources and duplicate entries are removed. Explicit provenance atoms follow by category and canonical binder/identity order, then capture-row variables by binder order;
 - unordered constraint collections sort first by constrained binder order and then by canonical predicate identity;
 - generated finite-positive parameter index sets sort in ascending parameter-position order.
 
-Within a semantic subject, render representation and usage facts first, then payload/result captures, mutable-owner region, finite-positive parameters, finite iteration, FFI facts, and nested selectors in §72.9's order. Capture paths compare projection kinds in the order `component`, `member`, `payload`, then their indices/identities. A usage block renders `Dup` before `Discard`; sort atoms in each conjunction by the ordinary canonical constraint order, deduplicate them, then sort/deduplicate conjunctions lexicographically and remove any conjunction strictly containing another. An empty conjunction is `true`; no offered conjunction is `false`. These are fixed syntactic normalization rules, not arbitrary logical/prose equivalence solving.
+Within a semantic subject, render representation and usage facts first, then result captures, mutable-owner region, finite-positive parameters, finite iteration, FFI facts, and nested selectors in §72.9's order. A usage block renders `Dup` before `Discard`; sort atoms in each conjunction by the ordinary canonical constraint order, deduplicate them, then sort/deduplicate conjunctions lexicographically and remove any conjunction strictly containing another. An empty conjunction is `true`; no offered conjunction is `false`. These are fixed syntactic normalization rules, not arbitrary logical/prose equivalence solving.
 
 User-authored source need not be reordered solely to match this interface order; the requirement is for generated canonical renderings, stable hashing inputs, and deterministic generated documentation.
 
 ## JSON representation
 
-`eldude-grammar.json` uses format `eldude-grammar`, format version `1`, and language version `0.0.3`. `entry_points` names the ordinary source and generated interface starts. `lexical.tokens` and `lexical.skip` are ordered arrays of `{ "name": ..., "pattern": ... }`; array order retains lexical priority. `reserved_words` and `contextual_words` expose the word categories. `literal_vocabulary` lists the reachable literals for each entry point. String/character token recognition additionally validates the Unicode scalar range and excluded surrogate interval recorded in `lexical`.
+`eldude-grammar.json` uses format `eldude-grammar`, format version `1`, and language version `0.0.4`. `entry_points` names the ordinary source and generated interface starts. `lexical.tokens` and `lexical.skip` are ordered arrays of `{ "name": ..., "pattern": ... }`; array order retains lexical priority. `reserved_words` and `contextual_words` expose the word categories. `literal_vocabulary` lists the reachable literals for each entry point. String/character token recognition additionally validates the Unicode scalar range and excluded surrogate interval recorded in `lexical`.
 
 `productions` maps each nonterminal to an array of alternatives. Each alternative is an ordered array of symbols; `[]` means epsilon. A symbol has exactly one key: `rule` references a nonterminal, `token` references a lexical category, and `literal` matches exact spelling. Names beginning with `@` are generated repetition helpers, not Eldude source tokens. This representation expands EBNF options and repetitions into ordinary BNF. `parsing_conventions` preserves the normative derivation/association rules above; consumers must apply them when building syntax trees.
 

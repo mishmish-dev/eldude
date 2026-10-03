@@ -7,7 +7,7 @@
   "format_version": 1,
   "language": {
     "name": "Eldude",
-    "version": "0.0.3"
+    "version": "0.0.4"
   },
   "lexical": {
     "contextual_words": [
@@ -75,7 +75,6 @@
         "component",
         "const",
         "continue",
-        "decreases",
         "defect",
         "delivery-domain",
         "deregistration",
@@ -122,8 +121,6 @@
         "output",
         "ownership",
         "parameter",
-        "payload",
-        "payload-captures",
         "pending-defect-entry",
         "pointer",
         "preconditions",
@@ -149,7 +146,6 @@
         "tail",
         "taskgroup",
         "thread-affinity",
-        "tracked",
         "trait",
         "true",
         "try",
@@ -208,7 +204,6 @@
         "case",
         "const",
         "continue",
-        "decreases",
         "diverge",
         "effect",
         "else",
@@ -270,7 +265,6 @@
       "case",
       "const",
       "continue",
-      "decreases",
       "diverge",
       "effect",
       "else",
@@ -363,6 +357,7 @@
     "the parser chooses among the three method forms syntactically, before method lookup; the type checker later verifies that the selected method has the matching receiver mode;",
     "`!path::op(args)` is always algebraic operation dispatch; explicit family arguments use `!path::<Args>::op(args)`, with the same expression-level turbofish convention as ordinary generic application;",
     "`@name`, `#name`, `!name` in generic-parameter lists, and `..name` in capture-row positions are determined solely by grammatical context;",
+    "an effect row has fixed entries followed by at most one `| name` tail; `{| e}` is tail-only, and `{E | e}` extends that tail. Whether a fixed entry denotes an effect family rather than a row variable is checked by kinding, not parsing;",
     "`semantic { ... }` is not ordinary source syntax; it belongs to the canonical-interface entry point of Appendix F;",
     "an unparenthesized nominal construction is excluded from the outer condition/scrutinee/source expression of `if`, `while`, `match`, and `for`; parentheses permit it and prevent confusion with the following block;",
     "`await` and `spawn` take the immediately following unary/postfix operand; use parentheses or a block to group a larger computation;",
@@ -386,7 +381,10 @@
       [],
       [
         {
-          "rule": "decreases_clause"
+          "literal": ":"
+        },
+        {
+          "rule": "type"
         }
       ]
     ],
@@ -394,13 +392,13 @@
       [],
       [
         {
+          "literal": ","
+        },
+        {
           "rule": "argument"
         },
         {
-          "rule": "@101"
-        },
-        {
-          "rule": "@102"
+          "rule": "@100"
         }
       ]
     ],
@@ -409,12 +407,6 @@
       [
         {
           "literal": ","
-        },
-        {
-          "rule": "argument"
-        },
-        {
-          "rule": "@101"
         }
       ]
     ],
@@ -422,19 +414,11 @@
       [],
       [
         {
-          "literal": ","
-        }
-      ]
-    ],
-    "@103": [
-      [],
-      [
-        {
           "rule": "value_fields"
         }
       ]
     ],
-    "@104": [
+    "@103": [
       [],
       [
         {
@@ -444,11 +428,11 @@
           "rule": "value_field"
         },
         {
-          "rule": "@104"
+          "rule": "@103"
         }
       ]
     ],
-    "@105": [
+    "@104": [
       [],
       [
         {
@@ -456,7 +440,7 @@
         }
       ]
     ],
-    "@106": [
+    "@105": [
       [],
       [
         {
@@ -467,17 +451,31 @@
         }
       ]
     ],
-    "@107": [
+    "@106": [
       [],
       [
         {
           "rule": "expr"
         },
         {
-          "rule": "@108"
+          "rule": "@107"
         },
         {
-          "rule": "@109"
+          "rule": "@108"
+        }
+      ]
+    ],
+    "@107": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "expr"
+        },
+        {
+          "rule": "@107"
         }
       ]
     ],
@@ -486,12 +484,6 @@
       [
         {
           "literal": ","
-        },
-        {
-          "rule": "expr"
-        },
-        {
-          "rule": "@108"
         }
       ]
     ],
@@ -499,7 +491,13 @@
       [],
       [
         {
-          "literal": ","
+          "rule": "expr"
+        },
+        {
+          "rule": "@110"
+        },
+        {
+          "rule": "@111"
         }
       ]
     ],
@@ -507,10 +505,7 @@
       [],
       [
         {
-          "literal": ":"
-        },
-        {
-          "rule": "type"
+          "rule": "usage_modifier"
         }
       ]
     ],
@@ -518,13 +513,13 @@
       [],
       [
         {
+          "literal": ","
+        },
+        {
           "rule": "expr"
         },
         {
-          "rule": "@111"
-        },
-        {
-          "rule": "@112"
+          "rule": "@110"
         }
       ]
     ],
@@ -533,12 +528,6 @@
       [
         {
           "literal": ","
-        },
-        {
-          "rule": "expr"
-        },
-        {
-          "rule": "@111"
         }
       ]
     ],
@@ -546,7 +535,13 @@
       [],
       [
         {
-          "literal": ","
+          "rule": "lambda_param"
+        },
+        {
+          "rule": "@113"
+        },
+        {
+          "rule": "@114"
         }
       ]
     ],
@@ -554,13 +549,13 @@
       [],
       [
         {
+          "literal": ","
+        },
+        {
           "rule": "lambda_param"
         },
         {
-          "rule": "@114"
-        },
-        {
-          "rule": "@115"
+          "rule": "@113"
         }
       ]
     ],
@@ -569,12 +564,6 @@
       [
         {
           "literal": ","
-        },
-        {
-          "rule": "lambda_param"
-        },
-        {
-          "rule": "@114"
         }
       ]
     ],
@@ -582,7 +571,7 @@
       [],
       [
         {
-          "literal": ","
+          "rule": "result_contract"
         }
       ]
     ],
@@ -590,19 +579,11 @@
       [],
       [
         {
-          "rule": "result_contract"
-        }
-      ]
-    ],
-    "@117": [
-      [],
-      [
-        {
           "rule": "access_mode"
         }
       ]
     ],
-    "@118": [
+    "@117": [
       [],
       [
         {
@@ -613,26 +594,18 @@
         }
       ]
     ],
-    "@119": [
+    "@118": [
       [],
       [
         {
           "rule": "statement"
         },
         {
-          "rule": "@119"
+          "rule": "@118"
         }
       ]
     ],
-    "@12": [
-      [],
-      [
-        {
-          "rule": "usage_modifier"
-        }
-      ]
-    ],
-    "@120": [
+    "@119": [
       [],
       [
         {
@@ -640,7 +613,15 @@
         }
       ]
     ],
-    "@121": [
+    "@12": [
+      [],
+      [
+        {
+          "rule": "generic_params"
+        }
+      ]
+    ],
+    "@120": [
       [],
       [
         {
@@ -659,18 +640,18 @@
         }
       ]
     ],
-    "@122": [
+    "@121": [
       [],
       [
         {
           "rule": "match_arm"
         },
         {
-          "rule": "@122"
+          "rule": "@121"
         }
       ]
     ],
-    "@123": [
+    "@122": [
       [],
       [
         {
@@ -681,23 +662,7 @@
         }
       ]
     ],
-    "@124": [
-      [],
-      [
-        {
-          "rule": "decreases_clause"
-        }
-      ]
-    ],
-    "@125": [
-      [],
-      [
-        {
-          "rule": "decreases_clause"
-        }
-      ]
-    ],
-    "@126": [
+    "@123": [
       [],
       [
         {
@@ -707,11 +672,11 @@
           "rule": "acquisition"
         },
         {
-          "rule": "@126"
+          "rule": "@123"
         }
       ]
     ],
-    "@127": [
+    "@124": [
       [],
       [
         {
@@ -719,7 +684,7 @@
         }
       ]
     ],
-    "@128": [
+    "@125": [
       [],
       [
         {
@@ -727,7 +692,7 @@
         }
       ]
     ],
-    "@129": [
+    "@126": [
       [],
       [
         {
@@ -744,15 +709,7 @@
         }
       ]
     ],
-    "@13": [
-      [],
-      [
-        {
-          "rule": "generic_params"
-        }
-      ]
-    ],
-    "@130": [
+    "@127": [
       [],
       [
         {
@@ -760,7 +717,7 @@
         }
       ]
     ],
-    "@131": [
+    "@128": [
       [],
       [
         {
@@ -771,18 +728,26 @@
         }
       ]
     ],
-    "@132": [
+    "@129": [
       [],
       [
         {
           "rule": "handler_clause"
         },
         {
-          "rule": "@132"
+          "rule": "@129"
         }
       ]
     ],
-    "@133": [
+    "@13": [
+      [],
+      [
+        {
+          "rule": "where_clause"
+        }
+      ]
+    ],
+    "@130": [
       [],
       [
         {
@@ -790,7 +755,7 @@
         }
       ]
     ],
-    "@134": [
+    "@131": [
       [],
       [
         {
@@ -798,7 +763,7 @@
         }
       ]
     ],
-    "@135": [
+    "@132": [
       [],
       [
         {
@@ -806,7 +771,7 @@
         }
       ]
     ],
-    "@136": [
+    "@133": [
       [],
       [
         {
@@ -817,7 +782,7 @@
         }
       ]
     ],
-    "@137": [
+    "@134": [
       [],
       [
         {
@@ -828,7 +793,7 @@
         }
       ]
     ],
-    "@138": [
+    "@135": [
       [],
       [
         {
@@ -839,7 +804,7 @@
         }
       ]
     ],
-    "@139": [
+    "@136": [
       [],
       [
         {
@@ -849,7 +814,7 @@
           "rule": "condition_product"
         },
         {
-          "rule": "@139"
+          "rule": "@136"
         }
       ],
       [
@@ -860,19 +825,11 @@
           "rule": "condition_product"
         },
         {
-          "rule": "@139"
+          "rule": "@136"
         }
       ]
     ],
-    "@14": [
-      [],
-      [
-        {
-          "rule": "where_clause"
-        }
-      ]
-    ],
-    "@140": [
+    "@137": [
       [],
       [
         {
@@ -882,7 +839,7 @@
           "rule": "condition_unary"
         },
         {
-          "rule": "@140"
+          "rule": "@137"
         }
       ],
       [
@@ -893,7 +850,7 @@
           "rule": "condition_unary"
         },
         {
-          "rule": "@140"
+          "rule": "@137"
         }
       ],
       [
@@ -904,22 +861,22 @@
           "rule": "condition_unary"
         },
         {
-          "rule": "@140"
+          "rule": "@137"
         }
       ]
     ],
-    "@141": [
+    "@138": [
       [],
       [
         {
           "rule": "postfix"
         },
         {
-          "rule": "@141"
+          "rule": "@138"
         }
       ]
     ],
-    "@142": [
+    "@139": [
       [],
       [
         {
@@ -929,18 +886,26 @@
           "rule": "pattern_atom"
         },
         {
-          "rule": "@142"
+          "rule": "@139"
         }
       ]
     ],
-    "@143": [
+    "@14": [
+      [],
+      [
+        {
+          "rule": "fields"
+        }
+      ]
+    ],
+    "@140": [
       [],
       [
         {
           "literal": "("
         },
         {
-          "rule": "@144"
+          "rule": "@141"
         },
         {
           "literal": ")"
@@ -951,14 +916,14 @@
           "literal": "{"
         },
         {
-          "rule": "@145"
+          "rule": "@142"
         },
         {
           "literal": "}"
         }
       ]
     ],
-    "@144": [
+    "@141": [
       [],
       [
         {
@@ -966,7 +931,7 @@
         }
       ]
     ],
-    "@145": [
+    "@142": [
       [],
       [
         {
@@ -974,7 +939,7 @@
         }
       ]
     ],
-    "@146": [
+    "@143": [
       [],
       [
         {
@@ -987,17 +952,53 @@
         }
       ]
     ],
-    "@147": [
+    "@144": [
       [],
       [
         {
           "rule": "pattern"
         },
         {
-          "rule": "@148"
+          "rule": "@145"
         },
         {
-          "rule": "@149"
+          "rule": "@146"
+        }
+      ]
+    ],
+    "@145": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "pattern"
+        },
+        {
+          "rule": "@145"
+        }
+      ]
+    ],
+    "@146": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@147": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "pattern"
+        },
+        {
+          "rule": "@147"
         }
       ]
     ],
@@ -1006,54 +1007,10 @@
       [
         {
           "literal": ","
-        },
-        {
-          "rule": "pattern"
-        },
-        {
-          "rule": "@148"
         }
       ]
     ],
     "@149": [
-      [],
-      [
-        {
-          "literal": ","
-        }
-      ]
-    ],
-    "@15": [
-      [],
-      [
-        {
-          "rule": "fields"
-        }
-      ]
-    ],
-    "@150": [
-      [],
-      [
-        {
-          "literal": ","
-        },
-        {
-          "rule": "pattern"
-        },
-        {
-          "rule": "@150"
-        }
-      ]
-    ],
-    "@151": [
-      [],
-      [
-        {
-          "literal": ","
-        }
-      ]
-    ],
-    "@152": [
       [],
       [
         {
@@ -1063,11 +1020,25 @@
           "rule": "pattern_field"
         },
         {
-          "rule": "@152"
+          "rule": "@149"
         }
       ]
     ],
-    "@153": [
+    "@15": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "field_decl"
+        },
+        {
+          "rule": "@15"
+        }
+      ]
+    ],
+    "@150": [
       [],
       [
         {
@@ -1075,7 +1046,7 @@
         }
       ]
     ],
-    "@154": [
+    "@151": [
       [],
       [
         {
@@ -1086,18 +1057,18 @@
         }
       ]
     ],
-    "@155": [
+    "@152": [
       [],
       [
         {
           "rule": "interface_item"
         },
         {
-          "rule": "@155"
+          "rule": "@152"
         }
       ]
     ],
-    "@156": [
+    "@153": [
       [],
       [
         {
@@ -1105,11 +1076,44 @@
         }
       ]
     ],
-    "@157": [
+    "@154": [
       [],
       [
         {
           "rule": "semantic_clause"
+        },
+        {
+          "rule": "@154"
+        }
+      ]
+    ],
+    "@155": [
+      [],
+      [
+        {
+          "rule": "index_list"
+        }
+      ]
+    ],
+    "@156": [
+      [],
+      [
+        {
+          "rule": "semantic_clause"
+        },
+        {
+          "rule": "@156"
+        }
+      ]
+    ],
+    "@157": [
+      [],
+      [
+        {
+          "literal": "|"
+        },
+        {
+          "rule": "usage_conjunction"
         },
         {
           "rule": "@157"
@@ -1120,7 +1124,13 @@
       [],
       [
         {
-          "rule": "index_list"
+          "literal": ","
+        },
+        {
+          "rule": "constraint"
+        },
+        {
+          "rule": "@158"
         }
       ]
     ],
@@ -1128,7 +1138,10 @@
       [],
       [
         {
-          "rule": "semantic_clause"
+          "literal": ","
+        },
+        {
+          "token": "INT_LITERAL"
         },
         {
           "rule": "@159"
@@ -1140,12 +1153,6 @@
       [
         {
           "literal": ","
-        },
-        {
-          "rule": "field_decl"
-        },
-        {
-          "rule": "@16"
         }
       ]
     ],
@@ -1153,13 +1160,13 @@
       [],
       [
         {
-          "literal": "|"
+          "rule": "generated_capture"
         },
         {
-          "rule": "usage_conjunction"
+          "rule": "@161"
         },
         {
-          "rule": "@160"
+          "rule": "@162"
         }
       ]
     ],
@@ -1170,7 +1177,7 @@
           "literal": ","
         },
         {
-          "rule": "constraint"
+          "rule": "generated_capture"
         },
         {
           "rule": "@161"
@@ -1182,12 +1189,6 @@
       [
         {
           "literal": ","
-        },
-        {
-          "token": "INT_LITERAL"
-        },
-        {
-          "rule": "@162"
         }
       ]
     ],
@@ -1195,13 +1196,10 @@
       [],
       [
         {
-          "rule": "generated_capture"
+          "rule": "ffi_clause"
         },
         {
-          "rule": "@164"
-        },
-        {
-          "rule": "@165"
+          "rule": "@163"
         }
       ]
     ],
@@ -1209,65 +1207,10 @@
       [],
       [
         {
-          "literal": ","
-        },
-        {
-          "rule": "generated_capture"
-        },
-        {
-          "rule": "@164"
-        }
-      ]
-    ],
-    "@165": [
-      [],
-      [
-        {
-          "literal": ","
-        }
-      ]
-    ],
-    "@166": [
-      [],
-      [
-        {
-          "rule": "capture_projection"
-        },
-        {
-          "rule": "@166"
-        }
-      ]
-    ],
-    "@167": [
-      [],
-      [
-        {
-          "rule": "capture_projection"
-        },
-        {
-          "rule": "@167"
-        }
-      ]
-    ],
-    "@168": [
-      [],
-      [
-        {
-          "rule": "capture_projection"
-        },
-        {
-          "rule": "@168"
-        }
-      ]
-    ],
-    "@169": [
-      [],
-      [
-        {
           "rule": "ffi_clause"
         },
         {
-          "rule": "@169"
+          "rule": "@164"
         }
       ]
     ],
@@ -1275,18 +1218,7 @@
       [],
       [
         {
-          "literal": ","
-        }
-      ]
-    ],
-    "@170": [
-      [],
-      [
-        {
-          "rule": "ffi_clause"
-        },
-        {
-          "rule": "@170"
+          "literal": "pub"
         }
       ]
     ],
@@ -1294,7 +1226,7 @@
       [],
       [
         {
-          "literal": "pub"
+          "rule": "usage_modifier"
         }
       ]
     ],
@@ -1302,7 +1234,7 @@
       [],
       [
         {
-          "rule": "usage_modifier"
+          "rule": "generic_params"
         }
       ]
     ],
@@ -1318,7 +1250,7 @@
       [],
       [
         {
-          "rule": "generic_params"
+          "rule": "where_clause"
         }
       ]
     ],
@@ -1326,7 +1258,7 @@
       [],
       [
         {
-          "rule": "where_clause"
+          "rule": "variants"
         }
       ]
     ],
@@ -1334,19 +1266,11 @@
       [],
       [
         {
-          "rule": "variants"
-        }
-      ]
-    ],
-    "@23": [
-      [],
-      [
-        {
           "rule": "gadt_constructors"
         }
       ]
     ],
-    "@24": [
+    "@23": [
       [],
       [
         {
@@ -1356,11 +1280,11 @@
           "rule": "variant"
         },
         {
-          "rule": "@24"
+          "rule": "@23"
         }
       ]
     ],
-    "@25": [
+    "@24": [
       [],
       [
         {
@@ -1368,7 +1292,7 @@
         }
       ]
     ],
-    "@26": [
+    "@25": [
       [],
       [
         {
@@ -1376,14 +1300,14 @@
         }
       ]
     ],
-    "@27": [
+    "@26": [
       [],
       [
         {
           "literal": "("
         },
         {
-          "rule": "@28"
+          "rule": "@27"
         },
         {
           "literal": ")"
@@ -1394,14 +1318,14 @@
           "literal": "{"
         },
         {
-          "rule": "@29"
+          "rule": "@28"
         },
         {
           "literal": "}"
         }
       ]
     ],
-    "@28": [
+    "@27": [
       [],
       [
         {
@@ -1409,11 +1333,25 @@
         }
       ]
     ],
-    "@29": [
+    "@28": [
       [],
       [
         {
           "rule": "fields"
+        }
+      ]
+    ],
+    "@29": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "gadt_constructor"
+        },
+        {
+          "rule": "@29"
         }
       ]
     ],
@@ -1436,12 +1374,6 @@
       [
         {
           "literal": ","
-        },
-        {
-          "rule": "gadt_constructor"
-        },
-        {
-          "rule": "@30"
         }
       ]
     ],
@@ -1449,7 +1381,7 @@
       [],
       [
         {
-          "literal": ","
+          "literal": "pub"
         }
       ]
     ],
@@ -1457,7 +1389,7 @@
       [],
       [
         {
-          "literal": "pub"
+          "literal": "intrinsic"
         }
       ]
     ],
@@ -1465,7 +1397,7 @@
       [],
       [
         {
-          "literal": "intrinsic"
+          "rule": "generic_params"
         }
       ]
     ],
@@ -1473,7 +1405,7 @@
       [],
       [
         {
-          "rule": "generic_params"
+          "rule": "where_clause"
         }
       ]
     ],
@@ -1481,7 +1413,10 @@
       [],
       [
         {
-          "rule": "where_clause"
+          "rule": "trait_member"
+        },
+        {
+          "rule": "@35"
         }
       ]
     ],
@@ -1489,10 +1424,7 @@
       [],
       [
         {
-          "rule": "trait_member"
-        },
-        {
-          "rule": "@36"
+          "literal": "unsafe"
         }
       ]
     ],
@@ -1500,7 +1432,7 @@
       [],
       [
         {
-          "literal": "unsafe"
+          "rule": "generic_params"
         }
       ]
     ],
@@ -1508,7 +1440,7 @@
       [],
       [
         {
-          "rule": "generic_params"
+          "rule": "where_clause"
         }
       ]
     ],
@@ -1516,7 +1448,7 @@
       [],
       [
         {
-          "rule": "where_clause"
+          "rule": "generic_params"
         }
       ]
     ],
@@ -1532,7 +1464,7 @@
       [],
       [
         {
-          "rule": "decreases_clause"
+          "rule": "where_clause"
         }
       ]
     ],
@@ -1564,22 +1496,6 @@
       [],
       [
         {
-          "rule": "where_clause"
-        }
-      ]
-    ],
-    "@45": [
-      [],
-      [
-        {
-          "rule": "generic_params"
-        }
-      ]
-    ],
-    "@46": [
-      [],
-      [
-        {
           "literal": "for"
         },
         {
@@ -1587,7 +1503,7 @@
         }
       ]
     ],
-    "@47": [
+    "@45": [
       [],
       [
         {
@@ -1595,14 +1511,30 @@
         }
       ]
     ],
-    "@48": [
+    "@46": [
       [],
       [
         {
           "rule": "impl_member"
         },
         {
-          "rule": "@48"
+          "rule": "@46"
+        }
+      ]
+    ],
+    "@47": [
+      [],
+      [
+        {
+          "literal": "pub"
+        }
+      ]
+    ],
+    "@48": [
+      [],
+      [
+        {
+          "rule": "generic_params"
         }
       ]
     ],
@@ -1610,7 +1542,10 @@
       [],
       [
         {
-          "literal": "pub"
+          "rule": "effect_operation"
+        },
+        {
+          "rule": "@49"
         }
       ]
     ],
@@ -1637,7 +1572,10 @@
       [],
       [
         {
-          "rule": "effect_operation"
+          "rule": "@52"
+        },
+        {
+          "rule": "function_decl"
         },
         {
           "rule": "@51"
@@ -1648,7 +1586,7 @@
       [],
       [
         {
-          "rule": "generic_params"
+          "literal": "pub"
         }
       ]
     ],
@@ -1656,13 +1594,13 @@
       [],
       [
         {
+          "rule": "parameter"
+        },
+        {
           "rule": "@54"
         },
         {
-          "rule": "function_decl"
-        },
-        {
-          "rule": "@53"
+          "rule": "@55"
         }
       ]
     ],
@@ -1670,7 +1608,13 @@
       [],
       [
         {
-          "literal": "pub"
+          "literal": ","
+        },
+        {
+          "rule": "parameter"
+        },
+        {
+          "rule": "@54"
         }
       ]
     ],
@@ -1678,13 +1622,7 @@
       [],
       [
         {
-          "rule": "parameter"
-        },
-        {
-          "rule": "@56"
-        },
-        {
-          "rule": "@57"
+          "literal": ","
         }
       ]
     ],
@@ -1692,13 +1630,7 @@
       [],
       [
         {
-          "literal": ","
-        },
-        {
-          "rule": "parameter"
-        },
-        {
-          "rule": "@56"
+          "rule": "access_mode"
         }
       ]
     ],
@@ -1706,7 +1638,7 @@
       [],
       [
         {
-          "literal": ","
+          "rule": "access_mode"
         }
       ]
     ],
@@ -1714,7 +1646,7 @@
       [],
       [
         {
-          "rule": "access_mode"
+          "rule": "effect_row"
         }
       ]
     ],
@@ -1722,7 +1654,7 @@
       [],
       [
         {
-          "rule": "access_mode"
+          "rule": "capture_clause"
         }
       ]
     ],
@@ -1738,7 +1670,13 @@
       [],
       [
         {
-          "rule": "effect_row"
+          "literal": ","
+        },
+        {
+          "rule": "constraint"
+        },
+        {
+          "rule": "@60"
         }
       ]
     ],
@@ -1746,7 +1684,7 @@
       [],
       [
         {
-          "rule": "capture_clause"
+          "literal": ","
         }
       ]
     ],
@@ -1754,10 +1692,10 @@
       [],
       [
         {
-          "literal": ","
+          "literal": "+"
         },
         {
-          "rule": "constraint"
+          "rule": "type"
         },
         {
           "rule": "@62"
@@ -1768,7 +1706,13 @@
       [],
       [
         {
-          "literal": ","
+          "literal": "::"
+        },
+        {
+          "rule": "path_part"
+        },
+        {
+          "rule": "@63"
         }
       ]
     ],
@@ -1776,10 +1720,10 @@
       [],
       [
         {
-          "literal": "+"
+          "literal": ","
         },
         {
-          "rule": "type"
+          "rule": "generic_param"
         },
         {
           "rule": "@64"
@@ -1790,39 +1734,11 @@
       [],
       [
         {
-          "literal": "::"
-        },
-        {
-          "rule": "path_part"
-        },
-        {
-          "rule": "@65"
+          "literal": ","
         }
       ]
     ],
     "@66": [
-      [],
-      [
-        {
-          "literal": ","
-        },
-        {
-          "rule": "generic_param"
-        },
-        {
-          "rule": "@66"
-        }
-      ]
-    ],
-    "@67": [
-      [],
-      [
-        {
-          "literal": ","
-        }
-      ]
-    ],
-    "@68": [
       [],
       [
         {
@@ -1836,7 +1752,7 @@
         }
       ]
     ],
-    "@69": [
+    "@67": [
       [],
       [
         {
@@ -1844,6 +1760,34 @@
         },
         {
           "literal": "_"
+        },
+        {
+          "rule": "@67"
+        }
+      ]
+    ],
+    "@68": [
+      [],
+      [
+        {
+          "rule": "mode_type"
+        },
+        {
+          "rule": "@69"
+        },
+        {
+          "rule": "@70"
+        }
+      ]
+    ],
+    "@69": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "mode_type"
         },
         {
           "rule": "@69"
@@ -1862,13 +1806,7 @@
       [],
       [
         {
-          "rule": "mode_type"
-        },
-        {
-          "rule": "@71"
-        },
-        {
-          "rule": "@72"
+          "literal": ","
         }
       ]
     ],
@@ -1876,13 +1814,7 @@
       [],
       [
         {
-          "literal": ","
-        },
-        {
-          "rule": "mode_type"
-        },
-        {
-          "rule": "@71"
+          "rule": "access_mode"
         }
       ]
     ],
@@ -1890,7 +1822,13 @@
       [],
       [
         {
-          "literal": ","
+          "literal": "+"
+        },
+        {
+          "rule": "applied_path"
+        },
+        {
+          "rule": "@72"
         }
       ]
     ],
@@ -1898,7 +1836,13 @@
       [],
       [
         {
-          "rule": "access_mode"
+          "rule": "type"
+        },
+        {
+          "rule": "@74"
+        },
+        {
+          "rule": "@75"
         }
       ]
     ],
@@ -1906,10 +1850,10 @@
       [],
       [
         {
-          "literal": "+"
+          "literal": ","
         },
         {
-          "rule": "applied_path"
+          "rule": "type"
         },
         {
           "rule": "@74"
@@ -1920,13 +1864,7 @@
       [],
       [
         {
-          "rule": "type"
-        },
-        {
-          "rule": "@76"
-        },
-        {
-          "rule": "@77"
+          "literal": ","
         }
       ]
     ],
@@ -1934,13 +1872,7 @@
       [],
       [
         {
-          "literal": ","
-        },
-        {
-          "rule": "type"
-        },
-        {
-          "rule": "@76"
+          "rule": "type_args"
         }
       ]
     ],
@@ -1948,7 +1880,16 @@
       [],
       [
         {
-          "literal": ","
+          "literal": "::"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@78"
+        },
+        {
+          "rule": "@77"
         }
       ]
     ],
@@ -1964,16 +1905,7 @@
       [],
       [
         {
-          "literal": "::"
-        },
-        {
-          "token": "IDENT"
-        },
-        {
-          "rule": "@80"
-        },
-        {
-          "rule": "@79"
+          "rule": "type_args"
         }
       ]
     ],
@@ -1989,7 +1921,13 @@
       [],
       [
         {
-          "rule": "type_args"
+          "literal": ","
+        },
+        {
+          "rule": "type_arg"
+        },
+        {
+          "rule": "@80"
         }
       ]
     ],
@@ -1997,7 +1935,7 @@
       [],
       [
         {
-          "rule": "type_args"
+          "literal": ","
         }
       ]
     ],
@@ -2008,7 +1946,7 @@
           "literal": ","
         },
         {
-          "rule": "type_arg"
+          "rule": "type"
         },
         {
           "rule": "@82"
@@ -2027,13 +1965,21 @@
       [],
       [
         {
-          "literal": ","
+          "rule": "effect_entries"
         },
         {
-          "rule": "type"
+          "rule": "@85"
+        }
+      ],
+      [
+        {
+          "rule": "@86"
         },
         {
-          "rule": "@84"
+          "literal": "|"
+        },
+        {
+          "token": "IDENT"
         }
       ]
     ],
@@ -2049,13 +1995,7 @@
       [],
       [
         {
-          "rule": "effect_entry"
-        },
-        {
-          "rule": "@87"
-        },
-        {
-          "rule": "@88"
+          "rule": "effect_entries"
         }
       ]
     ],
@@ -2077,7 +2017,13 @@
       [],
       [
         {
-          "literal": ","
+          "rule": "capture_entry"
+        },
+        {
+          "rule": "@89"
+        },
+        {
+          "rule": "@90"
         }
       ]
     ],
@@ -2085,13 +2031,13 @@
       [],
       [
         {
+          "literal": ","
+        },
+        {
           "rule": "capture_entry"
         },
         {
-          "rule": "@90"
-        },
-        {
-          "rule": "@91"
+          "rule": "@89"
         }
       ]
     ],
@@ -2108,12 +2054,6 @@
       [
         {
           "literal": ","
-        },
-        {
-          "rule": "capture_entry"
-        },
-        {
-          "rule": "@90"
         }
       ]
     ],
@@ -2121,7 +2061,13 @@
       [],
       [
         {
-          "literal": ","
+          "literal": "+"
+        },
+        {
+          "rule": "nat_product"
+        },
+        {
+          "rule": "@91"
         }
       ]
     ],
@@ -2129,10 +2075,10 @@
       [],
       [
         {
-          "literal": "+"
+          "literal": "*"
         },
         {
-          "rule": "nat_product"
+          "rule": "nat_atom"
         },
         {
           "rule": "@92"
@@ -2143,20 +2089,6 @@
       [],
       [
         {
-          "literal": "*"
-        },
-        {
-          "rule": "nat_atom"
-        },
-        {
-          "rule": "@93"
-        }
-      ]
-    ],
-    "@94": [
-      [],
-      [
-        {
           "literal": "??"
         },
         {
@@ -2164,7 +2096,7 @@
         }
       ]
     ],
-    "@95": [
+    "@94": [
       [],
       [
         {
@@ -2175,7 +2107,7 @@
         }
       ]
     ],
-    "@96": [
+    "@95": [
       [],
       [
         {
@@ -2186,7 +2118,7 @@
         }
       ]
     ],
-    "@97": [
+    "@96": [
       [],
       [
         {
@@ -2196,7 +2128,7 @@
           "rule": "product_expr"
         },
         {
-          "rule": "@97"
+          "rule": "@96"
         }
       ],
       [
@@ -2207,11 +2139,11 @@
           "rule": "product_expr"
         },
         {
-          "rule": "@97"
+          "rule": "@96"
         }
       ]
     ],
-    "@98": [
+    "@97": [
       [],
       [
         {
@@ -2221,7 +2153,7 @@
           "rule": "unary_expr"
         },
         {
-          "rule": "@98"
+          "rule": "@97"
         }
       ],
       [
@@ -2232,7 +2164,7 @@
           "rule": "unary_expr"
         },
         {
-          "rule": "@98"
+          "rule": "@97"
         }
       ],
       [
@@ -2243,6 +2175,17 @@
           "rule": "unary_expr"
         },
         {
+          "rule": "@97"
+        }
+      ]
+    ],
+    "@98": [
+      [],
+      [
+        {
+          "rule": "postfix"
+        },
+        {
           "rule": "@98"
         }
       ]
@@ -2251,10 +2194,13 @@
       [],
       [
         {
-          "rule": "postfix"
+          "rule": "argument"
         },
         {
-          "rule": "@99"
+          "rule": "@100"
+        },
+        {
+          "rule": "@101"
         }
       ]
     ],
@@ -2273,7 +2219,7 @@
           "token": "IDENT"
         },
         {
-          "rule": "@128"
+          "rule": "@125"
         },
         {
           "rule": "arguments"
@@ -2314,7 +2260,7 @@
           "token": "IDENT"
         },
         {
-          "rule": "@52"
+          "rule": "@50"
         },
         {
           "literal": "="
@@ -2336,7 +2282,7 @@
           "rule": "applied_path"
         },
         {
-          "rule": "@74"
+          "rule": "@72"
         }
       ]
     ],
@@ -2346,10 +2292,10 @@
           "rule": "path"
         },
         {
-          "rule": "@78"
+          "rule": "@76"
         },
         {
-          "rule": "@79"
+          "rule": "@77"
         }
       ]
     ],
@@ -2374,7 +2320,7 @@
           "literal": "("
         },
         {
-          "rule": "@100"
+          "rule": "@99"
         },
         {
           "literal": ")"
@@ -2390,10 +2336,10 @@
           "token": "IDENT"
         },
         {
-          "rule": "@41"
+          "rule": "@39"
         },
         {
-          "rule": "@42"
+          "rule": "@40"
         },
         {
           "literal": ";"
@@ -2409,10 +2355,10 @@
           "token": "IDENT"
         },
         {
-          "rule": "@43"
+          "rule": "@41"
         },
         {
-          "rule": "@44"
+          "rule": "@42"
         },
         {
           "literal": "="
@@ -2443,10 +2389,10 @@
           "literal": "{"
         },
         {
-          "rule": "@119"
+          "rule": "@118"
         },
         {
-          "rule": "@120"
+          "rule": "@119"
         },
         {
           "literal": "}"
@@ -2459,7 +2405,7 @@
           "literal": "{"
         },
         {
-          "rule": "@163"
+          "rule": "@160"
         },
         {
           "literal": "}"
@@ -2496,57 +2442,13 @@
         }
       ]
     ],
-    "capture_projection": [
-      [
-        {
-          "literal": "."
-        },
-        {
-          "literal": "component"
-        },
-        {
-          "literal": "("
-        },
-        {
-          "token": "INT_LITERAL"
-        },
-        {
-          "literal": ")"
-        }
-      ],
-      [
-        {
-          "literal": "."
-        },
-        {
-          "literal": "member"
-        },
-        {
-          "literal": "("
-        },
-        {
-          "rule": "path"
-        },
-        {
-          "literal": ")"
-        }
-      ],
-      [
-        {
-          "literal": "."
-        },
-        {
-          "literal": "payload"
-        }
-      ]
-    ],
     "capture_set": [
       [
         {
           "literal": "{"
         },
         {
-          "rule": "@89"
+          "rule": "@88"
         },
         {
           "literal": "}"
@@ -2559,7 +2461,7 @@
           "rule": "equality_expr"
         },
         {
-          "rule": "@94"
+          "rule": "@93"
         }
       ]
     ],
@@ -2569,7 +2471,7 @@
           "rule": "condition_relation"
         },
         {
-          "rule": "@137"
+          "rule": "@134"
         }
       ]
     ],
@@ -2579,7 +2481,7 @@
           "rule": "condition_equality"
         },
         {
-          "rule": "@136"
+          "rule": "@133"
         }
       ]
     ],
@@ -2676,7 +2578,7 @@
           "rule": "condition_unary"
         },
         {
-          "rule": "@140"
+          "rule": "@137"
         }
       ]
     ],
@@ -2686,7 +2588,7 @@
           "rule": "condition_sum"
         },
         {
-          "rule": "@138"
+          "rule": "@135"
         }
       ]
     ],
@@ -2696,7 +2598,7 @@
           "rule": "condition_product"
         },
         {
-          "rule": "@139"
+          "rule": "@136"
         }
       ]
     ],
@@ -2738,7 +2640,7 @@
           "rule": "condition_primary"
         },
         {
-          "rule": "@141"
+          "rule": "@138"
         }
       ]
     ],
@@ -2772,7 +2674,7 @@
           "rule": "type"
         },
         {
-          "rule": "@64"
+          "rule": "@62"
         }
       ]
     ],
@@ -2859,16 +2761,6 @@
         }
       ]
     ],
-    "decreases_clause": [
-      [
-        {
-          "literal": "decreases"
-        },
-        {
-          "rule": "condition_expr"
-        }
-      ]
-    ],
     "effect_decl": [
       [
         {
@@ -2878,16 +2770,26 @@
           "token": "IDENT"
         },
         {
-          "rule": "@50"
+          "rule": "@48"
         },
         {
           "literal": "{"
         },
         {
-          "rule": "@51"
+          "rule": "@49"
         },
         {
           "literal": "}"
+        }
+      ]
+    ],
+    "effect_entries": [
+      [
+        {
+          "rule": "effect_entry"
+        },
+        {
+          "rule": "@87"
         }
       ]
     ],
@@ -2976,7 +2878,7 @@
           "literal": "{"
         },
         {
-          "rule": "@86"
+          "rule": "@84"
         },
         {
           "literal": "}"
@@ -2986,7 +2888,7 @@
     "enum_decl": [
       [
         {
-          "rule": "@19"
+          "rule": "@18"
         },
         {
           "literal": "enum"
@@ -2995,16 +2897,16 @@
           "token": "IDENT"
         },
         {
-          "rule": "@20"
+          "rule": "@19"
         },
         {
-          "rule": "@21"
+          "rule": "@20"
         },
         {
           "literal": "{"
         },
         {
-          "rule": "@22"
+          "rule": "@21"
         },
         {
           "literal": "}"
@@ -3012,7 +2914,7 @@
       ],
       [
         {
-          "rule": "@19"
+          "rule": "@18"
         },
         {
           "literal": "enum"
@@ -3021,7 +2923,7 @@
           "token": "IDENT"
         },
         {
-          "rule": "@20"
+          "rule": "@19"
         },
         {
           "literal": "where"
@@ -3030,7 +2932,7 @@
           "literal": "{"
         },
         {
-          "rule": "@23"
+          "rule": "@22"
         },
         {
           "literal": "}"
@@ -3043,7 +2945,7 @@
           "rule": "relational_expr"
         },
         {
-          "rule": "@95"
+          "rule": "@94"
         }
       ]
     ],
@@ -3065,7 +2967,7 @@
           "literal": "return"
         },
         {
-          "rule": "@130"
+          "rule": "@127"
         }
       ],
       [
@@ -3098,7 +3000,7 @@
           "literal": "{"
         },
         {
-          "rule": "@53"
+          "rule": "@51"
         },
         {
           "literal": "}"
@@ -3128,7 +3030,7 @@
           "literal": "{"
         },
         {
-          "rule": "@170"
+          "rule": "@164"
         },
         {
           "literal": "}"
@@ -3144,7 +3046,7 @@
           "literal": "{"
         },
         {
-          "rule": "@169"
+          "rule": "@163"
         },
         {
           "literal": "}"
@@ -3373,7 +3275,7 @@
     "field_decl": [
       [
         {
-          "rule": "@18"
+          "rule": "@17"
         },
         {
           "token": "IDENT"
@@ -3392,10 +3294,10 @@
           "rule": "field_decl"
         },
         {
-          "rule": "@16"
+          "rule": "@15"
         },
         {
-          "rule": "@17"
+          "rule": "@16"
         }
       ]
     ],
@@ -3412,9 +3314,6 @@
         },
         {
           "rule": "condition_expr"
-        },
-        {
-          "rule": "@125"
         },
         {
           "rule": "block"
@@ -3461,9 +3360,6 @@
           "rule": "@9"
         },
         {
-          "rule": "@10"
-        },
-        {
           "rule": "block"
         }
       ],
@@ -3490,9 +3386,6 @@
           "rule": "@9"
         },
         {
-          "rule": "@10"
-        },
-        {
           "literal": ";"
         }
       ]
@@ -3506,7 +3399,7 @@
           "literal": "("
         },
         {
-          "rule": "@70"
+          "rule": "@68"
         },
         {
           "literal": ")"
@@ -3519,7 +3412,7 @@
     "gadt_constructor": [
       [
         {
-          "rule": "@32"
+          "rule": "@31"
         },
         {
           "token": "IDENT"
@@ -3538,10 +3431,10 @@
           "rule": "gadt_constructor"
         },
         {
-          "rule": "@30"
+          "rule": "@29"
         },
         {
-          "rule": "@31"
+          "rule": "@30"
         }
       ]
     ],
@@ -3555,9 +3448,6 @@
         },
         {
           "rule": "binding_name"
-        },
-        {
-          "rule": "@166"
         },
         {
           "literal": ")"
@@ -3583,9 +3473,6 @@
           "literal": ")"
         },
         {
-          "rule": "@167"
-        },
-        {
           "literal": ")"
         }
       ],
@@ -3598,9 +3485,6 @@
         },
         {
           "literal": ".."
-        },
-        {
-          "rule": "@168"
         },
         {
           "literal": ")"
@@ -3618,7 +3502,7 @@
           "token": "IDENT"
         },
         {
-          "rule": "@68"
+          "rule": "@66"
         }
       ],
       [
@@ -3663,10 +3547,10 @@
           "rule": "generic_param"
         },
         {
-          "rule": "@66"
+          "rule": "@64"
         },
         {
-          "rule": "@67"
+          "rule": "@65"
         },
         {
           "literal": ">"
@@ -3685,7 +3569,7 @@
           "literal": "with"
         },
         {
-          "rule": "@131"
+          "rule": "@128"
         },
         {
           "literal": "handler"
@@ -3697,7 +3581,7 @@
           "literal": "{"
         },
         {
-          "rule": "@132"
+          "rule": "@129"
         },
         {
           "literal": "}"
@@ -3713,7 +3597,7 @@
           "literal": "("
         },
         {
-          "rule": "@133"
+          "rule": "@130"
         },
         {
           "literal": ")"
@@ -3725,7 +3609,7 @@
           "rule": "expr"
         },
         {
-          "rule": "@134"
+          "rule": "@131"
         }
       ],
       [
@@ -3742,7 +3626,7 @@
           "rule": "expr"
         },
         {
-          "rule": "@135"
+          "rule": "@132"
         }
       ],
       [
@@ -3780,7 +3664,7 @@
           "rule": "block"
         },
         {
-          "rule": "@121"
+          "rule": "@120"
         }
       ]
     ],
@@ -3790,22 +3674,22 @@
           "literal": "impl"
         },
         {
-          "rule": "@45"
+          "rule": "@43"
         },
         {
           "rule": "type"
         },
         {
-          "rule": "@46"
+          "rule": "@44"
         },
         {
-          "rule": "@47"
+          "rule": "@45"
         },
         {
           "literal": "{"
         },
         {
-          "rule": "@48"
+          "rule": "@46"
         },
         {
           "literal": "}"
@@ -3815,7 +3699,7 @@
     "impl_member": [
       [
         {
-          "rule": "@49"
+          "rule": "@47"
         },
         {
           "rule": "method_decl"
@@ -3884,7 +3768,7 @@
           "token": "INT_LITERAL"
         },
         {
-          "rule": "@162"
+          "rule": "@159"
         }
       ]
     ],
@@ -3900,7 +3784,7 @@
           "literal": ";"
         },
         {
-          "rule": "@155"
+          "rule": "@152"
         }
       ]
     ],
@@ -3915,7 +3799,7 @@
           "rule": "declaration"
         },
         {
-          "rule": "@156"
+          "rule": "@153"
         }
       ]
     ],
@@ -3928,7 +3812,7 @@
           "literal": "("
         },
         {
-          "rule": "@113"
+          "rule": "@112"
         },
         {
           "literal": ")"
@@ -3948,13 +3832,13 @@
           "literal": "("
         },
         {
-          "rule": "@113"
+          "rule": "@112"
         },
         {
           "literal": ")"
         },
         {
-          "rule": "@116"
+          "rule": "@115"
         },
         {
           "rule": "block"
@@ -3964,13 +3848,13 @@
     "lambda_param": [
       [
         {
-          "rule": "@117"
+          "rule": "@116"
         },
         {
           "rule": "binding_name"
         },
         {
-          "rule": "@118"
+          "rule": "@117"
         }
       ]
     ],
@@ -3983,7 +3867,7 @@
           "rule": "pattern"
         },
         {
-          "rule": "@11"
+          "rule": "@10"
         },
         {
           "literal": "="
@@ -4002,7 +3886,7 @@
           "literal": "["
         },
         {
-          "rule": "@110"
+          "rule": "@109"
         },
         {
           "literal": "]"
@@ -4050,7 +3934,7 @@
           "rule": "pattern"
         },
         {
-          "rule": "@123"
+          "rule": "@122"
         },
         {
           "literal": "=>"
@@ -4075,7 +3959,7 @@
           "literal": "{"
         },
         {
-          "rule": "@122"
+          "rule": "@121"
         },
         {
           "literal": "}"
@@ -4085,7 +3969,7 @@
     "method_decl": [
       [
         {
-          "rule": "@37"
+          "rule": "@36"
         },
         {
           "literal": "fn"
@@ -4094,7 +3978,7 @@
           "token": "IDENT"
         },
         {
-          "rule": "@38"
+          "rule": "@37"
         },
         {
           "rule": "parameters"
@@ -4103,10 +3987,7 @@
           "rule": "result_contract"
         },
         {
-          "rule": "@39"
-        },
-        {
-          "rule": "@40"
+          "rule": "@38"
         },
         {
           "rule": "block"
@@ -4114,7 +3995,7 @@
       ],
       [
         {
-          "rule": "@37"
+          "rule": "@36"
         },
         {
           "literal": "fn"
@@ -4123,7 +4004,7 @@
           "token": "IDENT"
         },
         {
-          "rule": "@38"
+          "rule": "@37"
         },
         {
           "rule": "parameters"
@@ -4132,10 +4013,7 @@
           "rule": "result_contract"
         },
         {
-          "rule": "@39"
-        },
-        {
-          "rule": "@40"
+          "rule": "@38"
         },
         {
           "literal": ";"
@@ -4145,7 +4023,7 @@
     "mode_type": [
       [
         {
-          "rule": "@73"
+          "rule": "@71"
         },
         {
           "rule": "type"
@@ -4193,7 +4071,7 @@
           "rule": "nat_product"
         },
         {
-          "rule": "@92"
+          "rule": "@91"
         }
       ]
     ],
@@ -4203,7 +4081,7 @@
           "rule": "nat_atom"
         },
         {
-          "rule": "@93"
+          "rule": "@92"
         }
       ]
     ],
@@ -4216,7 +4094,7 @@
           "rule": "path"
         },
         {
-          "rule": "@129"
+          "rule": "@126"
         },
         {
           "rule": "arguments"
@@ -4226,7 +4104,7 @@
     "parameter": [
       [
         {
-          "rule": "@58"
+          "rule": "@56"
         },
         {
           "rule": "binding_name"
@@ -4240,7 +4118,7 @@
       ],
       [
         {
-          "rule": "@59"
+          "rule": "@57"
         },
         {
           "literal": "self"
@@ -4253,7 +4131,7 @@
           "literal": "("
         },
         {
-          "rule": "@55"
+          "rule": "@53"
         },
         {
           "literal": ")"
@@ -4266,7 +4144,7 @@
           "rule": "path_part"
         },
         {
-          "rule": "@65"
+          "rule": "@63"
         }
       ]
     ],
@@ -4288,7 +4166,7 @@
           "rule": "pattern_atom"
         },
         {
-          "rule": "@142"
+          "rule": "@139"
         }
       ]
     ],
@@ -4308,7 +4186,7 @@
           "rule": "path"
         },
         {
-          "rule": "@143"
+          "rule": "@140"
         }
       ],
       [
@@ -4323,7 +4201,7 @@
           "token": "IDENT"
         },
         {
-          "rule": "@154"
+          "rule": "@151"
         }
       ]
     ],
@@ -4333,10 +4211,10 @@
           "rule": "pattern_field"
         },
         {
-          "rule": "@152"
+          "rule": "@149"
         },
         {
-          "rule": "@153"
+          "rule": "@150"
         }
       ]
     ],
@@ -4346,10 +4224,10 @@
           "rule": "pattern"
         },
         {
-          "rule": "@150"
+          "rule": "@147"
         },
         {
-          "rule": "@151"
+          "rule": "@148"
         }
       ]
     ],
@@ -4359,7 +4237,7 @@
           "literal": "_"
         },
         {
-          "rule": "@69"
+          "rule": "@67"
         }
       ]
     ],
@@ -4413,7 +4291,7 @@
           "rule": "primary"
         },
         {
-          "rule": "@99"
+          "rule": "@98"
         }
       ]
     ],
@@ -4515,7 +4393,7 @@
           "rule": "unary_expr"
         },
         {
-          "rule": "@98"
+          "rule": "@97"
         }
       ]
     ],
@@ -4543,7 +4421,7 @@
           "token": "IDENT"
         },
         {
-          "rule": "@81"
+          "rule": "@79"
         }
       ]
     ],
@@ -4587,7 +4465,7 @@
           "rule": "sum_expr"
         },
         {
-          "rule": "@96"
+          "rule": "@95"
         }
       ]
     ],
@@ -4619,13 +4497,13 @@
           "literal": "->"
         },
         {
-          "rule": "@60"
+          "rule": "@58"
         },
         {
           "rule": "type"
         },
         {
-          "rule": "@61"
+          "rule": "@59"
         }
       ]
     ],
@@ -4685,7 +4563,7 @@
           "literal": "{"
         },
         {
-          "rule": "@157"
+          "rule": "@154"
         },
         {
           "literal": "}"
@@ -4696,34 +4574,6 @@
       [
         {
           "literal": "result-captures"
-        },
-        {
-          "literal": "<="
-        },
-        {
-          "rule": "capture_bound"
-        },
-        {
-          "literal": ";"
-        }
-      ],
-      [
-        {
-          "literal": "payload-captures"
-        },
-        {
-          "literal": "="
-        },
-        {
-          "literal": "tracked"
-        },
-        {
-          "literal": ";"
-        }
-      ],
-      [
-        {
-          "literal": "payload-captures"
         },
         {
           "literal": "<="
@@ -4760,7 +4610,7 @@
           "literal": "{"
         },
         {
-          "rule": "@158"
+          "rule": "@155"
         },
         {
           "literal": "}"
@@ -4864,7 +4714,7 @@
           "literal": "{"
         },
         {
-          "rule": "@159"
+          "rule": "@156"
         },
         {
           "literal": "}"
@@ -4923,7 +4773,7 @@
     "signed_literal": [
       [
         {
-          "rule": "@146"
+          "rule": "@143"
         },
         {
           "token": "INT_LITERAL"
@@ -4931,7 +4781,7 @@
       ],
       [
         {
-          "rule": "@146"
+          "rule": "@143"
         },
         {
           "token": "FLOAT_LITERAL"
@@ -5003,7 +4853,7 @@
     "struct_decl": [
       [
         {
-          "rule": "@12"
+          "rule": "@11"
         },
         {
           "literal": "struct"
@@ -5012,16 +4862,16 @@
           "token": "IDENT"
         },
         {
-          "rule": "@13"
+          "rule": "@12"
         },
         {
-          "rule": "@14"
+          "rule": "@13"
         },
         {
           "literal": "{"
         },
         {
-          "rule": "@15"
+          "rule": "@14"
         },
         {
           "literal": "}"
@@ -5029,7 +4879,7 @@
       ],
       [
         {
-          "rule": "@12"
+          "rule": "@11"
         },
         {
           "literal": "struct"
@@ -5038,10 +4888,10 @@
           "token": "IDENT"
         },
         {
-          "rule": "@13"
+          "rule": "@12"
         },
         {
-          "rule": "@14"
+          "rule": "@13"
         },
         {
           "literal": ";"
@@ -5057,7 +4907,7 @@
           "literal": "{"
         },
         {
-          "rule": "@103"
+          "rule": "@102"
         },
         {
           "literal": "}"
@@ -5070,14 +4920,14 @@
           "rule": "product_expr"
         },
         {
-          "rule": "@97"
+          "rule": "@96"
         }
       ]
     ],
     "trait_decl": [
       [
         {
-          "rule": "@33"
+          "rule": "@32"
         },
         {
           "literal": "trait"
@@ -5086,16 +4936,16 @@
           "token": "IDENT"
         },
         {
-          "rule": "@34"
+          "rule": "@33"
         },
         {
-          "rule": "@35"
+          "rule": "@34"
         },
         {
           "literal": "{"
         },
         {
-          "rule": "@36"
+          "rule": "@35"
         },
         {
           "literal": "}"
@@ -5134,7 +4984,7 @@
           "literal": ","
         },
         {
-          "rule": "@107"
+          "rule": "@106"
         },
         {
           "literal": ")"
@@ -5172,7 +5022,7 @@
           "literal": ","
         },
         {
-          "rule": "@147"
+          "rule": "@144"
         },
         {
           "literal": ")"
@@ -5210,7 +5060,7 @@
           "literal": ","
         },
         {
-          "rule": "@75"
+          "rule": "@73"
         },
         {
           "literal": ")"
@@ -5330,10 +5180,10 @@
           "rule": "type_arg"
         },
         {
-          "rule": "@82"
+          "rule": "@80"
         },
         {
-          "rule": "@83"
+          "rule": "@81"
         },
         {
           "literal": ">"
@@ -5346,10 +5196,10 @@
           "rule": "type"
         },
         {
-          "rule": "@84"
+          "rule": "@82"
         },
         {
-          "rule": "@85"
+          "rule": "@83"
         }
       ]
     ],
@@ -5408,7 +5258,7 @@
           "rule": "usage_conjunction"
         },
         {
-          "rule": "@160"
+          "rule": "@157"
         }
       ]
     ],
@@ -5421,7 +5271,7 @@
           "rule": "constraint"
         },
         {
-          "rule": "@161"
+          "rule": "@158"
         },
         {
           "literal": ")"
@@ -5452,10 +5302,10 @@
           "rule": "acquisition"
         },
         {
-          "rule": "@126"
+          "rule": "@123"
         },
         {
-          "rule": "@127"
+          "rule": "@124"
         },
         {
           "literal": ")"
@@ -5471,7 +5321,7 @@
           "token": "IDENT"
         },
         {
-          "rule": "@106"
+          "rule": "@105"
         }
       ]
     ],
@@ -5481,23 +5331,23 @@
           "rule": "value_field"
         },
         {
-          "rule": "@104"
+          "rule": "@103"
         },
         {
-          "rule": "@105"
+          "rule": "@104"
         }
       ]
     ],
     "variant": [
       [
         {
-          "rule": "@26"
+          "rule": "@25"
         },
         {
           "token": "IDENT"
         },
         {
-          "rule": "@27"
+          "rule": "@26"
         }
       ]
     ],
@@ -5507,10 +5357,10 @@
           "rule": "variant"
         },
         {
-          "rule": "@24"
+          "rule": "@23"
         },
         {
-          "rule": "@25"
+          "rule": "@24"
         }
       ]
     ],
@@ -5523,10 +5373,10 @@
           "rule": "constraint"
         },
         {
-          "rule": "@62"
+          "rule": "@60"
         },
         {
-          "rule": "@63"
+          "rule": "@61"
         }
       ]
     ],
@@ -5537,9 +5387,6 @@
         },
         {
           "rule": "condition_expr"
-        },
-        {
-          "rule": "@124"
         },
         {
           "rule": "block"

@@ -1,4 +1,4 @@
-# Normative Eldude 0.0.3 EBNF. Generated presentations: Appendix F and the Formal Grammar.
+# Normative Eldude 0.0.4 EBNF. Generated presentations: Appendix F and the Formal Grammar.
 # EBNF: ::= definition; | choice; () grouping; ? optional; * repetition; + one or more.
 # JSON strings quote terminals and lexical regular expressions; # begins a whole-line comment.
 %skip SPACE = "[ \\t\\r\\n]+";
@@ -9,7 +9,7 @@
 %token STRING_LITERAL = "\"(?:[^\"\\\\\\x00-\\x1f]|\\\\(?:[\"\\'\\\\nrt0]|u\\{[0-9a-fA-F]{1,6}\\}))*\"";
 %token CHAR_LITERAL = "'(?:[^'\\\\\\x00-\\x1f]|\\\\(?:[\"\\'\\\\nrt0]|u\\{[0-9a-fA-F]{1,6}\\}))'";
 %token IDENT = "[A-Za-z_][A-Za-z_0-9]*";
-%keywords "affine any as assert await break captures case const continue decreases effect else enum extern false fn for forall forward handle handler if impl import in intrinsic let linear match module mut once pub region resume return self spawn struct suspend taskgroup trait true try type unsafe using view where while diverge";
+%keywords "affine any as assert await break captures case const continue effect else enum extern false fn for forall forward handle handler if impl import in intrinsic let linear match module mut once pub region resume return self spawn struct suspend taskgroup trait true try type unsafe using view where while diverge";
 
 # Files and declarations
 source_file ::= "module" path ";" module_item*;
@@ -18,7 +18,7 @@ import_decl ::= "pub"? "import" path "::" "{" import_names "}" ";";
 import_names ::= import_name ("," import_name)* ","?;
 import_name ::= IDENT ("as" IDENT)?;
 declaration ::= "pub"? (function_decl | let_decl | struct_decl | enum_decl | trait_decl | effect_decl | alias_decl) | impl_decl | extern_block;
-function_decl ::= "unsafe"? "fn" IDENT generic_params? parameters result_contract where_clause? decreases_clause? (block | ";");
+function_decl ::= "unsafe"? "fn" IDENT generic_params? parameters result_contract where_clause? (block | ";");
 let_decl ::= "let" pattern (":" type)? "=" expr ";";
 struct_decl ::= usage_modifier? "struct" IDENT generic_params? where_clause? ("{" fields? "}" | ";");
 usage_modifier ::= "linear" | "affine";
@@ -31,7 +31,7 @@ gadt_constructors ::= gadt_constructor ("," gadt_constructor)* ","?;
 gadt_constructor ::= "pub"? IDENT ":" type;
 trait_decl ::= "intrinsic"? "trait" IDENT generic_params? where_clause? "{" trait_member* "}";
 trait_member ::= method_decl | associated_decl;
-method_decl ::= "unsafe"? "fn" IDENT generic_params? parameters result_contract where_clause? decreases_clause? (block | ";");
+method_decl ::= "unsafe"? "fn" IDENT generic_params? parameters result_contract where_clause? (block | ";");
 associated_decl ::= "type" IDENT generic_params? where_clause? ";";
 associated_equation ::= "type" IDENT generic_params? where_clause? "=" type ";";
 impl_decl ::= "impl" generic_params? type ("for" type)? where_clause? "{" impl_member* "}";
@@ -49,7 +49,6 @@ where_clause ::= "where" constraint ("," constraint)* ","?;
 constraint ::= constraint_subject ":" constraint_bounds | type "=" type;
 constraint_subject ::= type | ".." IDENT;
 constraint_bounds ::= type ("+" type)*;
-decreases_clause ::= "decreases" condition_expr;
 
 # Types, binders, and category slots
 path ::= path_part ("::" path_part)*;
@@ -70,7 +69,8 @@ type_args ::= "<" type_arg ("," type_arg)* ","? ">";
 type_arg ::= type | region_ref | effect_row | capture_set | ".." IDENT | nat_expr | IDENT "=" type;
 type_list ::= type ("," type)* ","?;
 region_ref ::= "@" IDENT;
-effect_row ::= "{" (effect_entry ("," effect_entry)* ","?)? "}";
+effect_row ::= "{" (effect_entries ","? | effect_entries? "|" IDENT)? "}";
+effect_entries ::= effect_entry ("," effect_entry)*;
 effect_entry ::= applied_path | "suspend" | "diverge";
 capture_clause ::= "captures" capture_set;
 capture_set ::= "{" (capture_entry ("," capture_entry)* ","?)? "}";
@@ -109,8 +109,8 @@ statement ::= let_decl | "assert" expr ";" | expr ";";
 if_expr ::= "if" condition_expr block ("else" (block | if_expr))?;
 match_expr ::= "match" condition_expr "{" match_arm* "}";
 match_arm ::= "case" pattern ("if" condition_expr)? "=>" expr ";";
-while_expr ::= "while" condition_expr decreases_clause? block;
-for_expr ::= "for" pattern "in" condition_expr decreases_clause? block;
+while_expr ::= "while" condition_expr block;
+for_expr ::= "for" pattern "in" condition_expr block;
 scoped_expr ::= "region" IDENT block | ("try" | "taskgroup" | "unsafe") block;
 using_expr ::= "using" "(" acquisition ("," acquisition)* ","? ")" block;
 acquisition ::= binding_name "=" expr;
@@ -143,13 +143,12 @@ pattern_field ::= IDENT (":" pattern)?;
 interface_file ::= "module" path ";" interface_item*;
 interface_item ::= import_decl | declaration semantic_block?;
 semantic_block ::= "semantic" "{" semantic_clause* "}";
-semantic_clause ::= "result-captures" "<=" capture_bound ";" | "payload-captures" "=" "tracked" ";" | "payload-captures" "<=" capture_bound ";" | "mutable-owner-region" "=" region_ref ";" | "finite-positive-parameters" "=" "{" index_list? "}" ";" | "finite-iteration" "=" "true" ";" | "representation" "=" ("opaque" | "complete") ";" | "usage" "{" "Dup" "=" usage_condition ";" "Discard" "=" usage_condition ";" "}" | ffi_contract | ffi_protocol | semantic_selector "{" semantic_clause* "}";
+semantic_clause ::= "result-captures" "<=" capture_bound ";" | "mutable-owner-region" "=" region_ref ";" | "finite-positive-parameters" "=" "{" index_list? "}" ";" | "finite-iteration" "=" "true" ";" | "representation" "=" ("opaque" | "complete") ";" | "usage" "{" "Dup" "=" usage_condition ";" "Discard" "=" usage_condition ";" "}" | ffi_contract | ffi_protocol | semantic_selector "{" semantic_clause* "}";
 usage_condition ::= "true" | "false" | usage_conjunction ("|" usage_conjunction)*;
 usage_conjunction ::= "(" constraint ("," constraint)* ")";
 index_list ::= INT_LITERAL ("," INT_LITERAL)*;
 capture_bound ::= "{" (generated_capture ("," generated_capture)* ","?)? "}";
-generated_capture ::= "captures" "(" (binding_name | "parameter" "(" INT_LITERAL ")" | "..") capture_projection* ")" | capture_entry;
-capture_projection ::= "." ("component" "(" INT_LITERAL ")" | "member" "(" path ")" | "payload");
+generated_capture ::= "captures" "(" (binding_name | "parameter" "(" INT_LITERAL ")" | "..") ")" | capture_entry;
 semantic_selector ::= "parameter" "(" INT_LITERAL ")" | "result" | "member" "(" path ")" | "component" "(" INT_LITERAL ")";
 
 # Generated audited native contracts; scope/value consistency is checked semantically.

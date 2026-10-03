@@ -31,7 +31,7 @@ class ArtifactTests(unittest.TestCase):
         exported.keywords = set(data['lexical']['reserved_words'])
         exported.bnf = {name: [tuple(symbol['rule'] if 'rule' in symbol else tuple(next(iter(symbol.items()))) for symbol in rhs) for rhs in options] for name, options in data['productions'].items()}
         source = 'module m; pub fn f(x:Int)->Int { x+1 }'
-        interface = 'module m; pub struct Box<T>; semantic { representation=opaque; usage { Dup=(T:Dup); Discard=(T:Discard); } payload-captures=tracked; } pub fn f(x:(T,U))->{Store<T>} T; semantic { result-captures <= {captures(parameter(0).component(0))}; ffi-contract { parameter(0) { pointer { retention=call_scoped; } } } } pub fn push<T>(mut box:Box<T>,value:T)->Unit; semantic { parameter(0) { payload-captures <= {captures(parameter(0).payload),captures(parameter(1))}; } } impl<T> Iterator for Box<T> { type Item=T; fn next(self)->Next<Box<T>,T>; } semantic { finite-iteration=true; }'
+        interface = 'module m; pub struct Box<T>; semantic { representation=opaque; usage { Dup=(T:Dup); Discard=(T:Discard); } } pub fn f<T,U,!e>(x:(T,U))->{Store<T>,Store<T> | e} T; semantic { result-captures <= {captures(parameter(0))}; ffi-contract { parameter(0) { pointer { retention=call_scoped; } } } } pub fn push<T>(mut box:Box<T>,value:T)->Unit; semantic { result-captures <= {}; } impl<T> Iterator for Box<T> { type Item=T; fn next(self)->Next<Box<T>,T>; } semantic { finite-iteration=true; }'
         for entry, example in [('source_file', source), ('interface_file', interface)]:
             self.assertTrue(exported.accepts(example, entry))
             self.assertFalse(exported.accepts(example[:-1], entry))
