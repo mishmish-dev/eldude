@@ -174,7 +174,7 @@ class Grammar:
         return {
             'format': 'eldude-grammar',
             'format_version': 1,
-            'language': {'name': 'Eldude', 'version': '0.0.2'},
+            'language': {'name': 'Eldude', 'version': '0.0.3'},
             'entry_points': {'source': 'source_file', 'interface': 'interface_file'},
             'lexical': {
                 'encoding': 'UTF-8',
@@ -263,7 +263,7 @@ def section(spec, number):
 def formal_markdown(text, spec):
     return '''# Eldude Formal Grammar
 
-**Version:** 0.0.2
+**Version:** 0.0.3
 
 **Status:** pre-implementation normative grammar
 
@@ -315,7 +315,7 @@ These rules select association among grammar derivations using syntax alone. The
 
 ## JSON representation
 
-`eldude-grammar.json` uses format `eldude-grammar`, format version `1`, and language version `0.0.2`. `entry_points` names the ordinary source and generated interface starts. `lexical.tokens` and `lexical.skip` are ordered arrays of `{ "name": ..., "pattern": ... }`; array order retains lexical priority. `reserved_words` and `contextual_words` expose the word categories. `literal_vocabulary` lists the reachable literals for each entry point. String/character token recognition additionally validates the Unicode scalar range and excluded surrogate interval recorded in `lexical`.
+`eldude-grammar.json` uses format `eldude-grammar`, format version `1`, and language version `0.0.3`. `entry_points` names the ordinary source and generated interface starts. `lexical.tokens` and `lexical.skip` are ordered arrays of `{ "name": ..., "pattern": ... }`; array order retains lexical priority. `reserved_words` and `contextual_words` expose the word categories. `literal_vocabulary` lists the reachable literals for each entry point. String/character token recognition additionally validates the Unicode scalar range and excluded surrogate interval recorded in `lexical`.
 
 `productions` maps each nonterminal to an array of alternatives. Each alternative is an ordered array of symbols; `[]` means epsilon. A symbol has exactly one key: `rule` references a nonterminal, `token` references a lexical category, and `literal` matches exact spelling. Names beginning with `@` are generated repetition helpers, not Eldude source tokens. This representation expands EBNF options and repetitions into ordinary BNF. `parsing_conventions` preserves the normative derivation/association rules above; consumers must apply them when building syntax trees.
 

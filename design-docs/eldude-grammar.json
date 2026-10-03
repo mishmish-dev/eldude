@@ -7,11 +7,10 @@
   "format_version": 1,
   "language": {
     "name": "Eldude",
-    "version": "0.0.2"
+    "version": "0.0.3"
   },
   "lexical": {
     "contextual_words": [
-      "state",
       "tail",
       "with"
     ],
@@ -52,6 +51,8 @@
         "?",
         "??",
         "@",
+        "Discard",
+        "Dup",
         "[",
         "]",
         "_",
@@ -70,6 +71,7 @@
         "captures",
         "cardinality",
         "case",
+        "complete",
         "component",
         "const",
         "continue",
@@ -87,6 +89,7 @@
         "false",
         "ffi-contract",
         "ffi-protocol",
+        "finite-iteration",
         "finite-positive-parameters",
         "finite-return",
         "fn",
@@ -115,9 +118,12 @@
         "mutable-owner-region",
         "native-cancellation",
         "once",
+        "opaque",
         "output",
         "ownership",
         "parameter",
+        "payload",
+        "payload-captures",
         "pending-defect-entry",
         "pointer",
         "preconditions",
@@ -126,6 +132,7 @@
         "pub",
         "reentrancy",
         "region",
+        "representation",
         "result",
         "result-captures",
         "resume",
@@ -136,19 +143,20 @@
         "shutdown",
         "spawn",
         "stable-address",
-        "state",
         "struct",
         "suspend",
         "suspension",
         "tail",
         "taskgroup",
         "thread-affinity",
+        "tracked",
         "trait",
         "true",
         "try",
         "type",
         "undelivered",
         "unsafe",
+        "usage",
         "using",
         "view",
         "where",
@@ -230,7 +238,6 @@
         "return",
         "self",
         "spawn",
-        "state",
         "struct",
         "suspend",
         "tail",
@@ -354,7 +361,7 @@
     "`view`/`mut` access arguments and access-prefixed method receivers apply to an in-scope binding (including a callback parameter carrying a projected grant), not to an arbitrary computed expression; compute an expression into a binding first when access must be granted to its result;",
     "this binding-only rule keeps `f(view x.method())` unambiguous: it is a plain argument whose expression is the `view self` method call, while `f(view x)` is an ordinary `view` argument;",
     "the parser chooses among the three method forms syntactically, before method lookup; the type checker later verifies that the selected method has the matching receiver mode;",
-    "`!path::op(args)` is always algebraic operation dispatch;",
+    "`!path::op(args)` is always algebraic operation dispatch; explicit family arguments use `!path::<Args>::op(args)`, with the same expression-level turbofish convention as ordinary generic application;",
     "`@name`, `#name`, `!name` in generic-parameter lists, and `..name` in capture-row positions are determined solely by grammatical context;",
     "`semantic { ... }` is not ordinary source syntax; it belongs to the canonical-interface entry point of Appendix F;",
     "an unparenthesized nominal construction is excluded from the outer condition/scrutinee/source expression of `if`, `while`, `match`, and `for`; parentheses permit it and prevent confusion with the following block;",
@@ -724,7 +731,16 @@
       [],
       [
         {
-          "rule": "expr"
+          "literal": "::"
+        },
+        {
+          "rule": "type_args"
+        },
+        {
+          "literal": "::"
+        },
+        {
+          "token": "IDENT"
         }
       ]
     ],
@@ -740,10 +756,7 @@
       [],
       [
         {
-          "token": "IDENT"
-        },
-        {
-          "literal": "="
+          "rule": "expr"
         }
       ]
     ],
@@ -751,10 +764,10 @@
       [],
       [
         {
-          "rule": "handler_clause"
+          "token": "IDENT"
         },
         {
-          "rule": "@131"
+          "literal": "="
         }
       ]
     ],
@@ -762,7 +775,10 @@
       [],
       [
         {
-          "rule": "patterns"
+          "rule": "handler_clause"
+        },
+        {
+          "rule": "@132"
         }
       ]
     ],
@@ -770,7 +786,7 @@
       [],
       [
         {
-          "literal": ";"
+          "rule": "patterns"
         }
       ]
     ],
@@ -786,6 +802,14 @@
       [],
       [
         {
+          "literal": ";"
+        }
+      ]
+    ],
+    "@136": [
+      [],
+      [
+        {
           "literal": "??"
         },
         {
@@ -793,7 +817,7 @@
         }
       ]
     ],
-    "@136": [
+    "@137": [
       [],
       [
         {
@@ -804,7 +828,7 @@
         }
       ]
     ],
-    "@137": [
+    "@138": [
       [],
       [
         {
@@ -815,7 +839,7 @@
         }
       ]
     ],
-    "@138": [
+    "@139": [
       [],
       [
         {
@@ -825,7 +849,7 @@
           "rule": "condition_product"
         },
         {
-          "rule": "@138"
+          "rule": "@139"
         }
       ],
       [
@@ -834,42 +858,6 @@
         },
         {
           "rule": "condition_product"
-        },
-        {
-          "rule": "@138"
-        }
-      ]
-    ],
-    "@139": [
-      [],
-      [
-        {
-          "literal": "*"
-        },
-        {
-          "rule": "condition_unary"
-        },
-        {
-          "rule": "@139"
-        }
-      ],
-      [
-        {
-          "literal": "/"
-        },
-        {
-          "rule": "condition_unary"
-        },
-        {
-          "rule": "@139"
-        }
-      ],
-      [
-        {
-          "literal": "%"
-        },
-        {
-          "rule": "condition_unary"
         },
         {
           "rule": "@139"
@@ -888,7 +876,32 @@
       [],
       [
         {
-          "rule": "postfix"
+          "literal": "*"
+        },
+        {
+          "rule": "condition_unary"
+        },
+        {
+          "rule": "@140"
+        }
+      ],
+      [
+        {
+          "literal": "/"
+        },
+        {
+          "rule": "condition_unary"
+        },
+        {
+          "rule": "@140"
+        }
+      ],
+      [
+        {
+          "literal": "%"
+        },
+        {
+          "rule": "condition_unary"
         },
         {
           "rule": "@140"
@@ -899,10 +912,7 @@
       [],
       [
         {
-          "literal": "|"
-        },
-        {
-          "rule": "pattern_atom"
+          "rule": "postfix"
         },
         {
           "rule": "@141"
@@ -913,10 +923,24 @@
       [],
       [
         {
+          "literal": "|"
+        },
+        {
+          "rule": "pattern_atom"
+        },
+        {
+          "rule": "@142"
+        }
+      ]
+    ],
+    "@143": [
+      [],
+      [
+        {
           "literal": "("
         },
         {
-          "rule": "@143"
+          "rule": "@144"
         },
         {
           "literal": ")"
@@ -927,18 +951,10 @@
           "literal": "{"
         },
         {
-          "rule": "@144"
+          "rule": "@145"
         },
         {
           "literal": "}"
-        }
-      ]
-    ],
-    "@143": [
-      [],
-      [
-        {
-          "rule": "patterns"
         }
       ]
     ],
@@ -946,11 +962,19 @@
       [],
       [
         {
-          "rule": "pattern_fields"
+          "rule": "patterns"
         }
       ]
     ],
     "@145": [
+      [],
+      [
+        {
+          "rule": "pattern_fields"
+        }
+      ]
+    ],
+    "@146": [
       [],
       [
         {
@@ -963,31 +987,17 @@
         }
       ]
     ],
-    "@146": [
-      [],
-      [
-        {
-          "rule": "pattern"
-        },
-        {
-          "rule": "@147"
-        },
-        {
-          "rule": "@148"
-        }
-      ]
-    ],
     "@147": [
       [],
       [
         {
-          "literal": ","
-        },
-        {
           "rule": "pattern"
         },
         {
-          "rule": "@147"
+          "rule": "@148"
+        },
+        {
+          "rule": "@149"
         }
       ]
     ],
@@ -996,6 +1006,12 @@
       [
         {
           "literal": ","
+        },
+        {
+          "rule": "pattern"
+        },
+        {
+          "rule": "@148"
         }
       ]
     ],
@@ -1004,12 +1020,6 @@
       [
         {
           "literal": ","
-        },
-        {
-          "rule": "pattern"
-        },
-        {
-          "rule": "@149"
         }
       ]
     ],
@@ -1026,10 +1036,24 @@
       [
         {
           "literal": ","
+        },
+        {
+          "rule": "pattern"
+        },
+        {
+          "rule": "@150"
         }
       ]
     ],
     "@151": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@152": [
       [],
       [
         {
@@ -1039,11 +1063,11 @@
           "rule": "pattern_field"
         },
         {
-          "rule": "@151"
+          "rule": "@152"
         }
       ]
     ],
-    "@152": [
+    "@153": [
       [],
       [
         {
@@ -1051,7 +1075,7 @@
         }
       ]
     ],
-    "@153": [
+    "@154": [
       [],
       [
         {
@@ -1062,22 +1086,14 @@
         }
       ]
     ],
-    "@154": [
+    "@155": [
       [],
       [
         {
           "rule": "interface_item"
         },
         {
-          "rule": "@154"
-        }
-      ]
-    ],
-    "@155": [
-      [],
-      [
-        {
-          "rule": "semantic_block"
+          "rule": "@155"
         }
       ]
     ],
@@ -1085,10 +1101,7 @@
       [],
       [
         {
-          "rule": "semantic_clause"
-        },
-        {
-          "rule": "@156"
+          "rule": "semantic_block"
         }
       ]
     ],
@@ -1096,7 +1109,10 @@
       [],
       [
         {
-          "rule": "index_list"
+          "rule": "semantic_clause"
+        },
+        {
+          "rule": "@157"
         }
       ]
     ],
@@ -1104,10 +1120,7 @@
       [],
       [
         {
-          "rule": "semantic_clause"
-        },
-        {
-          "rule": "@158"
+          "rule": "index_list"
         }
       ]
     ],
@@ -1115,10 +1128,7 @@
       [],
       [
         {
-          "literal": ","
-        },
-        {
-          "token": "INT_LITERAL"
+          "rule": "semantic_clause"
         },
         {
           "rule": "@159"
@@ -1143,13 +1153,13 @@
       [],
       [
         {
-          "rule": "generated_capture"
+          "literal": "|"
         },
         {
-          "rule": "@161"
+          "rule": "usage_conjunction"
         },
         {
-          "rule": "@162"
+          "rule": "@160"
         }
       ]
     ],
@@ -1160,7 +1170,7 @@
           "literal": ","
         },
         {
-          "rule": "generated_capture"
+          "rule": "constraint"
         },
         {
           "rule": "@161"
@@ -1172,6 +1182,12 @@
       [
         {
           "literal": ","
+        },
+        {
+          "token": "INT_LITERAL"
+        },
+        {
+          "rule": "@162"
         }
       ]
     ],
@@ -1179,10 +1195,13 @@
       [],
       [
         {
-          "rule": "ffi_clause"
+          "rule": "generated_capture"
         },
         {
-          "rule": "@163"
+          "rule": "@164"
+        },
+        {
+          "rule": "@165"
         }
       ]
     ],
@@ -1190,10 +1209,65 @@
       [],
       [
         {
-          "rule": "ffi_clause"
+          "literal": ","
+        },
+        {
+          "rule": "generated_capture"
         },
         {
           "rule": "@164"
+        }
+      ]
+    ],
+    "@165": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@166": [
+      [],
+      [
+        {
+          "rule": "capture_projection"
+        },
+        {
+          "rule": "@166"
+        }
+      ]
+    ],
+    "@167": [
+      [],
+      [
+        {
+          "rule": "capture_projection"
+        },
+        {
+          "rule": "@167"
+        }
+      ]
+    ],
+    "@168": [
+      [],
+      [
+        {
+          "rule": "capture_projection"
+        },
+        {
+          "rule": "@168"
+        }
+      ]
+    ],
+    "@169": [
+      [],
+      [
+        {
+          "rule": "ffi_clause"
+        },
+        {
+          "rule": "@169"
         }
       ]
     ],
@@ -1202,6 +1276,17 @@
       [
         {
           "literal": ","
+        }
+      ]
+    ],
+    "@170": [
+      [],
+      [
+        {
+          "rule": "ffi_clause"
+        },
+        {
+          "rule": "@170"
         }
       ]
     ],
@@ -2368,25 +2453,13 @@
         }
       ]
     ],
-    "block_statement": [
-      [
-        {
-          "rule": "while_expr"
-        }
-      ],
-      [
-        {
-          "rule": "for_expr"
-        }
-      ]
-    ],
     "capture_bound": [
       [
         {
           "literal": "{"
         },
         {
-          "rule": "@160"
+          "rule": "@163"
         },
         {
           "literal": "}"
@@ -2423,6 +2496,50 @@
         }
       ]
     ],
+    "capture_projection": [
+      [
+        {
+          "literal": "."
+        },
+        {
+          "literal": "component"
+        },
+        {
+          "literal": "("
+        },
+        {
+          "token": "INT_LITERAL"
+        },
+        {
+          "literal": ")"
+        }
+      ],
+      [
+        {
+          "literal": "."
+        },
+        {
+          "literal": "member"
+        },
+        {
+          "literal": "("
+        },
+        {
+          "rule": "path"
+        },
+        {
+          "literal": ")"
+        }
+      ],
+      [
+        {
+          "literal": "."
+        },
+        {
+          "literal": "payload"
+        }
+      ]
+    ],
     "capture_set": [
       [
         {
@@ -2452,7 +2569,7 @@
           "rule": "condition_relation"
         },
         {
-          "rule": "@136"
+          "rule": "@137"
         }
       ]
     ],
@@ -2462,7 +2579,7 @@
           "rule": "condition_equality"
         },
         {
-          "rule": "@135"
+          "rule": "@136"
         }
       ]
     ],
@@ -2559,7 +2676,7 @@
           "rule": "condition_unary"
         },
         {
-          "rule": "@139"
+          "rule": "@140"
         }
       ]
     ],
@@ -2569,7 +2686,7 @@
           "rule": "condition_sum"
         },
         {
-          "rule": "@137"
+          "rule": "@138"
         }
       ]
     ],
@@ -2579,7 +2696,7 @@
           "rule": "condition_product"
         },
         {
-          "rule": "@138"
+          "rule": "@139"
         }
       ]
     ],
@@ -2621,7 +2738,7 @@
           "rule": "condition_primary"
         },
         {
-          "rule": "@140"
+          "rule": "@141"
         }
       ]
     ],
@@ -2777,21 +2894,7 @@
     "effect_entry": [
       [
         {
-          "rule": "path"
-        }
-      ],
-      [
-        {
-          "literal": "state"
-        },
-        {
-          "literal": "<"
-        },
-        {
-          "rule": "region_ref"
-        },
-        {
-          "literal": ">"
+          "rule": "applied_path"
         }
       ],
       [
@@ -2962,7 +3065,7 @@
           "literal": "return"
         },
         {
-          "rule": "@129"
+          "rule": "@130"
         }
       ],
       [
@@ -3025,7 +3128,7 @@
           "literal": "{"
         },
         {
-          "rule": "@164"
+          "rule": "@170"
         },
         {
           "literal": "}"
@@ -3041,7 +3144,7 @@
           "literal": "{"
         },
         {
-          "rule": "@163"
+          "rule": "@169"
         },
         {
           "literal": "}"
@@ -3454,6 +3557,9 @@
           "rule": "binding_name"
         },
         {
+          "rule": "@166"
+        },
+        {
           "literal": ")"
         }
       ],
@@ -3477,6 +3583,9 @@
           "literal": ")"
         },
         {
+          "rule": "@167"
+        },
+        {
           "literal": ")"
         }
       ],
@@ -3489,6 +3598,9 @@
         },
         {
           "literal": ".."
+        },
+        {
+          "rule": "@168"
         },
         {
           "literal": ")"
@@ -3573,7 +3685,7 @@
           "literal": "with"
         },
         {
-          "rule": "@130"
+          "rule": "@131"
         },
         {
           "literal": "handler"
@@ -3585,7 +3697,7 @@
           "literal": "{"
         },
         {
-          "rule": "@131"
+          "rule": "@132"
         },
         {
           "literal": "}"
@@ -3601,7 +3713,7 @@
           "literal": "("
         },
         {
-          "rule": "@132"
+          "rule": "@133"
         },
         {
           "literal": ")"
@@ -3613,7 +3725,7 @@
           "rule": "expr"
         },
         {
-          "rule": "@133"
+          "rule": "@134"
         }
       ],
       [
@@ -3630,7 +3742,7 @@
           "rule": "expr"
         },
         {
-          "rule": "@134"
+          "rule": "@135"
         }
       ],
       [
@@ -3772,7 +3884,7 @@
           "token": "INT_LITERAL"
         },
         {
-          "rule": "@159"
+          "rule": "@162"
         }
       ]
     ],
@@ -3788,7 +3900,7 @@
           "literal": ";"
         },
         {
-          "rule": "@154"
+          "rule": "@155"
         }
       ]
     ],
@@ -3803,7 +3915,7 @@
           "rule": "declaration"
         },
         {
-          "rule": "@155"
+          "rule": "@156"
         }
       ]
     ],
@@ -4104,6 +4216,9 @@
           "rule": "path"
         },
         {
+          "rule": "@129"
+        },
+        {
           "rule": "arguments"
         }
       ]
@@ -4173,7 +4288,7 @@
           "rule": "pattern_atom"
         },
         {
-          "rule": "@141"
+          "rule": "@142"
         }
       ]
     ],
@@ -4193,7 +4308,7 @@
           "rule": "path"
         },
         {
-          "rule": "@142"
+          "rule": "@143"
         }
       ],
       [
@@ -4208,7 +4323,7 @@
           "token": "IDENT"
         },
         {
-          "rule": "@153"
+          "rule": "@154"
         }
       ]
     ],
@@ -4218,10 +4333,10 @@
           "rule": "pattern_field"
         },
         {
-          "rule": "@151"
+          "rule": "@152"
         },
         {
-          "rule": "@152"
+          "rule": "@153"
         }
       ]
     ],
@@ -4231,10 +4346,10 @@
           "rule": "pattern"
         },
         {
-          "rule": "@149"
+          "rule": "@150"
         },
         {
-          "rule": "@150"
+          "rule": "@151"
         }
       ]
     ],
@@ -4570,7 +4685,7 @@
           "literal": "{"
         },
         {
-          "rule": "@156"
+          "rule": "@157"
         },
         {
           "literal": "}"
@@ -4581,6 +4696,34 @@
       [
         {
           "literal": "result-captures"
+        },
+        {
+          "literal": "<="
+        },
+        {
+          "rule": "capture_bound"
+        },
+        {
+          "literal": ";"
+        }
+      ],
+      [
+        {
+          "literal": "payload-captures"
+        },
+        {
+          "literal": "="
+        },
+        {
+          "literal": "tracked"
+        },
+        {
+          "literal": ";"
+        }
+      ],
+      [
+        {
+          "literal": "payload-captures"
         },
         {
           "literal": "<="
@@ -4617,13 +4760,90 @@
           "literal": "{"
         },
         {
-          "rule": "@157"
+          "rule": "@158"
         },
         {
           "literal": "}"
         },
         {
           "literal": ";"
+        }
+      ],
+      [
+        {
+          "literal": "finite-iteration"
+        },
+        {
+          "literal": "="
+        },
+        {
+          "literal": "true"
+        },
+        {
+          "literal": ";"
+        }
+      ],
+      [
+        {
+          "literal": "representation"
+        },
+        {
+          "literal": "="
+        },
+        {
+          "literal": "opaque"
+        },
+        {
+          "literal": ";"
+        }
+      ],
+      [
+        {
+          "literal": "representation"
+        },
+        {
+          "literal": "="
+        },
+        {
+          "literal": "complete"
+        },
+        {
+          "literal": ";"
+        }
+      ],
+      [
+        {
+          "literal": "usage"
+        },
+        {
+          "literal": "{"
+        },
+        {
+          "literal": "Dup"
+        },
+        {
+          "literal": "="
+        },
+        {
+          "rule": "usage_condition"
+        },
+        {
+          "literal": ";"
+        },
+        {
+          "literal": "Discard"
+        },
+        {
+          "literal": "="
+        },
+        {
+          "rule": "usage_condition"
+        },
+        {
+          "literal": ";"
+        },
+        {
+          "literal": "}"
         }
       ],
       [
@@ -4644,7 +4864,7 @@
           "literal": "{"
         },
         {
-          "rule": "@158"
+          "rule": "@159"
         },
         {
           "literal": "}"
@@ -4703,7 +4923,7 @@
     "signed_literal": [
       [
         {
-          "rule": "@145"
+          "rule": "@146"
         },
         {
           "token": "INT_LITERAL"
@@ -4711,7 +4931,7 @@
       ],
       [
         {
-          "rule": "@145"
+          "rule": "@146"
         },
         {
           "token": "FLOAT_LITERAL"
@@ -4777,11 +4997,6 @@
         },
         {
           "literal": ";"
-        }
-      ],
-      [
-        {
-          "rule": "block_statement"
         }
       ]
     ],
@@ -4957,7 +5172,7 @@
           "literal": ","
         },
         {
-          "rule": "@146"
+          "rule": "@147"
         },
         {
           "literal": ")"
@@ -5174,6 +5389,42 @@
       [
         {
           "rule": "postfix_expr"
+        }
+      ]
+    ],
+    "usage_condition": [
+      [
+        {
+          "literal": "true"
+        }
+      ],
+      [
+        {
+          "literal": "false"
+        }
+      ],
+      [
+        {
+          "rule": "usage_conjunction"
+        },
+        {
+          "rule": "@160"
+        }
+      ]
+    ],
+    "usage_conjunction": [
+      [
+        {
+          "literal": "("
+        },
+        {
+          "rule": "constraint"
+        },
+        {
+          "rule": "@161"
+        },
+        {
+          "literal": ")"
         }
       ]
     ],

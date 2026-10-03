@@ -1,6 +1,6 @@
 # Eldude Language Specification
 
-**Version:** 0.0.2
+**Version:** 0.0.3
 
 **Status:** architectural consolidation; pre-implementation normative design
 
@@ -127,7 +127,7 @@ Wildcard imports do not exist.
 
 ### 2.6 Reserved words, sigils, and longest-token rules
 
-The source grammar reserves the following words because they participate directly in 0.0.2 syntax:
+The source grammar reserves the following words because they participate directly in 0.0.3 syntax:
 
 ```text
 affine any as assert await break captures case const continue decreases
@@ -139,7 +139,7 @@ diverge
 
 `with`, `tail`, and `state` are contextual words: they introduce handler composition, tail-resumption declarations, and region-state row entries in those specific grammatical positions, and are ordinary identifiers elsewhere. This permits projection APIs named `with`, record fields named `tail`, and values named `state` without name-dependent parsing.
 
-`many`, `abort`, `error`, and `host` are not reserved words in 0.0.2. Many-shot resumption is deferred; abortive operations are expressed by `affine ... -> Never`; expected-error composition uses nominal enums; host selection is root/build metadata rather than source syntax. Primitive type names such as `Int`, `Bool`, and `Unit` are ordinary predefined type names rather than keywords.
+`many`, `abort`, `error`, and `host` are not reserved words in 0.0.3. Many-shot resumption is deferred; abortive operations are expressed by `affine ... -> Never`; expected-error composition uses nominal enums; host selection is root/build metadata rather than source syntax. Primitive type names such as `Int`, `Bool`, and `Unit` are ordinary predefined type names rather than keywords.
 
 The category sigils are context-free tokens:
 
@@ -150,7 +150,7 @@ The category sigils are context-free tokens:
 ..C    capture-row parameter/rest
 ```
 
-At expression level, `!Qualified::op(...)` is algebraic operation dispatch. `!` is not an ordinary general-purpose prefix operator in 0.0.2. This prevents `!Console::check()` from having a second parse as boolean negation of an ordinary call.
+At expression level, `!Qualified::op(...)` is algebraic operation dispatch. `!` is not an ordinary general-purpose prefix operator in 0.0.3. This prevents `!Console::check()` from having a second parse as boolean negation of an ordinary call.
 
 Lexing uses longest-token matching for multi-character punctuation, including at least:
 
@@ -158,7 +158,7 @@ Lexing uses longest-token matching for multi-character punctuation, including at
 ::  ->  =>  .?  ??  ..  ==  !=  <=  >=
 ```
 
-Turbofish is parsed as `::` followed by `<...>`; it is not a distinct semantic token. Nested generic closers are individual `>` tokens; 0.0.2 defines no `>>` shift operator.
+Turbofish is parsed as `::` followed by `<...>`; it is not a distinct semantic token. Nested generic closers are individual `>` tokens; 0.0.3 defines no `>>` shift operator.
 
 ### 2.7 Fixed operators and precedence
 
@@ -189,7 +189,7 @@ The normative grammar is context-free. Appendix F reproduces the complete checke
 - `view`/`mut` access arguments and access-prefixed method receivers apply to an in-scope binding (including a callback parameter carrying a projected grant), not to an arbitrary computed expression; compute an expression into a binding first when access must be granted to its result;
 - this binding-only rule keeps `f(view x.method())` unambiguous: it is a plain argument whose expression is the `view self` method call, while `f(view x)` is an ordinary `view` argument;
 - the parser chooses among the three method forms syntactically, before method lookup; the type checker later verifies that the selected method has the matching receiver mode;
-- `!path::op(args)` is always algebraic operation dispatch;
+- `!path::op(args)` is always algebraic operation dispatch; explicit family arguments use `!path::<Args>::op(args)`, with the same expression-level turbofish convention as ordinary generic application;
 - `@name`, `#name`, `!name` in generic-parameter lists, and `..name` in capture-row positions are determined solely by grammatical context;
 - `semantic { ... }` is not ordinary source syntax; it belongs to the canonical-interface entry point of Appendix F;
 - an unparenthesized nominal construction is excluded from the outer condition/scrutinee/source expression of `if`, `while`, `match`, and `for`; parentheses permit it and prevent confusion with the following block;
@@ -206,7 +206,7 @@ Double-quoted strings contain Unicode scalar values. Single-quoted character lit
 
 Anonymous function parameters may omit a type when ordinary inference or an expected function type supplies it, as in `fn(x) => x`. Named-function parameters are typed; receiver `self` uses its enclosing implementation/trait type. `forall<...>. Type` is the explicit higher-rank type form. An associated projection may use `T::Item` when its trait is unambiguous in the static contract, or `<T as Trait<Args>>::Item<GatArgs>` for explicit qualification. This is type syntax, not expression-level conversion.
 
-Enum variants may use tuple payloads or nominal record payloads, for example `Cons { head: T, tail: LinkedList<T> }`; that record belongs to the enum constructor and is not a structural record type. Construction and patterns use `LinkedList::Cons { head, tail }`. All fields of an owned product/record pattern must be explicit, including wildcards; there is no rest pattern. Loop statements may omit a terminating semicolon; other nonfinal expressions require one.
+Enum variants may use tuple payloads or nominal record payloads, for example `Cons { head: T, tail: LinkedList<T> }`; that record belongs to the enum constructor and is not a structural record type. Construction and patterns use `LinkedList::Cons { head, tail }`. All fields of an owned product/record pattern must be explicit, including wildcards; there is no rest pattern. Every nonfinal expression, including `while` and `for`, requires a terminating semicolon. A final loop expression may omit it and yields `Unit`. Thus `{ while condition {} ; -1 }` has an integer tail; without the separator, `{ while condition {} -1 }` is one subtraction expression and fails typing because its left operand is `Unit`.
 
 ## 3. Evaluation
 
@@ -263,7 +263,7 @@ try
 
 `break` has no result value in the current design; loops have type `Unit` unless another expression form explicitly provides a result. Branch ownership joins and loop header/back-edge/exit rules are normative in §§62.5–62.6.
 
-Every non-local control exit that continues Eldude execution elsewhere is checked against usage, cleanup, capture, region, handler-continuation, and taskgroup obligations crossed by that exit. This includes `return`, `?`, loop exits, affine zero-resumption algebraic control, and cooperative cancellation. A nonrecoverable assertion defect is not such a recoverable exit; structural owners still perform specified defect unwinding, but ordinary naked linear obligations are not required to be discharged on a defect path.
+Every non-local control exit that continues Eldude execution elsewhere uses the single obligation-discharge judgment of §62.2. Defects use §20's nonrecoverable boundary and structural unwinding instead. Feature-specific rules below specify what each structural owner discharges, not alternative exit-legality tests.
 
 ## 4. Functions and calls
 
@@ -336,7 +336,7 @@ Package/source resolution is build metadata, not part of import syntax.
 
 ### 5.2 Declaration-only top level
 
-Top level contains declarations only. Importing a module does not execute arbitrary runtime code.
+Top level contains declarations only. An import establishes a static dependency; it does not execute code at its textual position. Ordinary top-level values are initialized once during the root startup phase defined below.
 
 Every ordinary top-level `let` initializer MUST be pure and terminating, and its result type MUST satisfy `Dup + Discard`. This applies to private as well as exported bindings and is checked using the ordinary structural usage rules, including obligations retained by closures, opaque values, and erased packages.
 
@@ -350,6 +350,12 @@ let makeToken = fn() => Token {};     // valid: the capture-free factory is Dup 
 ```
 
 A factory may return a fresh ownership obligation on each invocation; the restriction concerns the value held by the top-level binding. Runtime startup and ownership of state/resources belong to the selected host/root lifecycle or explicit state abstractions created during runtime execution.
+
+The selected root initializes all modules in its transitive import closure before entering application code or exposing embedding entry points. Primitive/predefined values and named declaration identities are available first. To order module initializers, collapse the import graph's strongly connected components and visit dependencies before importers; when several components are ready, choose the one whose smallest member path is lexicographically first. Within a component, visit modules by canonical path; within a module, evaluate top-level `let` initializers in source declaration order. Re-exports introduce ordinary import dependencies. Modules containing only declarations without value initializers have no executable initialization step.
+
+Each binding becomes available only after its initializer returns normally. Reading a not-yet-initialized top-level binding is an explicit nonrecoverable initialization defect, including a read through a function or callback. It does not trigger on-demand evaluation, retry, or waiting. This rule gives forward reads and cyclic imports a defined outcome without inspecting imported bodies or adding an initialization-effect axis. The first initializer defect stops startup, performs the ordinary structural unwinding, and reaches the root's defect boundary; later initializers and the application root do not run. An unused binding is still initialized.
+
+An implementation MAY precompute initializers or omit unobservable work only when it preserves this startup behavior, including defect order. A defect discovered by precomputation remains a startup defect, not an implementation-dependent source rejection. Initializers are checked with all named declarations in scope, so declaration visibility and initialization availability are distinct. Initializer code receives no general access to runtime services beyond its checked empty effect row.
 
 ### 5.3 Exports and opacity
 
@@ -378,6 +384,8 @@ An ordinary import creates private local names. `pub import path::{Name, Other a
 Every nominal/trait/effect identity appearing in a public author-visible contract must itself be publicly nameable, directly or through a public re-export. Private representation fields may contain private identities, provided canonical usage, positivity, captures, and other client-required guarantees are still exported without granting representation access. Public associated equations and method signatures cannot expose private nominal identities. Visibility never exempts the compiler from canonical interface completeness.
 
 Exhaustiveness accounts for hidden enum variants using an opaque remainder. Outside the defining module, if any variants are hidden, a match requires a wildcard or name catch-all for that remainder; an owned wildcard still requires `Discard`, while a name transfers ownership (§8.4). Interfaces reveal that a hidden remainder exists without exporting its constructors. Eldude has no `some Trait` abstraction form.
+
+Generated interfaces mark an incomplete representation with `representation = opaque` under §72.7. On a partially visible enum this is the hidden-remainder fact; on a struct it prevents clients from treating the listed fields as a complete construction/decomposition. This single completeness marker does not reveal omitted member identities.
 
 ### 5.4 Public contracts
 
@@ -471,7 +479,7 @@ Type -> Type
 EffectRow -> Constraint
 ```
 
-The compiler defines intrinsic constraints over non-type semantic categories when they expose an already-derived property rather than a user-defined protocol. In 0.0.2 this includes `NonAbandoning : EffectRow -> Constraint`, defined normatively in §17.3. It is not a trait and cannot be implemented by user code.
+The compiler defines intrinsic constraints over non-type semantic categories when they expose an already-derived property rather than a user-defined protocol. In 0.0.3 this includes `NonAbandoning : EffectRow -> Constraint`, defined normatively in §17.3. It is not a trait and cannot be implemented by user code.
 
 ### 6.3 Generic parameter categories
 
@@ -734,7 +742,7 @@ MutableOwner<T, @r>
 
 means that `T` denotes a non-duplicable owner of mutable identity in region `@r` whose in-place operations are governed by `state<@r>`. `T: not Dup` is necessary but not sufficient: a linear resource such as `File` does not acquire mutable-owner identity merely because it is non-duplicable.
 
-Mutable-owner status is not a user-implementable trait and does not participate in trait resolution. It is an intrinsic semantic fact of designated nominal state abstractions and is exported in canonical interfaces when clients need to form root `mut` grants. `DynArray<T,@r>` is the canonical standard example. Scoped projection (§15) may derive a `mut T` grant to an arbitrary subvalue from an already active parent-owner grant; the derived grant retains the parent owner identity/projection path and does not require `T` itself to satisfy `MutableOwner`. The 0.0.2 core does not define a general user-extensible mechanism for minting new root mutable-owner identities; abstractions that require new identity mechanisms are built from existing state primitives or audited unsafe/runtime facilities until such a mechanism is independently justified.
+Mutable-owner status is not a user-implementable trait and does not participate in trait resolution. It is an intrinsic semantic fact of designated nominal state abstractions and is exported in canonical interfaces when clients need to form root `mut` grants. `DynArray<T,@r>` is the canonical standard example. Scoped projection (§15) may derive a `mut T` grant to an arbitrary subvalue from an already active parent-owner grant; the derived grant retains the parent owner identity/projection path and does not require `T` itself to satisfy `MutableOwner`. The 0.0.3 core does not define a general user-extensible mechanism for minting new root mutable-owner identities; abstractions that require new identity mechanisms are built from existing state primitives or audited unsafe/runtime facilities until such a mechanism is independently justified.
 
 Root-grant formation accounts for `state<@r>` under §14.3. The grant carries that accounted state authority through forwarding and projection; the target type of a projected grant need not name the parent region.
 
@@ -811,6 +819,8 @@ Region, effect-row, capture-row, and natural slots in a head or searched prerequ
 
 Head overlap is decided by renaming both heads' parameters apart and applying kind-correct first-order unification, with an occurs check, to their receiver and trait-argument terms. Two heads for the same trait overlap exactly when that unification succeeds. All visible headers in the canonical index are checked, independent of import order and of their prerequisites. Conflicting headers are rejected at the module boundary that first brings them together.
 
+Every generic parameter declared by an implicit implementation MUST occur in its receiver or trait arguments after alias expansion. This coverage rule applies to every generic category; prerequisites and associated-equation outputs cannot determine an otherwise absent parameter. Consequently `impl<T> Assoc for Foo { type Out = T; }` is rejected: matching `Assoc for Foo` supplies no value for `T`. Unused implementation parameters are removed rather than existentially guessed.
+
 Selection uses one-way matching: only the implementation's parameters may be instantiated; the goal's abstract parameters and unresolved projections are rigid. Exact evidence in the local constraint environment is used first. Otherwise zero matching heads leaves an unsatisfied obligation, and one matching head is selected and its substituted prerequisites must all be discharged. Goals containing inference variables are postponed until ordinary inference fixes their relevant structure; they are never resolved by guessing an implementation. A remaining obligation must be supplied by a declared bound or is rejected at the checking boundary.
 
 ### 10.7 Decreasing implementation prerequisites
@@ -834,6 +844,8 @@ For example, `Eq<List<T>>` requiring `Eq<T>`, or `Eq<Pair<A,B>>` requiring each 
 ### 10.8 Associated equations and normalization
 
 An associated projection is identified by its canonical trait/member, receiver, trait arguments, and any GAT arguments. Its equation's input terms are the enclosing implementation head's receiver and trait arguments followed by the GAT parameters. Associated-member names do not contribute to input size.
+
+Every free variable of an associated equation's right-hand side and obligations MUST occur in these input terms; explicitly nested `forall` binders scope only their own bodies. Together with implementation coverage, this ensures that selecting an equation determines every substituted output variable.
 
 For every further associated projection `Q` in an equation's right-hand side, its input terms MUST be projection-free and satisfy both `size(Q.inputs) < size(equation.inputs)` and the parameter-occurrence condition of §10.7. Known acyclic aliases within the implementation are expanded before this check; recursive local associated aliases are rejected. Declared GAT-local bounds are expanded into each equation's obligations: all are projection-free after permitted alias expansion, and every user-trait obligation satisfies the same size/occurrence decrease against the equation's full input terms. The output may freely construct nominal types and repeat parameters outside further projection inputs. Changing the associated member or trait does not exempt a projection from decrease.
 
@@ -865,7 +877,7 @@ Dynamic compatibility is a closed static judgment over the erased package interf
 StaticEnvironment ⊢ DynCompatible(any Trait<Args... associated bindings ...>)
 ```
 
-The judgment is decided from the canonical interface of the trait plus the package's visible arguments/bindings. Imported implementation bodies are never consulted. Because 0.0.2 has no syntax for excluding individual trait methods from dynamic dispatch, every method of the trait must satisfy the method rule below; otherwise that `any Trait<...>` type is ill-formed.
+The judgment is decided from the canonical interface of the trait plus the package's visible arguments/bindings. Imported implementation bodies are never consulted. Because 0.0.3 has no syntax for excluding individual trait methods from dynamic dispatch, every method of the trait must satisfy the method rule below; otherwise that `any Trait<...>` type is ill-formed.
 
 For a candidate package interface `P = any Trait<...>`, each trait method `m` is dynamically compatible exactly when all of the following hold after substituting the trait arguments and package associated-type bindings supplied by `P`:
 
@@ -908,7 +920,7 @@ trait GenericMap {
 }
 ```
 
-`any CopyOut` is ill-formed because `Self` remains in the result, and `any GenericMap` is ill-formed because `map` introduces the method-local type parameter `U`. A trait method that exposes a GAT projection is likewise statically callable but makes the trait ineligible for `any` in the 0.0.2 core.
+`any CopyOut` is ill-formed because `Self` remains in the result, and `any GenericMap` is ill-formed because `map` introduces the method-local type parameter `U`. A trait method that exposes a GAT projection is likewise statically callable but makes the trait ineligible for `any` in the 0.0.3 core.
 
 A dynamically callable `mut self` method does not make every erased package a root mutable owner. Direct root `mut` access to the package is available only when packaging preserves compiler-recognized mutable-owner status/provenance; a package reached through an existing projected `mut` grant may use that derived grant normally.
 
@@ -1050,13 +1062,13 @@ fn defer<A, !e, ..C>(
 
 ### 13.4 Result-capture relationships
 
-Callable-environment captures and result captures are distinct facts. Every function or method semantic contract therefore has a result-capture transformer `ResultCaptureTransformer` that maps tracked provenance of its argument values (including values targeted by `view`/`mut` arguments) and callable environment to the capture/provenance summary of the returned value. Conceptually:
+Callable-environment captures and result captures are distinct facts. Every function or method semantic contract therefore has a result-capture transformer `ResultCaptureTransformer`, represented by the finite public algebra of §13.6, that maps tracked provenance of its argument values (including values targeted by `view`/`mut` arguments) and callable environment to the capture/provenance summary of the returned value. Conceptually:
 
 ```text
 ResultCaptures = ResultCaptureTransformer(CallableCaptures, Argument1Captures, ..., ArgumentNCaptures)
 ```
 
-`ResultCaptureTransformer` is part of the semantic callable contract even when ordinary source syntax does not display it. The compiler normally infers it from a body. A public or first-class callable whose result provenance affects client validity MUST carry a stable transformer in the canonical interface. This is what lets a separately compiled caller know, for example, that `fn(Ref<T,@r>) -> any Trait` returns an erased package retaining `@r`.
+`ResultCaptureTransformer` is part of the semantic callable contract even when ordinary source syntax does not display it. The compiler normally infers it from a body and exports a sound contract in that algebra. A public or first-class callable whose result provenance affects client validity MUST carry this stable contract. There is no additional opaque machine-only transformer on which clients may rely. This is what lets a separately compiled caller know, for example, that `fn(Ref<T,@r>) -> any Trait` returns an erased package retaining `@r`.
 
 For an access-mode argument, its input capture summary describes the accessed value, not the grant or its authority. An ordinary value legally copied through a grant, such as a duplicable field (§8.1), retains its own provenance and may be returned subject to ordinary escape checks. The grant and its authority cannot escape. Thus returning an erased field that retains `@r` through `view holder` must preserve `@r` in the result contract even when the holder itself is non-`Dup`.
 
@@ -1076,13 +1088,23 @@ This rejects storing a task handle from an inner taskgroup or a value tied to an
 
 The compiler may infer local capture summaries and result-capture transformers. Public values/callables whose correctness depends on nonempty or polymorphic captures MUST expose stable capture relationships in the canonical interface.
 
-The standard toolchain MUST also render every client-relevant result-capture transformer in a deterministic human-readable generated form. The generated notation is interface/diagnostic notation, not required author-written source syntax and not a lifetime language. A normalized relationship is rendered as an upper bound, conceptually:
+The public contract is a finite union of argument/environment provenance sources, existing capture-row parameters, and named provenance atoms. A source may select visible stored components as described below. The checker, machine serialization, human-readable rendering, and semantic hash MUST use this same contract. The generated notation is interface/diagnostic notation, not required author-written source syntax and not a lifetime language. A normalized relationship is rendered as an upper bound:
 
 ```text
 result-captures <= { captures(cell), captures(callback), ..C, @r }
 ```
 
-where an entry `captures(x)` means the tracked capture/provenance summary of the named argument value or callable environment source; for a `view`/`mut` argument it denotes the accessed value, not the grant. `..C` is an existing capture-row parameter, a named provenance atom such as `@r` may appear directly, and the braces denote union. `{}` denotes a capture-free result. The rendered relationship MAY conservatively overapproximate the internally inferred `ResultCaptureTransformer`, but MUST NOT omit provenance that could change client validity. If the exact transformer cannot be expressed in this normalized algebra, the toolchain MUST render a safe conservative union rather than an opaque compiler variable.
+An entry `captures(x)` means the tracked capture/provenance summary of the named argument value; for a `view`/`mut` argument it denotes the accessed value, not the grant. Canonical positional sources are `captures(parameter(n))` and `captures(..)` for the callable environment. `..C` is an existing capture-row parameter, a named provenance atom such as `@r` may appear directly, and the braces denote union. `{}` denotes a capture-free result.
+
+A parameter source may be followed by `.component(n)` for a stored tuple/constructor-payload component or `.member(path)` for a visible nominal field/constructor, with paths composed left to right. For example, `captures(parameter(0).component(0))` retains only the first component of the first argument; `captures(pair.member(m::Pair::first))` selects the visible field by canonical identity. Selecting an enum constructor denotes that variant's possible payload provenance; an absent variant contributes the empty set. Indices must be in range and each such step must select visible finite stored structure. Paths cannot traverse private fields, a callable environment, a function invocation, an aliasable mutable/foreign identity, or a grant's authority. They are provenance selectors, not executable projections, so they neither duplicate values nor require `Dup`.
+
+An owning container may expose one abstract stored-payload summary using the generated nominal fact `payload-captures = tracked` (§72.7). The terminal selector `.payload` then denotes the union of provenance retained by its stored values, separately from the container's own allocation/region identity. This is an explicit public component of the same capture algebra; it exposes no private layout and grants no access. Its implementation must derive or audit the separation from owned storage. Aliasable cells and foreign identities cannot offer this profile. The whole container summary always includes its payload summary. For `DynArray<T,@r>`, freezing may retain `captures(parameter(0).payload)` without retaining the allocation's `@r`; if an element itself retains `@r`, that atom remains in the payload summary and still prevents escape. No rule subtracts a region from an undifferentiated union.
+
+Tracking survives abstraction and mutation. Construction establishes the payload summary, and every write, grant projection/forwarding, move, branch join, and call must preserve a sound bound. A generated `payload-captures <= {...}` on a callable's result describes the returned container payload; on a `mut` parameter it describes the payload after the call, with sources referring to pre-call arguments/environment. A post-call bound must cover every normal or continuing structural exit on which that owner survives, not only successful return. Providers check or audit these bounds against every possible write. In the absence of a precise public bound, an opaque call conservatively grows each affected mutable payload by the previous payload and every argument/environment provenance that its storage could retain, including the receiver's own region. Newly introduced local provenance cannot be retained past its horizon. This default also applies through imported wrappers and forwarded/projected grants. Thus precision may require an explicit generated bound, but never imported implementation inspection.
+
+The contract of a function consuming `(first, second)` and returning `first` can therefore retain `captures(parameter(0).component(0))` without retaining `second`. Existing capture summaries must preserve this component distinction when the input shape is visible. Contracts may also attach bounds to visible stored result components through the generated selectors of §72.7. The whole-result bound includes every retained component and any other result provenance; a component with no more specific bound conservatively inherits the enclosing value's bound. A refinement may never omit provenance retained by that component.
+
+Inference inside an implementation may be more precise, but at a callable abstraction boundary it MUST produce a sound finite union in this public algebra. Any required approximation is part of the published contract itself; separate clients cannot exploit unrendered precision. Duplicate sources and sources already covered by an ancestor source are removed. This preserves a single reviewable contract without promising arbitrary conditional or representation-sensitive public transformers.
 
 ### 13.7 Diagnostics
 
@@ -1297,6 +1319,8 @@ Eldude distinguishes three semantic categories of row entry.
 
 **Algebraic effect families** are declared with `effect` and may be interpreted by handlers.
 
+An algebraic row entry is the family identity applied to all its declared generic arguments, for example `Store<Int>` or `Raise<LoadError>`. These arguments are fixed for each effect instance (§17.4), not freshly universally quantified on each operation call. Distinct applications such as `Store<Int>` and `Store<Text>` are distinct row entries and may coexist. Open effect-row variables remain bare names. The contextual application `state<@r>` denotes the intrinsic region-state entry below, not a user-handleable family.
+
 **Intrinsic semantic effects** are compiler/runtime effects that are not user-handleable algebraic families. The current design includes at least:
 
 ```text
@@ -1353,6 +1377,16 @@ effect Raise<E> {
 
 There is no separate `abort` mode. Because safe Eldude cannot construct a `Never` value, a handler for `raise` cannot take the resuming path; every terminating handler path chooses zero resumptions. The ordinary affine abandonment rule therefore supplies the complete control semantics.
 
+Family generic parameters scope over every operation signature and are instantiated once for the selected instance. For example:
+
+```eldude
+fn raise<E>(error: E) ->{Raise<E>} Never {
+    !Raise::<E>::raise(error)
+}
+```
+
+An operation has no operation-local generic binder in this version. Explicit dispatch arguments use `!Family::<Args>::operation(...)`; a named instance already fixes its family arguments and uses `!instance::operation(...)` without repeating them.
+
 ### 17.2 Resumption modes
 
 The core modes are normative:
@@ -1368,11 +1402,11 @@ affine
     zero or one resume
 ```
 
-The declaration describes control behavior independently of the handler implementation. Many-shot resumption is not part of the 0.0.2 core and is listed as deferred in Appendix A.
+The declaration describes control behavior independently of the handler implementation. Many-shot resumption is not part of the 0.0.3 core and is listed as deferred in Appendix A.
 
 ### 17.3 Derived continuation-control envelope
 
-Effect rows determine a compiler-derived continuation-control envelope used at opaque calls and other composition boundaries. In the 0.0.2 core, the envelope records whether evaluation may abandon the surrounding continuation. The envelope is evaluated relative to the current structural-control context `Control`, including whether cooperative cancellation is masked at the evaluation point.
+Effect rows determine a compiler-derived continuation-control envelope used at opaque calls and other composition boundaries. In the 0.0.3 core, the envelope records whether evaluation may abandon the surrounding continuation. The envelope is evaluated relative to the current structural-control context `Control`, including whether cooperative cancellation is masked at the evaluation point.
 
 For a closed effect row `Effects`, define `mayAbandon(Control, Effects)` as follows:
 
@@ -1382,7 +1416,7 @@ For a closed effect row `Effects`, define `mayAbandon(Control, Effects)` as foll
 
 In the ordinary unmasked structural control context `UnmaskedControl`, write `mayAbandon(Effects)` as shorthand for `mayAbandon(UnmaskedControl, Effects)`. An unconstrained open effect-row variable is conservatively treated as potentially abandoning in any context where its unknown families could contain `affine`; masking may remove only the known cancellation edge contributed by `suspend`.
 
-Eldude 0.0.2 exposes exactly one source constraint on the **ordinary unmasked** derived property:
+Eldude 0.0.3 exposes exactly one source constraint on the **ordinary unmasked** derived property:
 
 ```eldude
 where e: NonAbandoning
@@ -1398,7 +1432,7 @@ Canonical cleanup and taskgroup-shutdown execution establish cancellation masks 
 
 ### 17.4 Effect instances
 
-At elaborated-core level, an algebraic operation belongs to an effect family plus an instance identity.
+At elaborated-core level, an algebraic operation belongs to a fully applied effect family plus an instance identity. `handler Store<Int>` introduces an instance whose operation signatures are substituted with `T = Int`. The handler must supply every family argument, either explicitly or by ordinary local inference; unresolved family arguments are errors. A canonical interface always renders the complete application.
 
 A `handle` expression creates a fresh instance for its inline lexical handler. Source code may name it when necessary:
 
@@ -1423,7 +1457,7 @@ An unqualified operation such as:
 !Console::print(...)
 ```
 
-selects the nearest unambiguous ambient instance of that family. Ambiguity is an error.
+selects the nearest unambiguous ambient instance of that applied family. For a generic family, omitted arguments must be determined by its current effect contract, ordinary argument/result inference, or a unique ambient application; they are not guessed from handler implementation bodies. An explicit application selects the nearest instance of that same application, so an inner `Store<Int>` does not intercept `Store<Text>`. Distinct named instances of the same application retain distinct lexical identities in the elaborated row and capture metadata. Ambiguity is an error.
 
 Named effect instances are lexical identities, not ordinary first-class values. If a closure retains one through lexical reference, that retention is tracked in its capture summary.
 
@@ -1502,7 +1536,15 @@ where T: Discard
 
 ### 19.3 Explicit measures
 
-Well-founded measures may be supplied:
+`decreases` is a static annotation with a fixed portable checking rule; it is not executable code or a theorem assumption. A measure is one `Nat` expression or a nonempty tuple of `Nat` expressions, ordered lexicographically by the ordinary well-founded natural order. All functions in an explicitly measured recursive group use vectors of the same length. The admitted measure expressions are natural literals, immutable `Nat` bindings or visible immutable stored-field paths, parentheses, addition, subtraction with proved nonnegative result, and multiplication by a natural literal. Mutable/foreign reads, access to mutable identity through a grant, ordinary calls, algebraic operations, assertions, and all other expression forms are outside this measure fragment. A field path contributes no ownership transfer or access permission.
+
+Checking uses symbolic natural values at function entry or a loop header. Simple aliases, immutable field reads, and supported primitive arithmetic propagate expressions; an arbitrary call result is a fresh unconstrained value of its type. At a recursive call, substitute actual argument expressions into the callee's measure. At every loop back-edge, including `continue`, compare the next header measure with the current one. Require every component to be defined and natural and require a lexicographic decrease. An iteration with no continuing back-edge creates no decrease obligation. Measures are never evaluated again at runtime and cannot change effects, defects, ownership, or evaluation order.
+
+The proof fragment is quantifier-free linear integer arithmetic with nonnegativity constraints for natural values. Branches contribute only the truth or negation of supported primitive comparisons (`==`, `!=`, `<`, `<=`, `>`, `>=`) on these terms; immutable aliases preserve those facts. Assertions contribute no facts. For a primitive `a % b` on naturals, a proved `b > 0` additionally permits the fixed facts `0 <= a % b` and `a % b < b`; an identical remainder term has the same symbolic value. No quotient identities, variable-by-variable multiplication, user-defined orderings, or imported implementation facts are used. A proof succeeds exactly when these facts entail the required definedness and decrease in linear integer arithmetic; implementation resource limits do not change the language's acceptance rule.
+
+An unsupported or unproved annotation is rejected. Code outside the fragment may omit the annotation and admit `diverge`; a compiler MUST NOT accept additional annotations using a private stronger solver. State-dependent `while` progress is outside this initial fragment; finite iteration uses §19.5, and other such loops admit `diverge`. Expanding the fragment requires a specification change.
+
+For example, the negative branch of `b == 0` establishes `b > 0` for `Nat`, so the remainder rule accepts:
 
 ```eldude
 fn gcd(a: Nat, b: Nat) -> Nat
@@ -1589,6 +1631,8 @@ The condition must have type `Bool`. Eldude has no build-erasable debug assertio
 
 A failed assertion is a nonrecoverable defect termination.
 
+The explicitly specified arithmetic and initialization defects (§§6.1.1 and 5.2) use this same boundary and precedence rule. They are not additional recoverable failure mechanisms.
+
 A defect is:
 
 - not `Result::Err`;
@@ -1655,7 +1699,7 @@ enum LoadError {
 }
 ```
 
-Eldude 0.0.2 has no structural `error { ... }` type and no implicit nominal-error subtyping/widening. When a computation with error type `E1` must participate in an API using error type `E2`, the program performs an explicit mapping or constructs the chosen nominal variant.
+Eldude 0.0.3 has no structural `error { ... }` type and no implicit nominal-error subtyping/widening. When a computation with error type `E1` must participate in an API using error type `E2`, the program performs an explicit mapping or constructs the chosen nominal variant.
 
 This keeps expected failure within the ordinary nominal data model rather than introducing a specialized structural sum mechanism.
 
@@ -1751,7 +1795,7 @@ Assertions do not acquire a `Log` effect. A host may route defect diagnostics an
 
 ### 23.1 Handlers are not first-class values
 
-Eldude 0.0.2 has no public `Handler<...>` value type. A handler is a lexical interpreter block written only as part of a `handle` application:
+Eldude 0.0.3 has no public `Handler<...>` value type. A handler is a lexical interpreter block written only as part of a `handle` application:
 
 ```eldude
 handle {
@@ -1784,11 +1828,11 @@ fn withTerminal<A, !e, ..C>(
     } with handler Console {
         print(text) => {
             terminalWrite(text);
-            resume(());
+            resume(())
         }
 
         readLine() => {
-            resume(terminalRead());
+            resume(terminalRead())
         }
     }
 }
@@ -1935,7 +1979,7 @@ handle {
 
 ### 26.3 Forwarding
 
-Forwarded operations target the next outer instance of the same family. If no outer instance exists, the family remains in the resulting effect row.
+Forwarded operations target the next outer instance of the same fully applied family. They do not erase, change, or re-infer its generic arguments. If no outer instance exists, that application remains in the resulting effect row.
 
 ### 26.4 Same-family operations inside clauses
 
@@ -2011,7 +2055,7 @@ The identity is generative: two different executions or lexical introductions de
 Generic code may abstract over a region:
 
 ```eldude
-fn size<@r>(view buffer: DynArray<Byte, @r>) -> Nat;
+fn size<@r>(view buffer: DynArray<Byte, @r>) ->{state<@r>} Nat;
 ```
 
 There is no region subtyping or source-level outlives relation.
@@ -2262,16 +2306,7 @@ A `using`-owned resource may not be moved out of the `using` scope as an escapin
 
 ### 31.4 Exit behavior
 
-For each still-live cleanup-owned binding, cleanup is initiated on every control exit crossing the scope, including:
-
-- normal completion;
-- `return`;
-- `?` propagation;
-- `break` or `continue` crossing the scope;
-- affine zero-resumption algebraic control;
-- cooperative cancellation;
-- assertion-defect unwinding;
-- abandonment of an affine continuation when the control-exit judgment permits it.
+For each still-live cleanup-owned binding, cleanup is initiated on normal completion, every legal continuing structural exit of §62.2 crossing the scope, and nonrecoverable defect unwinding under §20. This includes affine continuation abandonment; it is the same exit judgment, not a second cleanup-specific escape rule.
 
 ### 31.5 Cancellation protection
 
@@ -2319,27 +2354,15 @@ Discarding an affine value never invokes `Cleanup` automatically.
 
 A type for which silent abandonment would violate semantics must be linear rather than relying on hidden destruction.
 
-# Part VI — Standard Library Collections and Iteration Profile
+# Part VI — Collection Ownership and Iteration
 
-This part specifies the bundled standard-library collection profile and the language/library contracts used by `for` and scoped projection. The semantic core requires usage-preserving ownership behavior; the exact collection families, representations, and cost guarantees below are standard-library commitments rather than independent language mechanisms.
+This part specifies the language/library contracts used by collections, `for`, and scoped projection. Concrete collection families, representations, and cost guarantees belong to the bundled [standard-library profile](ELDUDE-STANDARD-LIBRARY.md). They do not introduce independent language mechanisms.
 
 ## 32. Standard sequence abstractions
 
 ### 32.1 `List<T>` (standard library)
 
-`List<T>` is the default immutable finite dynamic-length sequence.
-
-Its required semantic/cost contract is:
-
-- contiguous logical element storage;
-- value semantics;
-- copy-on-write or equivalent retained sharing when usage permits;
-- O(1) length;
-- O(1) indexed element location;
-- amortized O(1) append when representation can be reused;
-- O(n) worst-case copy when retained sharing or growth requires it.
-
-Under the bundled standard-library profile, list literals construct `List<T>`:
+Under the bundled standard-library profile, list literals construct the finite immutable sequence `List<T>`:
 
 ```eldude
 [1, 2, 3]
@@ -2347,26 +2370,15 @@ Under the bundled standard-library profile, list literals construct `List<T>`:
 
 ### 32.2 `TreeList<T>` (standard library)
 
-`TreeList<T>` is an immutable persistent tree-backed sequence intended for workloads retaining branching historical versions.
-
-It provides structural sharing and logarithmic indexed update/access under a fixed branching-factor implementation contract.
+`TreeList<T>` follows the same structural ownership laws as `List<T>`; its persistent representation and cost contract are library policy.
 
 ### 32.3 `LinkedList<T>` (standard library)
 
-`LinkedList<T>` is the canonical immutable cons structure, conceptually:
-
-```eldude
-enum LinkedList<T> {
-    Nil,
-    Cons { head: T, tail: LinkedList<T> },
-}
-```
-
-Prepend/head/tail are O(1); length and indexed access are O(n).
+`LinkedList<T>` is an ordinary finite inductive cons structure subject to §8.5. Its constructors and operations are defined by the library profile.
 
 ### 32.4 `Array<T,N>` (standard library)
 
-`Array<T,N>` is immutable statically sized contiguous storage. `N` is a `NatIndex`.
+`Array<T,N>` is immutable statically sized storage. `N` is a `NatIndex`.
 
 ```eldude
 Array<Byte, 32>
@@ -2374,11 +2386,11 @@ Array<Byte, 32>
 
 Under the bundled profile, list literals do not contextually become arrays.
 
-Fixed shape is the point of the abstraction. Shape-changing insertion/removal is not part of the initial core `Array` API; code needing routine dynamic insertion/removal uses `List` or `DynArray`.
+The initial library API preserves its fixed shape.
 
 ### 32.5 `DynArray<T,@r>` (standard library mutable-owner example)
 
-`DynArray<T,@r>` is mutable growable contiguous storage owned in region `@r`.
+`DynArray<T,@r>` is mutable storage owned in region `@r`.
 
 It is never `Dup`. Direct mutation requires `mut` plus the region-state accounting specified in §14.3; its API's explicitly declared state effects remain admitted on forwarded calls.
 
@@ -2555,6 +2567,8 @@ The iterator protocol alone does not prove finiteness.
 
 `for` is total only when the source's iteration contract establishes finite completion and the body is total. Potentially unbounded iteration contributes `diverge`.
 
+Finite completion is recorded as `finite-iteration = true` on the selected concrete `Iterator` implementation in its canonical interface (§72.7). The ordinary compiler may derive this fact when `next` is non-diverging and every reachable `Next::Item` returns a successor iterator that is a strict finite stored subterm of its input under §19.2. Bundled runtime primitives such as the `List` iterator may instead provide an audited finite-length-decrease contract. Without this fact or a local proof in §19.3's portable fragment, iteration is conservatively unbounded. Storage positivity alone is insufficient: an implementation returning its unchanged input forever has finite stored values but infinite iteration. The fact is not a user-implementable predicate or an unchecked source annotation.
+
 ### 35.6 Ownership-preserving early-exit combinators
 
 The ownership-threaded iterator protocol is intentionally strict about early exit. Standard collections and iterator adapters SHOULD therefore provide consuming combinators whose recoverable outcomes preserve every unconsumed obligation rather than forcing callers to manually reconstruct iterator state.
@@ -2654,7 +2668,7 @@ This makes interleaving points part of source-level/effect-level reasoning.
 
 ### 38.3 Parallelism
 
-The current language does not specify a general source-level shared-memory parallelism API or memory model. User-directed multicore execution of ordinary Eldude strands is outside the 0.0.2 language scope; programs requiring it must currently use host/native facilities.
+The current language does not specify a general source-level shared-memory parallelism API or memory model. User-directed multicore execution of ordinary Eldude strands is outside the 0.0.3 language scope; programs requiring it must currently use host/native facilities.
 
 No ordinary `Send`, `Sync`, `Transfer`, or thread-affinity predicate exists.
 
@@ -2686,16 +2700,7 @@ Completed child results whose handles were discarded are safely discarded becaus
 
 ### 39.3 Early exit
 
-If the body attempts to leave the group through:
-
-- `return`;
-- `?` propagation;
-- `break`/`continue` crossing the group;
-- affine zero-resumption algebraic control;
-- outer cooperative cancellation;
-- assertion defect;
-
-then the taskgroup:
+If the body attempts a continuing structural exit of §62.2 across the group, or reaches a nonrecoverable defect, the taskgroup:
 
 1. records the current structural outcome;
 2. requests cancellation of all outstanding children;
@@ -2724,7 +2729,7 @@ has completed normally with a value. This does not automatically cancel siblings
 Only parent control flow such as:
 
 ```eldude
-let x = await task?;
+let x = (await task)?;
 ```
 
 may choose to propagate that error, after which normal taskgroup early-exit shutdown applies.
@@ -2929,11 +2934,17 @@ This avoids first-class taskgroup capabilities, lifetime parameters, and latent 
 
 When a taskgroup begins, it records the algebraic handler environment that lexically encloses the `taskgroup` construct itself.
 
-A child effect may resolve through a handler in that baseline only when the corresponding active handler frame is `Dup`. Semantically, each child receives its own reusable frame installation for the same lexical effect-instance identity; duplicated captured values follow ordinary `Dup` semantics. Child inheritance MUST NOT create an implicit shared path to a non-`Dup` captured owner.
+A child effect may resolve through a baseline handler only when its active frame is `Dup` **and** its clauses satisfy the result-preserving inheritance check below. Each child receives its own frame installation for the same lexical effect-instance identity, with values duplicated only by ordinary `Dup`. The inherited delimiter surrounds that child's computation; it does not capture a parent continuation or run the parent's return clause against a differently typed value.
 
-If a child effect would resolve to a non-`Dup` baseline handler frame, the composition is rejected unless an appropriate handler is explicitly installed inside that child computation. An unconstrained open child effect row is checked conservatively against ambient non-`Dup` handlers because a future instantiation may contain the handled family. Shared mutable handler state, when desired, uses ordinary explicit aliasable state such as `Ref`.
+The inheritance check rechecks the lexical handler with a fresh rigid result type `A`, with no `Dup`, `Discard`, trait, or representation assumptions about `A`, while keeping the handled family application and ordinary environment contracts fixed. The default or explicit return clause must transfer its `A` input unchanged to its result. An operation clause must resume exactly once on each normally completed path and transfer the resulting `A` unchanged to its result. Simple aliases and ownership-preserving transfer through control-flow joins preserve this result identity; inspecting, replacing, packaging, discarding, or passing it to arbitrary code does not. Code before/after resumption may perform its admitted effects and use other values. A `once` clause can therefore log after resumption and return the saved result. All usual resource, cancellation, defect, and non-divergence checks still apply; a defect or admitted divergence does not manufacture an `A` result.
 
-Every child otherwise executes under the permitted baseline environment plus handlers explicitly installed inside the child computation.
+An `affine` declaration is not automatically disqualified if its actual clause passes this exactly-once check, but a normally returning zero-resumption clause cannot pass. Forwarded operations retain their applied family and must resolve only through similarly admissible inherited frames. The operation's declared mode still controls operation-site abandonment checking; inheritance does not strengthen an `affine` operation to `once` in public effect contracts. The inferred residual row and capture contract of the inherited handler must be independent of `A`. These checks are properties of the existing lexical handler source, not a new author-written handler type or permission.
+
+If either frame duplication or this check fails, child dispatch through that frame is rejected unless a suitable handler is installed explicitly inside the child. In particular, a parent handler with `return n => n + 1` cannot be inherited by a `Bool` child merely because its captures are duplicable. A handler installed inside a child may transform the child's result or use affine abandonment under the ordinary rules; the resulting handled expression determines `Task<T>`'s `T`.
+
+An unconstrained open child row is checked against every baseline frame it could select. Shared mutable handler state uses explicit aliasable state such as `Ref`. Each inherited operation/return clause executes as child work and its residual effects belong to the taskgroup; its identity return preserves the child's result type, usage, and provenance. Parent completion separately uses the parent's frame and return clause.
+
+At an opaque ordinary call whose admitted row may contain `suspend`, every residual algebraic application that the call may perform is conservatively treated as potentially performed by a nested child. Its selected ambient frame must therefore satisfy this same duplication/inheritance check. A row variable is checked against every compatible ambient family unless its bounds rule out suspension or that family. This uses the existing row contract: any computation that may spawn a child necessarily admits `suspend` (§44.3). It does not inspect imported bodies or introduce a hidden spawning permission. The conservative rule may reject an opaque implementation that actually performs all effects on its parent strand; installing an appropriate handler inside the supplied computation or exposing a non-suspending contract avoids that ambiguity. Direct local operations and visible lexical `spawn` forms use their exact contexts. Root-supplied service interpretations used by children must satisfy the same result-preserving contract at root conformance.
 
 ### 45.2 Parent-local handlers
 
@@ -2979,7 +2990,7 @@ taskgroup {
 
 ### 45.3 Rationale as normative structure
 
-This rule prevents `spawn` from becoming an implicit arbitrary dynamic-context capture operation, ensures the lifetime of inherited handler frames encloses every child using them, and makes handler inheritance obey the same `Dup` law as other values reused across child computations.
+This rule prevents `spawn` from becoming an implicit arbitrary dynamic-context capture operation, ensures inherited frame lifetimes enclose their children, and preserves the child's result contract as well as ordinary `Dup` ownership. The authoritative eligibility and delimiter rule is §45.1.
 
 ## 46. Structured racing
 
@@ -3431,7 +3442,7 @@ Each synchronous foreign invocation has an internal defect-pending state shared 
 
 Already-required callback-local structural unwinding may continue; it does not authorize fresh normal callback work. Native calls made during that discharge must honor the same pending-state check. Suppression is invocation-scoped, not a domain-wide suspension of unrelated strands or registrations. A pending defect cannot be cleared by native success, callback retry, or returning an ordinary sentinel. At rendezvous the waiting Eldude computation resumes defect unwinding, never normal completion. The retained callback/registration obligations of a suppressed entry remain owned until their specified structural discharge; suppression does not count as a successful callback delivery or silently release roots. The rule also applies to audited stack-preserving protocols.
 
-A host/native adapter MAY define a separately audited **stack-preserving synchronous callback protocol** that permits `suspend`. Such a protocol MUST specify at least native-stack/frame lifetime while parked, the thread/fiber on which resumption occurs, runtime rooting of managed values reachable from the parked computation, stability of retained dereferenceable native pointers, permitted reentrancy, cancellation rendezvous, defect rendezvous, and shutdown behavior. Under such a protocol, suspension uses the ordinary Eldude `suspend` and cancellation semantics; the exceptional protocol does not create a second suspension effect. Permission to suspend does not by itself permit an algebraic operation to target a handler outside the foreign-control barrier. Cross-foreign-frame algebraic continuation capture/resumption is not part of the ordinary safe FFI model in 0.0.2.
+A host/native adapter MAY define a separately audited **stack-preserving synchronous callback protocol** that permits `suspend`. Such a protocol MUST specify at least native-stack/frame lifetime while parked, the thread/fiber on which resumption occurs, runtime rooting of managed values reachable from the parked computation, stability of retained dereferenceable native pointers, permitted reentrancy, cancellation rendezvous, defect rendezvous, and shutdown behavior. Under such a protocol, suspension uses the ordinary Eldude `suspend` and cancellation semantics; the exceptional protocol does not create a second suspension effect. Permission to suspend does not by itself permit an algebraic operation to target a handler outside the foreign-control barrier. Cross-foreign-frame algebraic continuation capture/resumption is not part of the ordinary safe FFI model in 0.0.3.
 
 ### 56.2 Asynchronous callback from another native thread
 
@@ -3479,7 +3490,7 @@ Safe adapters translate typed results/control outcomes at the boundary.
 
 Assertion defects likewise MUST NOT unwind through arbitrary foreign frames. A safe synchronous callback adapter must use the defect-rendezvous protocol of §56.1 so that Eldude structural unwinding resumes only after the audited foreign call regains an Eldude boundary. If the native call may fail to return after such a callback failure, that possibility contributes `diverge`.
 
-A defect MUST NOT be presented as a normal recoverable C return unless the wrapper deliberately translates it before crossing the ABI boundary as an explicitly different API contract.
+A defect MUST NOT become a normal recoverable return to a still-live Eldude continuation. At the terminal root/embedding boundary, the host may report the ended Eldude execution to its native caller according to the root contract. That report neither clears a pending synchronous-callback defect nor resumes the failed Eldude execution; callback-local private sentinels remain rendezvous machinery under §56.1.
 
 # Part IX — Formal Static and Dynamic Semantics
 
@@ -3632,7 +3643,7 @@ While such a barrier is active:
 - a pending cooperative cancellation request remains pending rather than being delivered through the foreign frame;
 - a defect reaching `ForeignBarrier` follows the audited defect-rendezvous protocol of §56.1.
 
-An audited stack-preserving synchronous-callback protocol may replace `suspend = forbidden` with `suspend = permitted` for that specific foreign entry. It must still provide the cancellation/defect rendezvous and lifetime/rooting guarantees required by §56.1. In 0.0.2, such a protocol does not change `algebraic-crossing = forbidden`.
+An audited stack-preserving synchronous-callback protocol may replace `suspend = forbidden` with `suspend = permitted` for that specific foreign entry. It must still provide the cancellation/defect rendezvous and lifetime/rooting guarantees required by §56.1. In 0.0.3, such a protocol does not change `algebraic-crossing = forbidden`.
 
 ## 59. Function introduction and application
 
@@ -3679,6 +3690,8 @@ Each `ArgumentNCaptures` is the capture/provenance summary of the supplied argum
 If `mayAbandon(Control, CallableEffects)` holds under §17.3, application also checks the relevant enclosing continuation segment(s) in `Control` using the ordinary non-local-exit judgment. For an unconstrained open effect-row variable this check uses the conservative abandoning envelope. Thus an opaque effectful call cannot silently acquire the ability to abandon live non-`Discard` caller obligations.
 
 If `Control` contains an ordinary synchronous foreign-control barrier, application additionally enforces §58.8: a callable whose admitted row contains `suspend` cannot be invoked there, and every residual algebraic family that may be performed by the call must resolve to a handler on the callback side of the barrier. This barrier check is distinct from `mayAbandon` and `NonAbandoning`.
+
+Application at an opaque boundary also enforces §45.1's inheritance rule whenever the admitted row may contain `suspend`: residual algebraic operations may belong to nested children, so their ambient handlers must be duplicable and result-preserving. This check is independent of whether the current call actually suspends or spawns on a particular execution.
 
 ### 59.3 Access modes
 
@@ -3893,7 +3906,7 @@ A cleanup frame is an ordinary structural control/resource obligation for contin
 
 ### 64.1 Direct operation
 
-For an operation `operation` in effect family `EffectFamily` returning `OperationResult` and selected instance `EffectInstance`:
+For an operation `operation` in fully applied effect family `EffectFamily` returning the substituted `OperationResult` and selected instance `EffectInstance`:
 
 ```text
 arguments well typed
@@ -3908,7 +3921,7 @@ If `Control` contains a synchronous foreign-control barrier between the operatio
 
 An `affine` operation returning `Never` is treated by the same ordinary affine rule when its handler is reachable without crossing a foreign-control barrier; safe code cannot take its resuming path because it cannot supply a `Never` value.
 
-Source interfaces normally display families rather than elaborated instance identities.
+Source interfaces normally display fully applied families rather than elaborated instance identities. Family argument substitution is fixed at instance creation (§17.4); rows, forwarding, and handler elimination preserve those arguments. Lexically fixed instance identities remain tracked wherever they affect dispatch or escape safety.
 
 ### 64.2 Lexical handler application
 
@@ -3998,7 +4011,7 @@ For static abandonment safety, the compiler models the captured segment as an in
 
 `affine` permits zero resumption only when abandonment of the segment is a valid non-local exit. An `affine` operation returning `Never` cannot resume in safe code but uses the same rule rather than a separate mode.
 
-The same abandonment model is invoked indirectly at an ordinary call when the call's derived continuation-control envelope is potentially abandoning. Many-shot continuation duplication is not part of the 0.0.2 core.
+The same abandonment model is invoked indirectly at an ordinary call when the call's derived continuation-control envelope is potentially abandoning. Many-shot continuation duplication is not part of the 0.0.3 core.
 
 ## 66. Error typing
 
@@ -4045,12 +4058,12 @@ and the spawn site is in the immediate executable body of the current taskgroup 
 - registers the child's retained free-value provenance and anticipated result provenance `ChildCaptures` in the group's live-child provenance summary until child/result structural lifetime ends;
 - transfers/duplicates free captured values into the child according to usage;
 - rejects retained `view`/`mut` grants;
-- for each child effect that would resolve through a handler in the taskgroup baseline, requires that active handler frame to be `Dup`;
+- for each child effect that would resolve through a handler in the taskgroup baseline, requires both frame `Dup` and the result-preserving inheritance check of §45.1; inherited delimiters preserve `ChildResultType` and `ChildCaptures`;
 - produces `Task<ChildResultType>` carrying group provenance `TaskgroupId` together with the child result provenance `ChildCaptures` that a later `await` may reveal;
 - does not itself perform `ChildEffects` in the parent strand;
 - does not itself add `suspend` merely by child creation.
 
-The enclosing `taskgroup` expression includes child effects and admits `suspend` when it may own any child.
+The enclosing `taskgroup` expression includes child effects, including inherited handler residuals, and admits `suspend` when it may own any child. A handler explicitly installed in `childExpression` is checked before deriving `ChildResultType` and may change that type under the ordinary handler rule.
 
 ### 67.3 Task provenance non-escape
 
@@ -4157,7 +4170,7 @@ Every callback-entry transition first checks the enclosing synchronous invocatio
 
 At the first defect-processing transition, the runtime records the defect and marks every active enclosing synchronous invocation pending before any callback-local discharge or native call. Callback-local structural unwinding then proceeds while possible; the barrier returns through the native frame using the audited rendezvous protocol, and outer Eldude defect unwinding resumes only when the corresponding Eldude boundary is regained. Removing an inner rendezvoused frame does not clear enclosing pending states. Native non-local unwinding across live Eldude frames is not part of ordinary safe-machine execution.
 
-An audited stack-preserving callback protocol may permit suspension by preserving the waiting native execution state and all required roots/lifetimes. Resumption must re-enter the same logical callback computation according to that protocol. Such an implementation remains subject to ordinary Eldude cancellation semantics at the permitted suspension point and still does not permit algebraic handler lookup across the foreign-control barrier in 0.0.2.
+An audited stack-preserving callback protocol may permit suspension by preserving the waiting native execution state and all required roots/lifetimes. Resumption must re-enter the same logical callback computation according to that protocol. Such an implementation remains subject to ordinary Eldude cancellation semantics at the permitted suspension point and still does not permit algebraic handler lookup across the foreign-control barrier in 0.0.3.
 
 ## 70. Soundness obligations
 
@@ -4204,7 +4217,7 @@ Resumptions obey their declared mode and remain lexical. Affine zero-resumption 
 
 ### 70.9 Structured-concurrency safety
 
-No safe spawned child outlives its owning taskgroup, and no task handle escapes its group provenance.
+No safe spawned child outlives its owning taskgroup, and no task handle escapes its group provenance. Inherited handlers preserve each child's result type and provenance under §45.1; frame duplicability alone is insufficient.
 
 ### 70.10 Cleanup safety
 
@@ -4276,6 +4289,8 @@ Canonical interfaces contain, as applicable:
 - callable-environment captures, result-capture transformers, and capture-row parameters;
 - intrinsic `Dup` and `Discard` guarantees;
 - intrinsic mutable-owner status where applicable;
+- abstract owned-payload capture profiles and post-call payload bounds where applicable;
+- finite-completion facts for concrete iterator implementations;
 - region parameters and provenance relations;
 - compile-time natural parameters and constraints;
 - trait declarations;
@@ -4345,17 +4360,29 @@ Representative generated clauses are:
 
 ```text
 semantic {
+    representation = opaque;
+    usage { Dup = (T: Dup); Discard = (T: Discard); }
     result-captures <= {captures(cell), ..C, @r};
     mutable-owner-region = @r;
     finite-positive-parameters = {0, 1};
 }
 ```
 
-`result-captures <= {...}` is the normalized upper-bound notation of §13.6. `mutable-owner-region = @r` states the intrinsic `MutableOwner<T,@r>` fact when clients may form root `mut` grants. `finite-positive-parameters` lists the zero-based generic parameter positions certified by §8.5; `{}` certifies no positions. FFI facts use the generated contracts and protocol descriptions of §72.9. Other future generated clauses MUST use source-level semantic terminology and MUST NOT expose implementation-specific solver state as the only representation of a client-relevant fact.
+These clauses illustrate separate applicable subjects, not one declaration requiring every fact. `result-captures <= {...}` is the authoritative public upper-bound algebra of §13.6. `mutable-owner-region = @r` states the intrinsic `MutableOwner<T,@r>` fact when clients may form root `mut` grants. `finite-positive-parameters` lists the zero-based generic parameter positions certified by §8.5; `{}` certifies no positions. `finite-iteration = true` applies only to a concrete `Iterator` implementation certified under §35.5; omission offers no finite-completion guarantee. Storage positivity and finite iteration are distinct facts. FFI facts use the generated contracts and protocol descriptions of §72.9.
+
+On a nominal owning container, `payload-captures = tracked` publishes the abstract stored-payload component of §13.6. Omission offers no `.payload` selector; no further projection after `.payload` is permitted. On a callable result or `mut` parameter, `payload-captures <= {...}` uses the same capture-bound algebra to describe its returned/post-call payload, resolving sources in the enclosing callable's pre-call scope. The target must have the tracked profile. These bounds never authorize grant escape, unsafe aliasing, or retention past a provenance horizon. They are included in checking, rendering, and hashing just like result bounds.
+
+`representation = complete` certifies that the rendered nominal fields/constructors are exhaustive. `representation = opaque` states that they are incomplete or unavailable: struct construction/decomposition cannot infer missing fields, and enum matching must account for the opaque remainder of §5.3. A semicolon struct implies `opaque`; a generated braced nominal declaration with omitted members MUST carry the marker. In the absence of a marker, a braced declaration is complete. An explicit contradictory marker is an interface error. Private member names and types are not serialized merely to explain this fact.
+
+A generated `usage` block gives each intrinsic permission's public sufficient condition. `true` offers the permission unconditionally; `false` offers no such guarantee. A parenthesized comma-separated set of constraints is conjunction, and `|` between those sets is disjunction. The only permitted atoms are kind-correct public type equalities and intrinsic `Dup`/`Discard` bounds on types or capture rows. The condition may mention only the nominal declaration's public generic inputs and publicly nameable types; it introduces no user trait search, negative predicate, existential guess, or executable proof. A client gains a permission when at least one conjunction is established by the existing equality/usage judgments. Recursive conditions must be justified by the existing structural usage derivation, never by assuming the permission being established.
+
+For example, an opaque `Box<T>` that stores `T` publishes `usage { Dup = (T: Dup); Discard = (T: Discard); }`, whereas a phantom representation may publish both permissions as `true`; a linear resource publishes both as `false`. These are permission conditions, not formation constraints: `Box<LinearResource>` remains a legal linear type. The defining module checks every offered condition against its representation and source-level strengthening. Opaque declarations MUST publish both conditions; unavailable hidden proofs may conservatively withhold a guarantee, but cannot grant one. Complete representations may derive the same facts directly. An interface usage block is not an `impl Dup`/`impl Discard` declaration and is unreachable from ordinary source. Changing a published condition changes the semantic interface.
+
+Other future generated clauses MUST use source-level semantic terminology and MUST NOT expose implementation-specific solver state as the only representation of a client-relevant fact.
 
 A semantic block is attached to its preceding declaration. Nested `member(path) { ... }` clauses select individual methods, fields, associated declarations, or enum constructors by canonical identity; this includes trait and implementation methods and declarations in an `extern` block. Nested `parameter(n)`, `result`, and `component(n)` clauses select callable slots and stored tuple/payload components with the same zero-based rules as §72.9. All semantic clauses, including `result-captures`, may occur at the selected subject. Repeated selectors or facts in the same scope, invalid member/slot identities, or facts inappropriate to that subject are interface errors. Selectors use §72.9's canonical recursive ordering.
 
-Within a selected callable contract, `captures(x)` refers to the named parameter/accessed-value summary. The positional spelling `captures(parameter(n))` refers to its zero-based parameter summary (counting a receiver), and `captures(..)` refers to the callable environment. These spellings make nested anonymous function contracts renderable without inventing author-visible argument names; canonical rendering uses positional spelling for unnamed slots. The bound's meaning and transitive provenance rules remain those of §13.6.
+Within a selected callable contract, `captures(x)` refers to the named parameter/accessed-value summary. The positional spelling `captures(parameter(n))` refers to its zero-based parameter summary (counting a receiver), and `captures(..)` refers to the callable environment. A parameter source may append the public component/payload paths of §13.6. These spellings make nested anonymous function contracts renderable without inventing author-visible argument names; canonical rendering uses positional parameter sources. A bound attached to a stored result component refines that component's provenance and resolves its sources in the enclosing callable contract. Selecting a nested callable starts a new parameter/environment scope; it does not capture the outer callable's argument names implicitly. The bound's meaning and transitive provenance rules remain those of §13.6.
 
 Generated semantic clauses are interface/diagnostic notation. They belong to the canonical-interface grammar of Appendix F, not to the ordinary Eldude source grammar. A generated interface is therefore not promised to be a copy-pastable source stub unless those interface-only clauses are omitted. Tools MUST label/render canonical interface output distinctly enough that interface-only syntax is not presented as ordinary author-written source.
 
@@ -4397,7 +4424,7 @@ The following vocabulary is normative. Values in the table are bare generated wo
 | Callback | `delivery-domain` | `current_domain`, `registration_domain`, or `protocol(path)` |
 | Callback | `barrier` | `ordinary`, `stack_preserving`, `not_applicable`; `stack_preserving` requires the complete audited §56.1 protocol |
 | Callback | `suspension` | `forbidden`, `permitted`; permission does not authorize crossing an ordinary barrier |
-| Callback | `algebraic-crossing` | `forbidden` in 0.0.2 |
+| Callback | `algebraic-crossing` | `forbidden` in 0.0.3 |
 | Callback | `cancellation` | `deferred`, `ordinary_points`, or `protocol(path)` |
 | Callback | `defect` | `rendezvous` or `protocol(path)` describing the applicable Eldude-boundary/private-ABI protocol |
 | Callback | `pending-defect-entry` | `suppressed` for synchronous entry; `not_applicable` for independently posted delivery |
@@ -4407,6 +4434,8 @@ The following vocabulary is normative. Values in the table are bare generated wo
 | Any subject | `preconditions` | `protocol(path)` for additional audited validity, representation, encoding, lifetime, thread, or unsafe obligations |
 
 Every applicable key MUST be emitted, including conservative ordinary-barrier facts. In addition to the listed scalar values, every key except the fixed `algebraic-crossing = forbidden` permits `protocol(path)` to describe compound/conditional behavior. The protocol MUST enumerate the alternatives and their guards/selection conditions; each alternative obeys the unconditional safe-language laws of §§53–56. This covers a callable that invokes inline on one path and posts/offloads on another, including the corresponding barrier, suspension, and pending-entry modes. It must not choose one scalar outcome that hides another. A protocol may supplement a fixed enum via `preconditions`; it cannot contradict that enum or relax a mandatory safe-language rule. Invalid scopes, repeated keys/selectors, invalid values, mismatches with the ordinary signature/effect row, or insufficient audited safety guarantees are interface errors.
+
+Fixed callback facts have one source: the normalized callback-entry profile. For an ordinary synchronous entry, derive `barrier=ordinary`, `suspension=forbidden`, `cancellation=deferred`, and `pending-defect-entry=suppressed`. An audited stack-preserving synchronous entry derives the corresponding permitted-suspension/ordinary-cancellation profile and still suppresses entry after a pending defect. Independently posted delivery has no waiting foreign barrier or synchronous pending-entry state and executes with ordinary cancellation points. Every profile derives `algebraic-crossing=forbidden` in this version. Conditional protocols normalize each alternative separately. The renderer emits these derived facts for review, but metadata producers do not independently assert or override them. Canonical hashing uses the normalized profile and its deterministic expansion. Cardinality, reentrancy, lifetime, pointer stability, rendezvous details, and drain/discharge protocols remain independent audited facts.
 
 A protocol reference names a stable canonical contract identity. The same semantic block MUST include exactly one `ffi-protocol path = "description";` for every referenced protocol, and descriptions must be self-contained with respect to their audited protocol behavior. Descriptions normalize line endings to LF; their remaining text is contract content, not subject to a prose-equivalence solver. The normalized description is part of the audited semantic contract and machine metadata, and MUST render all remaining client-relevant facts faithfully in human-readable terms; an opaque identifier/hash alone is insufficient. For a stack-preserving protocol this includes all §56.1 obligations, and for a retained registration it includes the terminal drain/discharge outcomes of §56.2.1. Tools may display the escaped string as prose, but must preserve its content in canonical serialization and semantic diffs. A changed guarantee, obligation, or protocol description invalidates semantic dependents independently of ABI changes.
 
@@ -4658,13 +4687,15 @@ Compiler-generated public signatures MUST use the same canonical surface convent
 
 Generated canonical interfaces MUST render semantically unordered collections in one deterministic textual order:
 
-- algebraic effect families and nominal error alternatives sort by canonical fully qualified identity;
+- applied algebraic effect families sort by canonical fully qualified identity and then recursively canonicalized generic arguments; nominal error alternatives sort by canonical identity;
 - `state<@r>` entries sort by canonical region-binder identity/order rather than incidental source spelling;
 - open row variables sort by binder order;
 - intrinsic effect entries follow named/state entries in the fixed order `suspend`, then `diverge`;
-- generated capture/provenance unions sort `captures(x)` entries by canonical source slot (callable environment, then all arguments by parameter position, using accessed-value summaries for access-mode slots; source names are display labels only), then explicit provenance atoms by category and canonical binder/identity order, then capture-row variables by binder order;
+- generated capture/provenance unions sort sources by canonical source slot (callable environment, then arguments by position), then lexicographically by their projection path with component indices compared numerically and members by canonical identity; source names are replaced by positional parameter sources. Ancestor sources subsume their descendants. Explicit provenance atoms follow by category and canonical binder/identity order, then capture-row variables by binder order;
 - unordered constraint collections sort first by constrained binder order and then by canonical predicate identity;
 - generated finite-positive parameter index sets sort in ascending parameter-position order.
+
+Within a semantic subject, render representation and usage facts first, then payload/result captures, mutable-owner region, finite-positive parameters, finite iteration, FFI facts, and nested selectors in §72.9's order. Capture paths compare projection kinds in the order `component`, `member`, `payload`, then their indices/identities. A usage block renders `Dup` before `Discard`; sort atoms in each conjunction by the ordinary canonical constraint order, deduplicate them, then sort/deduplicate conjunctions lexicographically and remove any conjunction strictly containing another. An empty conjunction is `true`; no offered conjunction is `false`. These are fixed syntactic normalization rules, not arbitrary logical/prose equivalence solving.
 
 User-authored source need not be reordered solely to match this interface order; the requirement is for generated canonical renderings, stable hashing inputs, and deterministic generated documentation.
 
@@ -4798,7 +4829,7 @@ The following are intentionally not fixed by the core architecture and may evolv
 
 ## A.8 Deferred or removed algebraic-control variants
 
-The 0.0.2 core has no separate `abort` resumption mode. Abortive operations use `affine ... -> Never`, so continuation abandonment follows the ordinary affine rule.
+The 0.0.3 core has no separate `abort` resumption mode. Abortive operations use `affine ... -> Never`, so continuation abandonment follows the ordinary affine rule.
 
 Many-shot algebraic resumption is deferred. Reintroducing it would require a demonstrated need for continuation duplication plus a separately reviewed composition story for usage, mutable state, handlers, concurrency, and separate compilation. It is not accepted merely as the completion of a resumption-mode feature matrix.
 
@@ -4879,7 +4910,7 @@ fn encode(values: List<Byte>) -> List<Byte> {
 
         for value in values {
             mut out.push(value);
-        }
+        };
 
         out.freeze()
     }
@@ -4941,6 +4972,7 @@ fn copyFile(src: Path, dst: Path)
     ) {
         copy(view input, mut output)?;
         output.finish()?;
+        Result::Ok(())
     }
 }
 ```
@@ -4967,7 +4999,7 @@ fn runGreeting() ->{io} Unit {
     } with handler Console {
         print(text) => {
             terminalWrite(text);
-            resume(());
+            resume(())
         }
 
         readLine() => {
@@ -5043,11 +5075,11 @@ enum LoadError {
     Parse(ParseError),
 }
 
-fn load(path: Path) -> Result<LoadError, Config>
+fn load(path: Path) ->{fs, diverge} Result<LoadError, Config>
 {
     let bytes =
         readFile(path).mapError(LoadError::IO)?;
-    parse(bytes).mapError(LoadError::Parse)?
+    parse(bytes).mapError(LoadError::Parse)
 }
 ```
 
@@ -5079,10 +5111,10 @@ fn fetchBoth(id: UserId)
         let userTask = spawn fetchUser(id);
         let orderTask = spawn fetchOrders(id);
 
-        Pair {
+        Result::Ok(Pair {
             user: (await userTask).mapError(FetchBothError::User)?,
             orders: (await orderTask).mapError(FetchBothError::Orders)?,
-        }
+        })
     }
 }
 ```
@@ -5295,13 +5327,13 @@ This appendix restates the most important cross-feature invariants in compact fo
 17. Discarding Task<T> does not cancel it.
 18. Task handles cannot escape their lexical taskgroup; captures enforce this without lifetime syntax.
 19. Child effects belong to the lexical taskgroup, not to Task<T>.
-20. Children may inherit only Dup handler frames from the environment enclosing the taskgroup; arbitrary transient or non-Dup parent handler frames are not implicitly shared.
+20. Children may inherit only Dup, result-preserving handler frames from the taskgroup baseline under §45.1; opaque suspending calls conservatively enforce the same contract for residual algebraic effects.
 21. No general Send/Sync/Transfer or pinning axis exists.
 22. Stable foreign identity, stable native storage, and temporary FFI pointers are distinct abstractions. Safe temporary marshalling introduces fresh scoped foreign provenance that cannot escape its callback horizon.
 23. Unsafe grants designated low-level operations but never disables ordinary static checking.
 24. The host is the single outer runtime boundary; libraries expose ordinary effect contracts. A conforming runtime does not indefinitely stutter while runnable Eldude work exists; this minimal progress rule is weaker than general fairness.
-25. Canonical interfaces contain every client-relevant semantic fact, including result-capture and mutable-owner facts, and are sufficient for separate checking.
-26. Many-shot algebraic resumption is deferred from the 0.0.2 core rather than forcing continuation-duplication machinery into every composition rule.
+25. Canonical interfaces contain every client-relevant semantic fact, including component capture bounds, opaque representation/usage conditions, and mutable-owner facts; the checker and renderer use the same public contracts.
+26. Many-shot algebraic resumption is deferred from the 0.0.3 core rather than forcing continuation-duplication machinery into every composition rule.
 27. `any Trait<...>` formation is governed by one closed `DynCompatible` judgment decidable from canonical interface data; dynamic erasure never relies on implementation-defined object-safety intuition.
 28. `NonAbandoning` is the sole source-level constraint on the derived continuation-abandonment property of effect rows; it is intrinsic and not user-implementable.
 29. Standard projection, traversal, and structured-concurrency combinators preserve the same ownership, provenance, effect, cancellation, and taskgroup laws as their core primitives; library ergonomics do not create hidden escape mechanisms.
@@ -5318,7 +5350,7 @@ The normative artifact is [eldude.ebnf](eldude.ebnf). This appendix, the standal
 
 <!-- BEGIN GENERATED ELDUDE GRAMMAR -->
 ```ebnf
-# Normative Eldude 0.0.2 EBNF. Generated presentations: Appendix F and the Formal Grammar.
+# Normative Eldude 0.0.3 EBNF. Generated presentations: Appendix F and the Formal Grammar.
 # EBNF: ::= definition; | choice; () grouping; ? optional; * repetition; + one or more.
 # JSON strings quote terminals and lexical regular expressions; # begins a whole-line comment.
 %skip SPACE = "[ \\t\\r\\n]+";
@@ -5391,7 +5423,7 @@ type_arg ::= type | region_ref | effect_row | capture_set | ".." IDENT | nat_exp
 type_list ::= type ("," type)* ","?;
 region_ref ::= "@" IDENT;
 effect_row ::= "{" (effect_entry ("," effect_entry)* ","?)? "}";
-effect_entry ::= path | "state" "<" region_ref ">" | "suspend" | "diverge";
+effect_entry ::= applied_path | "suspend" | "diverge";
 capture_clause ::= "captures" capture_set;
 capture_set ::= "{" (capture_entry ("," capture_entry)* ","?)? "}";
 capture_entry ::= region_ref | ".." IDENT | path;
@@ -5425,8 +5457,7 @@ list_literal ::= "[" (expr ("," expr)* ","?)? "]";
 lambda ::= "fn" "(" (lambda_param ("," lambda_param)* ","?)? ")" ("=>" expr | result_contract? block);
 lambda_param ::= access_mode? binding_name (":" type)?;
 block ::= "{" statement* expr? "}";
-statement ::= let_decl | "assert" expr ";" | expr ";" | block_statement;
-block_statement ::= while_expr | for_expr;
+statement ::= let_decl | "assert" expr ";" | expr ";";
 if_expr ::= "if" condition_expr block ("else" (block | if_expr))?;
 match_expr ::= "match" condition_expr "{" match_arm* "}";
 match_arm ::= "case" pattern ("if" condition_expr)? "=>" expr ";";
@@ -5436,7 +5467,7 @@ scoped_expr ::= "region" IDENT block | ("try" | "taskgroup" | "unsafe") block;
 using_expr ::= "using" "(" acquisition ("," acquisition)* ","? ")" block;
 acquisition ::= binding_name "=" expr;
 access_method ::= access_mode binding_name "." IDENT turbofish? arguments;
-operation_call ::= "!" path arguments;
+operation_call ::= "!" path ("::" type_args "::" IDENT)? arguments;
 resume_expr ::= "resume" arguments;
 exit_expr ::= "return" expr? | "break" | "continue";
 handle_expr ::= "handle" block "with" (IDENT "=")? "handler" applied_path "{" handler_clause* "}";
@@ -5464,10 +5495,13 @@ pattern_field ::= IDENT (":" pattern)?;
 interface_file ::= "module" path ";" interface_item*;
 interface_item ::= import_decl | declaration semantic_block?;
 semantic_block ::= "semantic" "{" semantic_clause* "}";
-semantic_clause ::= "result-captures" "<=" capture_bound ";" | "mutable-owner-region" "=" region_ref ";" | "finite-positive-parameters" "=" "{" index_list? "}" ";" | ffi_contract | ffi_protocol | semantic_selector "{" semantic_clause* "}";
+semantic_clause ::= "result-captures" "<=" capture_bound ";" | "payload-captures" "=" "tracked" ";" | "payload-captures" "<=" capture_bound ";" | "mutable-owner-region" "=" region_ref ";" | "finite-positive-parameters" "=" "{" index_list? "}" ";" | "finite-iteration" "=" "true" ";" | "representation" "=" ("opaque" | "complete") ";" | "usage" "{" "Dup" "=" usage_condition ";" "Discard" "=" usage_condition ";" "}" | ffi_contract | ffi_protocol | semantic_selector "{" semantic_clause* "}";
+usage_condition ::= "true" | "false" | usage_conjunction ("|" usage_conjunction)*;
+usage_conjunction ::= "(" constraint ("," constraint)* ")";
 index_list ::= INT_LITERAL ("," INT_LITERAL)*;
 capture_bound ::= "{" (generated_capture ("," generated_capture)* ","?)? "}";
-generated_capture ::= "captures" "(" (binding_name | "parameter" "(" INT_LITERAL ")" | "..") ")" | capture_entry;
+generated_capture ::= "captures" "(" (binding_name | "parameter" "(" INT_LITERAL ")" | "..") capture_projection* ")" | capture_entry;
+capture_projection ::= "." ("component" "(" INT_LITERAL ")" | "member" "(" path ")" | "payload");
 semantic_selector ::= "parameter" "(" INT_LITERAL ")" | "result" | "member" "(" path ")" | "component" "(" INT_LITERAL ")";
 
 # Generated audited native contracts; scope/value consistency is checked semantically.
@@ -5479,4 +5513,3 @@ ffi_property ::= "invocation" | "blocking" | "finite-return" | "native-cancellat
 ffi_value ::= IDENT | capture_bound | "protocol" "(" path ")";
 ```
 <!-- END GENERATED ELDUDE GRAMMAR -->
-
