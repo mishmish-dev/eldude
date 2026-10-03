@@ -1,6 +1,7 @@
 # The Eldude Manifesto
 
-**Version:** 0.0.1  
+**Version:** 0.0.2
+
 **Status:** architectural consolidation; pre-implementation
 
 Eldude is a strict, statically typed, non-diverging-by-default functional language for application, systems, and library programming. Possible nontermination must be admitted explicitly as `diverge`; absence of `diverge` does not mean that every well-typed computation is guaranteed to produce a normal result rather than terminate at an explicit nonrecoverable defect boundary. Its design objective is not maximal expressiveness per mechanism. It is a small set of orthogonal semantic mechanisms that remain understandable when composed.
@@ -64,7 +65,7 @@ This law concerns source-level semantic redundancy. Canonical interfaces may res
 
 ## 3. Parsing is independent of semantic analysis
 
-Eldude source can be parsed without name resolution, type checking, imported implementation bodies, or trait resolution.
+Eldude source can be parsed without name resolution, type checking, imported implementation bodies, or trait resolution. One complete checked grammar artifact defines both source and the distinct generated-interface entry point. The standalone [Formal Grammar](ELDUDE-FORMAL-GRAMMAR.md) and the full specification reproduce it mechanically; [EBNF](eldude.ebnf) and [JSON](eldude-grammar.json) provide machine-readable forms.
 
 The language uses:
 
@@ -77,7 +78,7 @@ The language uses:
 
 The Full Specification publishes the normative surface grammar needed to enforce this law. In particular, `!` is reserved for effect-category syntax (`!e` at effect-row generic declaration sites and `!Effect::op(...)` for algebraic operation dispatch), not overloaded as a general expression-prefix operator. Expression-level type application uses turbofish specifically so `<...>` never requires name resolution to distinguish a comparison from generic application.
 
-User-defined operators and precedence are excluded. Many-shot resumption is deferred and `many` is not reserved as a keyword in the 0.0.1 source grammar.
+User-defined operators and precedence are excluded. Many-shot resumption is deferred and `many` is not reserved as a keyword in the 0.0.2 source grammar.
 
 ## 4. Local reasoning is a design requirement
 
@@ -100,7 +101,7 @@ A feature that requires whole-program reasoning, unstable inference, global alia
 
 Eldude accepts conservative checking where exact inference would make the language substantially less predictable. When termination or control safety cannot be proved, the program admits `diverge` or is rejected at the relevant safety boundary rather than relying on undocumented heuristics.
 
-The same burden applies to mechanisms already present in the design. High-cost features are not exempt merely because they appear in an early draft: they must justify their cross-feature checking, diagnostics, runtime, and separate-compilation costs with concrete programs. The 0.0.1 core therefore defers many-shot resumption rather than forcing arbitrary continuation duplication through usage, handlers, concurrency, state, and separate compilation before a concrete need earns that cost.
+The same burden applies to mechanisms already present in the design. High-cost features are not exempt merely because they appear in an early draft: they must justify their cross-feature checking, diagnostics, runtime, and separate-compilation costs with concrete programs. The 0.0.2 core therefore defers many-shot resumption rather than forcing arbitrary continuation duplication through usage, handlers, concurrency, state, and separate compilation before a concrete need earns that cost.
 
 ## 6. Defer generality until a concrete use case earns it
 
@@ -135,6 +136,10 @@ is permitted exactly when the value is semantically duplicable. Representation s
 
 Physical address is never part of ordinary safe value semantics.
 
+Reading a data field by value while preserving its aggregate requires `Dup` of the field, not of the whole aggregate. The copied value retains its own provenance, including when read through `view` or `mut`; result contracts preserve that provenance without allowing the grant to escape. Ownership decomposition uses patterns that consume the whole matched value and transfer its components; ignoring an owned value requires `Discard`. Field access creates no partially moved aggregate or reference value. A computed owned temporary used for field projection must itself be discardable, so reading one field cannot silently abandon a linear remainder. Optional field access follows the same ownership rules.
+
+Continuing branches must agree on non-discardable ownership; a discardable value consumed on only some paths becomes unavailable after the join. A `using` frame instead retains conditional cleanup responsibility. Every continuing loop edge restores the header's outer ownership state, and each iteration discharges its own local obligations.
+
 ## 8. Bindings do not change
 
 `let` bindings are immutable. Same-scope shadowing creates a new binding:
@@ -148,7 +153,11 @@ There is no assignment expression, assignment statement, compound assignment, or
 
 Mutable identity exists only through explicit state abstractions.
 
+Ordinary top-level `let` initializers are pure and terminating and produce only `Dup + Discard` values. Module bindings are reusable definitions; affine/linear ownership and runtime state belong to the host/root lifecycle or explicit abstractions created during execution. A duplicable factory may still produce a fresh resource obligation on each call.
+
 Local inferred polymorphism is deliberately conservative around effects and identity. A `let` binding is implicitly generalized only when evaluating its initializer has no admitted effect and the generalized variables are not already fixed by the surrounding type, capture/provenance, region, usage, access, or structural context. Lexical region identities are never implicitly generalized. In particular, constructing mutable identity such as `Ref<T,@r>` performs `state<@r>` and therefore cannot create a polymorphic mutable cell by local generalization. When these conditions do not hold, the binding remains monomorphic.
+
+Declarations and representation members are private to their module unless marked `pub`. A public nominal type may keep all fields and constructors hidden. Public traits/effects expose their complete contracts; `pub import` explicitly re-exports an existing public identity without weakening its opacity.
 
 ## 9. Evaluation is strict and left-to-right
 
@@ -191,7 +200,7 @@ A closure whose retained environment is duplicable and discardable is unrestrict
 
 Calling a function value consumes one logical instance of that value. An unrestricted function value may therefore be called repeatedly; a linear closure may be called exactly once.
 
-This same rule applies to other first-class callable packages. Lexical handler frames are not first-class values in the 0.0.1 core. Callable-environment captures and result provenance are distinct contracts: every callable also has a compiler-tracked result-capture relationship describing which argument or environment provenance may be retained by its result. Public and erased callables preserve that relationship through canonical interfaces; abstraction cannot turn a region-, taskgroup-, effect-instance-, or foreign-tied result into provenance-free data.
+This same rule applies to other first-class callable packages. Lexical handler frames are not first-class values in the 0.0.2 core. Callable-environment captures and result provenance are distinct contracts: every callable also has a compiler-tracked result-capture relationship describing which argument or environment provenance may be retained by its result. Public and erased callables preserve that relationship through canonical interfaces; abstraction cannot turn a region-, taskgroup-, effect-instance-, or foreign-tied result into provenance-free data.
 
 ---
 
@@ -199,9 +208,11 @@ This same rule applies to other first-class callable packages. Lexical handler f
 
 ## 12. Nominal algebraic data is primary
 
-Eldude uses nominal `struct` and `enum` types, exhaustive pattern matching, GADTs, higher-rank polymorphism where explicit, higher-kinded parameters, and compile-time natural parameters.
+Eldude uses nominal `struct` and `enum` types, exhaustive pattern matching, GADTs, higher-rank polymorphism where explicit, higher-kinded parameters, and compile-time natural parameters. Recursive source data follows a finite storage-based positivity rule: recursive children occur only through certified positive stored components. Structural recursion decreases through actual constructor subterms; function calls, mutable identities, and reconstruction do not create subterm evidence.
 
 Structural records, general explicit existentials, and type-level lambdas are not currently part of the language.
+
+Ordinary numeric operators have fixed portable semantics: `Int`/`UInt` are 64-bit, bounded integer arithmetic defects on overflow, division truncates toward zero, and floats use binary32/binary64 ties-to-even arithmetic with explicit NaN comparison behavior. Literal suffixes or expected types determine numeric types; unconstrained integers default to `Int` and fractional/exponent literals to `Float64`. There are no implicit numeric promotions.
 
 ## 13. Usage has two primitive permissions
 
@@ -231,7 +242,7 @@ Trait resolution terminates and is independent of import order. An implicit impl
 
 Overlapping or incoherent implicit implementations are excluded. Alternative behavior uses explicit wrapper values or dictionaries.
 
-Associated types and generic associated types are supported when checking remains decidable.
+Implicit implementation heads use first-order matching and head-only overlap checks. Every searched trait prerequisite must be structurally smaller, with no increase in any parameter's occurrences. Associated types and generic associated types use the same decreasing-input discipline for further projections; implementation prerequisites cannot use projections to conceal growth. Unresolved generic projections remain opaque until a declared equality or applicable equation determines them. These are fixed acceptance rules, not compiler-selected recursion limits.
 
 ## 15. Static opacity uses nominal types; dynamic erasure uses `any`
 
@@ -245,7 +256,7 @@ Runtime heterogeneity uses:
 any Trait
 ```
 
-Dynamic compatibility is deliberately conservative and closed. An `any Trait<...>` package is formable only when the package interface satisfies Eldude's `DynCompatible` judgment using canonical interface information alone. In the 0.0.1 core every trait method belongs to that dynamic interface: it must have a receiver, declare no method-local generic parameters, expose no concrete `Self` outside the receiver, use no GAT projection, and resolve every associated type used by the callable signature to a package-visible type. Any remaining method constraint, effect contract, or result-capture relationship must be expressible from the erased package interface without knowing the hidden concrete implementation type.
+Dynamic compatibility is deliberately conservative and closed. An `any Trait<...>` package is formable only when the package interface satisfies Eldude's `DynCompatible` judgment using canonical interface information alone. In the 0.0.2 core every trait method belongs to that dynamic interface: it must have a receiver, declare no method-local generic parameters, expose no concrete `Self` outside the receiver, use no GAT projection, and resolve every associated type used by the callable signature to a package-visible type. Any remaining method constraint, effect contract, or result-capture relationship must be expressible from the erased package interface without knowing the hidden concrete implementation type.
 
 Because there is no per-method dynamic-exclusion syntax, one incompatible method makes that `any Trait<...>` form invalid. Static-only behavior remains available through nominal abstraction, explicit wrappers/dictionaries, or a separate dyn-compatible trait. Dynamic compatibility is therefore a deterministic interface property, not an implementation-body heuristic.
 
@@ -272,6 +283,8 @@ fn(A) -> B
 
 means no admitted ordinary effect and no admitted nontermination, subject to the contracts of primitives, foreign functions, handlers, and the host. It does not promise defect-freedom: an explicit failed assertion may terminate the computation at the host diagnostic boundary instead of producing `B`.
 
+For a callable with `mut` parameters or receiver, the written row describes additional effects under caller-supplied access authority. `fn(mut T) -> R` may update through that grant; forming a root grant to invoke it still charges the owner's region state. An empty written row therefore does not make an owned-root mutable invocation pure.
+
 Possible nontermination is represented by the intrinsic semantic effect:
 
 ```eldude
@@ -284,7 +297,7 @@ When the compiler cannot prove absence of nontermination, it admits `diverge` ra
 
 ## 17. Effects describe admitted computation behavior
 
-Effects are visible in function types. They describe the behaviors represented in Eldude effect rows; they are not an exhaustive catalogue of every observable structural outcome of evaluation.
+Effect rows and explicit access modes make admitted computation behavior visible in function contracts. Rows describe additional effects under any supplied `mut` authority; root mutable access also contributes region state. They are not an exhaustive catalogue of every observable structural outcome of evaluation.
 
 ```eldude
 fn(Path) ->{fs} Bytes
@@ -299,9 +312,9 @@ Eldude distinguishes:
 
 `suspend`, `diverge`, and `state<@r>` are not ordinary user-handleable algebraic operations. Defect termination and cooperative cancellation are not effect-row entries; they are structural control outcomes governed by their dedicated rules.
 
-Effect rows also determine a compiler-derived **continuation-control envelope**. In the 0.0.1 core, the relevant property is whether evaluation may abandon the surrounding continuation. The envelope is evaluated relative to the current structural-control context: `suspend` contributes an abandonment path only when cooperative cancellation is unmasked at that point, while an algebraic family with an `affine` operation contributes an abandonment path regardless of cancellation masking unless that family is handled before the boundary. `tail` and `once` operations are non-abandoning. In ordinary unmasked code, an unconstrained open effect-row variable is checked conservatively as potentially abandoning. This envelope is derived from existing effect declarations and structural masks; it is not a new source-level effect or permission axis.
+Effect rows also determine a compiler-derived **continuation-control envelope**. In the 0.0.2 core, the relevant property is whether evaluation may abandon the surrounding continuation. The envelope is evaluated relative to the current structural-control context: `suspend` contributes an abandonment path only when cooperative cancellation is unmasked at that point, while an algebraic family with an `affine` operation contributes an abandonment path regardless of cancellation masking unless that family is handled before the boundary. `tail` and `once` operations are non-abandoning. In ordinary unmasked code, an unconstrained open effect-row variable is checked conservatively as potentially abandoning. This envelope is derived from existing effect declarations and structural masks; it is not a new source-level effect or permission axis.
 
-Eldude 0.0.1 exposes one compiler-governed constraint on that already-derived property:
+Eldude 0.0.2 exposes one compiler-governed constraint on that already-derived property:
 
 ```eldude
 where e: NonAbandoning
@@ -335,7 +348,7 @@ Handlers are deep. Resumption is lexical and written only as:
 resume(value)
 ```
 
-There is no first-class continuation variable. Many-shot resumption is not part of the 0.0.1 core; it is deferred until concrete programs and implementation evidence justify continuation duplication.
+There is no first-class continuation variable. Many-shot resumption is not part of the 0.0.2 core; it is deferred until concrete programs and implementation evidence justify continuation duplication.
 
 Eldude has no separate `abort` resumption mode. An operation that is semantically abortive is written as an `affine` operation returning `Never`:
 
@@ -376,7 +389,7 @@ enum LoadError {
 }
 ```
 
-Eldude has no structural `error { ... }` set type in the 0.0.1 core. When APIs compose distinct nominal error types, they map them explicitly into a chosen nominal error type.
+Eldude has no structural `error { ... }` set type in the 0.0.2 core. When APIs compose distinct nominal error types, they map them explicitly into a chosen nominal error type.
 
 Postfix `?` performs identity propagation of a `Result<E,T>` to a compatible lexical `try` boundary or enclosing `Result<E,_>` function. It never performs programmer-defined conversion code, structural error-set injection, or widening implicitly.
 
@@ -423,6 +436,8 @@ Errors may optionally implement a pure `Diagnostic` trait that produces structur
 Eldude separates two forms of mutable identity.
 
 A nonduplicable mutable owner is mutated through exclusive call-scoped `mut` access. The bundled standard-library `DynArray<T,@r>` is the canonical example; the semantic category is not tied to that exact collection type. Forming a root `mut` grant requires compiler-recognized mutable-owner identity on a designated region-owned abstraction; being non-`Dup` is necessary for exclusive ownership but does not itself create mutable identity. Scoped projection may derive a `mut` grant to an arbitrary subvalue from an already valid parent-owner grant without making the subvalue a new root mutable owner. Mutable-owner status is not a user-implementable trait.
+
+Forming a root grant charges `state<@r>` to the caller even when the callee's written row is empty. A callee receives state authority for updates through that grant; forwarding and projection preserve the already-accounted authority without requiring the target type or callback row to name the parent region. This applies equally to `mut self` traits and dynamic dispatch. Independent mutable identities and every explicitly declared effect of an invoked callable still use ordinary row accounting; supplied authority never erases those effects. Only a non-escaping region boundary eliminates the enclosing computation's accounted region state.
 
 An aliasable cell is an explicit shared-state abstraction whose operations carry `state<@r>`. The bundled standard-library `Ref<T,@r>` is the canonical example; the core law is about aliasable region state, not that exact type name.
 
@@ -720,15 +735,15 @@ Safe self-referential ordinary Eldude values are not a general language feature.
 
 ## 45. Foreign threads do not silently become Eldude strands
 
-A synchronous same-domain foreign callback may re-enter Eldude according to its audited FFI contract. Callback contracts must state invocation cardinality—whether the callback may be skipped or repeated—and whether the same registration may be re-entered before a prior invocation returns. Ordinary `Discard`/`Dup` rules govern the callback environment: possible skipping requires discardability, repeated invocation requires duplicability, and re-entry of the same registration likewise requires a duplicable environment.
+A synchronous same-domain foreign callback may re-enter Eldude according to its audited FFI contract. Callback contracts must state invocation cardinality—whether the callback may be skipped or repeated—and whether the same registration may be re-entered before a prior invocation returns. Ordinary `Discard`/`Dup` rules govern the callback environment: skipping and abandonment requires discardability (or an ownership-preserving return/discharge protocol), repeated invocation requires duplicability, and re-entry of the same registration likewise requires a duplicable environment.
 
 An ordinary safe same-domain synchronous callback executes beneath an internal **foreign-control barrier**. While that barrier is active, callback execution must not reach an ordinary `suspend` point, and an algebraic operation may resolve only to a handler installed on the callback side of the barrier. Handler lookup does not cross the waiting foreign frame, regardless of whether the operation is `tail`, `once`, or `affine`. `NonAbandoning` does not weaken this rule: non-abandoning operations may still require continuation capture and resumption. Pending cooperative cancellation remains pending until execution has returned through the foreign call to an ordinary Eldude cancellation-delivery point.
 
-A safe synchronous callback that can defect must have an audited defect rendezvous: the runtime/native shim records the defect, performs callback-local structural unwinding, returns through the foreign call using a contractually valid private control path, and resumes Eldude defect unwinding only after control reaches an Eldude boundary. Any native sentinel used only for this rendezvous is not exposed as a normal recoverable application result. A foreign API that cannot provide such a rendezvous requires an unsafe/native adapter; Eldude defects and foreign exceptions do not unwind arbitrarily through foreign frames.
+A safe synchronous callback that can defect must have an audited defect rendezvous: the runtime/native shim records the defect, performs callback-local structural unwinding, returns through the foreign call using a contractually valid private control path, and resumes Eldude defect unwinding only after control reaches an Eldude boundary. Any native sentinel used only for this rendezvous is not exposed as a normal recoverable application result. Before callback-local defect cleanup begins, every active enclosing synchronous invocation is marked pending; further callback entry through that invocation or its nested waiting chain is suppressed through the same private ABI path until rendezvous. It cannot execute fresh Eldude work, clear the defect, or abandon retained callback obligations. A foreign API that cannot provide such a rendezvous requires an unsafe/native adapter; Eldude defects and foreign exceptions do not unwind arbitrarily through foreign frames.
 
 A host/native adapter may define a separately audited stack-preserving synchronous-callback protocol that permits `suspend`. Such a protocol must define native-stack lifetime, runtime rooting, resumption thread/fiber behavior, pointer stability, reentrancy, cancellation rendezvous, defect rendezvous, and shutdown. Permission to suspend does not by itself permit algebraic continuation capture through the foreign frame; cross-foreign-frame algebraic control remains outside the ordinary safe model.
 
-An asynchronous callback from another native thread is posted to an Eldude execution domain and runs later as ordinary Eldude work. It does not execute arbitrary Eldude code concurrently on the foreign thread. A retained callback registration has an explicit lifetime owner that deregisters and drains accepted/in-flight callback work before releasing captured Eldude state.
+An asynchronous callback from another native thread is posted to an Eldude execution domain and runs later as ordinary Eldude work. It does not execute arbitrary Eldude code concurrently on the foreign thread. A retained callback registration has an explicit lifetime owner that deregisters and drains accepted/in-flight callback work before releasing captured Eldude state. Cardinality covers the whole lifecycle, including close and cancellation. Suppressing an undelivered callback requires `Discard`, returns/transfers the callback obligation, or performs specified structural discharge. Automatic cleanup cannot return an obligation and must instead guarantee a valid discard or discharge.
 
 Foreign APIs requiring synchronous arbitrary-thread execution require an explicit unsafe/native adapter with audited runtime attachment and synchronization semantics.
 
@@ -774,7 +789,7 @@ Interfaces include, as applicable:
 - foreign/ABI semantic contracts;
 - root-only host/embedding contracts when the artifact itself is an application or embedding root.
 
-Ordinary library interfaces contain no separate host-requirement predicate. Every client-validity fact in the canonical machine interface must also have a deterministic human-readable generated rendering. Facts already expressible in ordinary Eldude syntax use that syntax; inferred facts such as result-capture relationships and mutable-owner status use normalized generated semantic clauses rather than opaque compiler variables or lifetime inequalities. Canonical interface notation is a distinct toolchain grammar: generated `semantic { ... }` clauses are not silently treated as author-written source syntax. Generated unordered rows and sets use one deterministic textual ordering so equivalent public semantics produce stable signatures and diffs.
+Ordinary library interfaces contain no separate host-requirement predicate. Every client-validity fact in the canonical machine interface must also have a deterministic human-readable generated rendering. Facts already expressible in ordinary Eldude syntax use that syntax; inferred facts such as result-capture relationships and mutable-owner status use normalized generated semantic clauses rather than opaque compiler variables or lifetime inequalities. Generated semantic selectors scope these facts to individual trait/implementation members and nested callable slots, including positional argument and callable-environment provenance. Canonical interface notation is a distinct toolchain grammar: generated `semantic { ... }` clauses are not silently treated as author-written source syntax. Generated `ffi-contract` clauses render every applicable audited native fact, including callback barriers, pending-defect suppression, lifecycle cardinality, and drain/discharge obligations; referenced protocols include normalized human-readable descriptions. These clauses stay separate from mechanically derived ABI facts. Generated unordered rows and sets use one deterministic textual ordering so equivalent public semantics produce stable signatures and diffs.
 
 Optimization bodies and specialization hints are separate non-semantic metadata.
 
@@ -814,7 +829,7 @@ The current Eldude design deliberately excludes:
 - general-purpose panic/exception semantics;
 - a separate `abort` resumption mode (`affine ... -> Never` is used instead);
 - structural `error { ... }` set types or implicit error-set widening;
-- many-shot algebraic resumption in the 0.0.1 core;
+- many-shot algebraic resumption in the 0.0.2 core;
 - unchecked implicit failure conversion;
 - overlapping/incoherent traits;
 - mandatory whole-program monomorphization;
@@ -826,7 +841,7 @@ The current Eldude design deliberately excludes:
 - safe `spawn` results that carry non-`Discard` ownership obligations across the task boundary;
 - user-defined operators/precedence;
 - ambient executable module initialization;
-- first-class handler values/types in the 0.0.1 core;
+- first-class handler values/types in the 0.0.2 core;
 - source-level host-selection declarations;
 - syntax whose only current justification is convenience.
 

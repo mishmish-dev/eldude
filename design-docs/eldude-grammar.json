@@ -1,0 +1,5299 @@
+{
+  "entry_points": {
+    "interface": "interface_file",
+    "source": "source_file"
+  },
+  "format": "eldude-grammar",
+  "format_version": 1,
+  "language": {
+    "name": "Eldude",
+    "version": "0.0.2"
+  },
+  "lexical": {
+    "contextual_words": [
+      "state",
+      "tail",
+      "with"
+    ],
+    "encoding": "UTF-8",
+    "excluded_scalar_ranges": [
+      [
+        55296,
+        57343
+      ]
+    ],
+    "literal_vocabulary": {
+      "interface_file": [
+        "!",
+        "!=",
+        "#",
+        "%",
+        "(",
+        ")",
+        "*",
+        "+",
+        ",",
+        "-",
+        "->",
+        ".",
+        "..",
+        ".?",
+        "/",
+        ":",
+        "::",
+        ";",
+        "<",
+        "<=",
+        "=",
+        "==",
+        "=>",
+        ">",
+        ">=",
+        "?",
+        "??",
+        "@",
+        "[",
+        "]",
+        "_",
+        "affine",
+        "algebraic-crossing",
+        "aliasing",
+        "any",
+        "as",
+        "assert",
+        "await",
+        "barrier",
+        "blocking",
+        "break",
+        "callback",
+        "cancellation",
+        "captures",
+        "cardinality",
+        "case",
+        "component",
+        "const",
+        "continue",
+        "decreases",
+        "defect",
+        "delivery-domain",
+        "deregistration",
+        "diverge",
+        "drain",
+        "effect",
+        "else",
+        "enum",
+        "extern",
+        "failure-state",
+        "false",
+        "ffi-contract",
+        "ffi-protocol",
+        "finite-positive-parameters",
+        "finite-return",
+        "fn",
+        "for",
+        "forall",
+        "foreign-unwind",
+        "forward",
+        "handle",
+        "handler",
+        "if",
+        "impl",
+        "import",
+        "in",
+        "initialization",
+        "intrinsic",
+        "invocation",
+        "let",
+        "lifetime",
+        "linear",
+        "marshalling",
+        "match",
+        "member",
+        "module",
+        "mut",
+        "mutability",
+        "mutable-owner-region",
+        "native-cancellation",
+        "once",
+        "output",
+        "ownership",
+        "parameter",
+        "pending-defect-entry",
+        "pointer",
+        "preconditions",
+        "protocol",
+        "provenance",
+        "pub",
+        "reentrancy",
+        "region",
+        "result",
+        "result-captures",
+        "resume",
+        "retention",
+        "return",
+        "self",
+        "semantic",
+        "shutdown",
+        "spawn",
+        "stable-address",
+        "state",
+        "struct",
+        "suspend",
+        "suspension",
+        "tail",
+        "taskgroup",
+        "thread-affinity",
+        "trait",
+        "true",
+        "try",
+        "type",
+        "undelivered",
+        "unsafe",
+        "using",
+        "view",
+        "where",
+        "while",
+        "with",
+        "{",
+        "|",
+        "}"
+      ],
+      "source_file": [
+        "!",
+        "!=",
+        "#",
+        "%",
+        "(",
+        ")",
+        "*",
+        "+",
+        ",",
+        "-",
+        "->",
+        ".",
+        "..",
+        ".?",
+        "/",
+        ":",
+        "::",
+        ";",
+        "<",
+        "<=",
+        "=",
+        "==",
+        "=>",
+        ">",
+        ">=",
+        "?",
+        "??",
+        "@",
+        "[",
+        "]",
+        "_",
+        "affine",
+        "any",
+        "as",
+        "assert",
+        "await",
+        "break",
+        "captures",
+        "case",
+        "const",
+        "continue",
+        "decreases",
+        "diverge",
+        "effect",
+        "else",
+        "enum",
+        "extern",
+        "false",
+        "fn",
+        "for",
+        "forall",
+        "forward",
+        "handle",
+        "handler",
+        "if",
+        "impl",
+        "import",
+        "in",
+        "intrinsic",
+        "let",
+        "linear",
+        "match",
+        "module",
+        "mut",
+        "once",
+        "pub",
+        "region",
+        "resume",
+        "return",
+        "self",
+        "spawn",
+        "state",
+        "struct",
+        "suspend",
+        "tail",
+        "taskgroup",
+        "trait",
+        "true",
+        "try",
+        "type",
+        "unsafe",
+        "using",
+        "view",
+        "where",
+        "while",
+        "with",
+        "{",
+        "|",
+        "}"
+      ]
+    },
+    "matching": "longest; ties prefer tokens in declaration order before punctuation",
+    "regex_dialect": "Python re",
+    "reserved_words": [
+      "affine",
+      "any",
+      "as",
+      "assert",
+      "await",
+      "break",
+      "captures",
+      "case",
+      "const",
+      "continue",
+      "decreases",
+      "diverge",
+      "effect",
+      "else",
+      "enum",
+      "extern",
+      "false",
+      "fn",
+      "for",
+      "forall",
+      "forward",
+      "handle",
+      "handler",
+      "if",
+      "impl",
+      "import",
+      "in",
+      "intrinsic",
+      "let",
+      "linear",
+      "match",
+      "module",
+      "mut",
+      "once",
+      "pub",
+      "region",
+      "resume",
+      "return",
+      "self",
+      "spawn",
+      "struct",
+      "suspend",
+      "taskgroup",
+      "trait",
+      "true",
+      "try",
+      "type",
+      "unsafe",
+      "using",
+      "view",
+      "where",
+      "while"
+    ],
+    "skip": [
+      {
+        "name": "SPACE",
+        "pattern": "[ \\t\\r\\n]+"
+      },
+      {
+        "name": "LINE_COMMENT",
+        "pattern": "//[^\\r\\n]*"
+      },
+      {
+        "name": "BLOCK_COMMENT",
+        "pattern": "/\\*(?:[^*]|\\*(?!/))*\\*/"
+      }
+    ],
+    "tokens": [
+      {
+        "name": "FLOAT_LITERAL",
+        "pattern": "(?:[0-9](?:_?[0-9])*\\.[0-9](?:_?[0-9])*(?:[eE][+-]?[0-9](?:_?[0-9])*)?|[0-9](?:_?[0-9])*[eE][+-]?[0-9](?:_?[0-9])*)(?:f32|f64)?|[0-9](?:_?[0-9])*(?:f32|f64)"
+      },
+      {
+        "name": "INT_LITERAL",
+        "pattern": "(?:0b[01](?:_?[01])*|0o[0-7](?:_?[0-7])*|0x[0-9a-fA-F](?:_?[0-9a-fA-F])*|[0-9](?:_?[0-9])*)(?:i8|i16|i32|i64|i128|u8|u16|u32|u64|u128|int|uint|nat)?"
+      },
+      {
+        "name": "STRING_LITERAL",
+        "pattern": "\"(?:[^\"\\\\\\x00-\\x1f]|\\\\(?:[\"\\'\\\\nrt0]|u\\{[0-9a-fA-F]{1,6}\\}))*\""
+      },
+      {
+        "name": "CHAR_LITERAL",
+        "pattern": "'(?:[^'\\\\\\x00-\\x1f]|\\\\(?:[\"\\'\\\\nrt0]|u\\{[0-9a-fA-F]{1,6}\\}))'"
+      },
+      {
+        "name": "IDENT",
+        "pattern": "[A-Za-z_][A-Za-z_0-9]*"
+      }
+    ],
+    "unicode_scalar_range": [
+      0,
+      1114111
+    ]
+  },
+  "parsing_conventions": [
+    "`value.method(args)` selects a consuming/value receiver (`self`);",
+    "`view value.method(args)` selects `view self`;",
+    "`mut value.method(args)` selects `mut self`;",
+    "`view`/`mut` access arguments and access-prefixed method receivers apply to an in-scope binding (including a callback parameter carrying a projected grant), not to an arbitrary computed expression; compute an expression into a binding first when access must be granted to its result;",
+    "this binding-only rule keeps `f(view x.method())` unambiguous: it is a plain argument whose expression is the `view self` method call, while `f(view x)` is an ordinary `view` argument;",
+    "the parser chooses among the three method forms syntactically, before method lookup; the type checker later verifies that the selected method has the matching receiver mode;",
+    "`!path::op(args)` is always algebraic operation dispatch;",
+    "`@name`, `#name`, `!name` in generic-parameter lists, and `..name` in capture-row positions are determined solely by grammatical context;",
+    "`semantic { ... }` is not ordinary source syntax; it belongs to the canonical-interface entry point of Appendix F;",
+    "an unparenthesized nominal construction is excluded from the outer condition/scrutinee/source expression of `if`, `while`, `match`, and `for`; parentheses permit it and prevent confusion with the following block;",
+    "`await` and `spawn` take the immediately following unary/postfix operand; use parentheses or a block to group a larger computation;",
+    "an undelimited `=>` lambda body and the operand of `return` consume the longest following expression permitted by the enclosing grammatical delimiters. Among complete derivations, compare those body/operand end-token positions in order of their introducing `=>`/`return` tokens, earliest first, and choose the lexicographically greatest vector. Thus `fn(x) => x + 1` keeps the addition inside the lambda and `return f() + 1` returns the sum. Parenthesize the lambda/return expression when a following postfix/binary operation belongs outside it, as in `(fn(x) => x)(1)`;",
+    "a capture clause attaches to the nearest unparenthesized function contract; parenthesize a returned function type before writing a capture clause for the outer function;",
+    "a generic closing `>` immediately followed by `=` forms the longest token `>=`; separate them with whitespace when a closing delimiter and equality/initializer token are intended."
+  ],
+  "productions": {
+    "@1": [
+      [],
+      [
+        {
+          "rule": "module_item"
+        },
+        {
+          "rule": "@1"
+        }
+      ]
+    ],
+    "@10": [
+      [],
+      [
+        {
+          "rule": "decreases_clause"
+        }
+      ]
+    ],
+    "@100": [
+      [],
+      [
+        {
+          "rule": "argument"
+        },
+        {
+          "rule": "@101"
+        },
+        {
+          "rule": "@102"
+        }
+      ]
+    ],
+    "@101": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "argument"
+        },
+        {
+          "rule": "@101"
+        }
+      ]
+    ],
+    "@102": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@103": [
+      [],
+      [
+        {
+          "rule": "value_fields"
+        }
+      ]
+    ],
+    "@104": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "value_field"
+        },
+        {
+          "rule": "@104"
+        }
+      ]
+    ],
+    "@105": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@106": [
+      [],
+      [
+        {
+          "literal": ":"
+        },
+        {
+          "rule": "expr"
+        }
+      ]
+    ],
+    "@107": [
+      [],
+      [
+        {
+          "rule": "expr"
+        },
+        {
+          "rule": "@108"
+        },
+        {
+          "rule": "@109"
+        }
+      ]
+    ],
+    "@108": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "expr"
+        },
+        {
+          "rule": "@108"
+        }
+      ]
+    ],
+    "@109": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@11": [
+      [],
+      [
+        {
+          "literal": ":"
+        },
+        {
+          "rule": "type"
+        }
+      ]
+    ],
+    "@110": [
+      [],
+      [
+        {
+          "rule": "expr"
+        },
+        {
+          "rule": "@111"
+        },
+        {
+          "rule": "@112"
+        }
+      ]
+    ],
+    "@111": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "expr"
+        },
+        {
+          "rule": "@111"
+        }
+      ]
+    ],
+    "@112": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@113": [
+      [],
+      [
+        {
+          "rule": "lambda_param"
+        },
+        {
+          "rule": "@114"
+        },
+        {
+          "rule": "@115"
+        }
+      ]
+    ],
+    "@114": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "lambda_param"
+        },
+        {
+          "rule": "@114"
+        }
+      ]
+    ],
+    "@115": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@116": [
+      [],
+      [
+        {
+          "rule": "result_contract"
+        }
+      ]
+    ],
+    "@117": [
+      [],
+      [
+        {
+          "rule": "access_mode"
+        }
+      ]
+    ],
+    "@118": [
+      [],
+      [
+        {
+          "literal": ":"
+        },
+        {
+          "rule": "type"
+        }
+      ]
+    ],
+    "@119": [
+      [],
+      [
+        {
+          "rule": "statement"
+        },
+        {
+          "rule": "@119"
+        }
+      ]
+    ],
+    "@12": [
+      [],
+      [
+        {
+          "rule": "usage_modifier"
+        }
+      ]
+    ],
+    "@120": [
+      [],
+      [
+        {
+          "rule": "expr"
+        }
+      ]
+    ],
+    "@121": [
+      [],
+      [
+        {
+          "literal": "else"
+        },
+        {
+          "rule": "block"
+        }
+      ],
+      [
+        {
+          "literal": "else"
+        },
+        {
+          "rule": "if_expr"
+        }
+      ]
+    ],
+    "@122": [
+      [],
+      [
+        {
+          "rule": "match_arm"
+        },
+        {
+          "rule": "@122"
+        }
+      ]
+    ],
+    "@123": [
+      [],
+      [
+        {
+          "literal": "if"
+        },
+        {
+          "rule": "condition_expr"
+        }
+      ]
+    ],
+    "@124": [
+      [],
+      [
+        {
+          "rule": "decreases_clause"
+        }
+      ]
+    ],
+    "@125": [
+      [],
+      [
+        {
+          "rule": "decreases_clause"
+        }
+      ]
+    ],
+    "@126": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "acquisition"
+        },
+        {
+          "rule": "@126"
+        }
+      ]
+    ],
+    "@127": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@128": [
+      [],
+      [
+        {
+          "rule": "turbofish"
+        }
+      ]
+    ],
+    "@129": [
+      [],
+      [
+        {
+          "rule": "expr"
+        }
+      ]
+    ],
+    "@13": [
+      [],
+      [
+        {
+          "rule": "generic_params"
+        }
+      ]
+    ],
+    "@130": [
+      [],
+      [
+        {
+          "token": "IDENT"
+        },
+        {
+          "literal": "="
+        }
+      ]
+    ],
+    "@131": [
+      [],
+      [
+        {
+          "rule": "handler_clause"
+        },
+        {
+          "rule": "@131"
+        }
+      ]
+    ],
+    "@132": [
+      [],
+      [
+        {
+          "rule": "patterns"
+        }
+      ]
+    ],
+    "@133": [
+      [],
+      [
+        {
+          "literal": ";"
+        }
+      ]
+    ],
+    "@134": [
+      [],
+      [
+        {
+          "literal": ";"
+        }
+      ]
+    ],
+    "@135": [
+      [],
+      [
+        {
+          "literal": "??"
+        },
+        {
+          "rule": "condition_expr"
+        }
+      ]
+    ],
+    "@136": [
+      [],
+      [
+        {
+          "rule": "equality_op"
+        },
+        {
+          "rule": "condition_relation"
+        }
+      ]
+    ],
+    "@137": [
+      [],
+      [
+        {
+          "rule": "relational_op"
+        },
+        {
+          "rule": "condition_sum"
+        }
+      ]
+    ],
+    "@138": [
+      [],
+      [
+        {
+          "literal": "+"
+        },
+        {
+          "rule": "condition_product"
+        },
+        {
+          "rule": "@138"
+        }
+      ],
+      [
+        {
+          "literal": "-"
+        },
+        {
+          "rule": "condition_product"
+        },
+        {
+          "rule": "@138"
+        }
+      ]
+    ],
+    "@139": [
+      [],
+      [
+        {
+          "literal": "*"
+        },
+        {
+          "rule": "condition_unary"
+        },
+        {
+          "rule": "@139"
+        }
+      ],
+      [
+        {
+          "literal": "/"
+        },
+        {
+          "rule": "condition_unary"
+        },
+        {
+          "rule": "@139"
+        }
+      ],
+      [
+        {
+          "literal": "%"
+        },
+        {
+          "rule": "condition_unary"
+        },
+        {
+          "rule": "@139"
+        }
+      ]
+    ],
+    "@14": [
+      [],
+      [
+        {
+          "rule": "where_clause"
+        }
+      ]
+    ],
+    "@140": [
+      [],
+      [
+        {
+          "rule": "postfix"
+        },
+        {
+          "rule": "@140"
+        }
+      ]
+    ],
+    "@141": [
+      [],
+      [
+        {
+          "literal": "|"
+        },
+        {
+          "rule": "pattern_atom"
+        },
+        {
+          "rule": "@141"
+        }
+      ]
+    ],
+    "@142": [
+      [],
+      [
+        {
+          "literal": "("
+        },
+        {
+          "rule": "@143"
+        },
+        {
+          "literal": ")"
+        }
+      ],
+      [
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@144"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "@143": [
+      [],
+      [
+        {
+          "rule": "patterns"
+        }
+      ]
+    ],
+    "@144": [
+      [],
+      [
+        {
+          "rule": "pattern_fields"
+        }
+      ]
+    ],
+    "@145": [
+      [],
+      [
+        {
+          "literal": "+"
+        }
+      ],
+      [
+        {
+          "literal": "-"
+        }
+      ]
+    ],
+    "@146": [
+      [],
+      [
+        {
+          "rule": "pattern"
+        },
+        {
+          "rule": "@147"
+        },
+        {
+          "rule": "@148"
+        }
+      ]
+    ],
+    "@147": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "pattern"
+        },
+        {
+          "rule": "@147"
+        }
+      ]
+    ],
+    "@148": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@149": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "pattern"
+        },
+        {
+          "rule": "@149"
+        }
+      ]
+    ],
+    "@15": [
+      [],
+      [
+        {
+          "rule": "fields"
+        }
+      ]
+    ],
+    "@150": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@151": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "pattern_field"
+        },
+        {
+          "rule": "@151"
+        }
+      ]
+    ],
+    "@152": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@153": [
+      [],
+      [
+        {
+          "literal": ":"
+        },
+        {
+          "rule": "pattern"
+        }
+      ]
+    ],
+    "@154": [
+      [],
+      [
+        {
+          "rule": "interface_item"
+        },
+        {
+          "rule": "@154"
+        }
+      ]
+    ],
+    "@155": [
+      [],
+      [
+        {
+          "rule": "semantic_block"
+        }
+      ]
+    ],
+    "@156": [
+      [],
+      [
+        {
+          "rule": "semantic_clause"
+        },
+        {
+          "rule": "@156"
+        }
+      ]
+    ],
+    "@157": [
+      [],
+      [
+        {
+          "rule": "index_list"
+        }
+      ]
+    ],
+    "@158": [
+      [],
+      [
+        {
+          "rule": "semantic_clause"
+        },
+        {
+          "rule": "@158"
+        }
+      ]
+    ],
+    "@159": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "token": "INT_LITERAL"
+        },
+        {
+          "rule": "@159"
+        }
+      ]
+    ],
+    "@16": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "field_decl"
+        },
+        {
+          "rule": "@16"
+        }
+      ]
+    ],
+    "@160": [
+      [],
+      [
+        {
+          "rule": "generated_capture"
+        },
+        {
+          "rule": "@161"
+        },
+        {
+          "rule": "@162"
+        }
+      ]
+    ],
+    "@161": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "generated_capture"
+        },
+        {
+          "rule": "@161"
+        }
+      ]
+    ],
+    "@162": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@163": [
+      [],
+      [
+        {
+          "rule": "ffi_clause"
+        },
+        {
+          "rule": "@163"
+        }
+      ]
+    ],
+    "@164": [
+      [],
+      [
+        {
+          "rule": "ffi_clause"
+        },
+        {
+          "rule": "@164"
+        }
+      ]
+    ],
+    "@17": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@18": [
+      [],
+      [
+        {
+          "literal": "pub"
+        }
+      ]
+    ],
+    "@19": [
+      [],
+      [
+        {
+          "rule": "usage_modifier"
+        }
+      ]
+    ],
+    "@2": [
+      [],
+      [
+        {
+          "literal": "pub"
+        }
+      ]
+    ],
+    "@20": [
+      [],
+      [
+        {
+          "rule": "generic_params"
+        }
+      ]
+    ],
+    "@21": [
+      [],
+      [
+        {
+          "rule": "where_clause"
+        }
+      ]
+    ],
+    "@22": [
+      [],
+      [
+        {
+          "rule": "variants"
+        }
+      ]
+    ],
+    "@23": [
+      [],
+      [
+        {
+          "rule": "gadt_constructors"
+        }
+      ]
+    ],
+    "@24": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "variant"
+        },
+        {
+          "rule": "@24"
+        }
+      ]
+    ],
+    "@25": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@26": [
+      [],
+      [
+        {
+          "literal": "pub"
+        }
+      ]
+    ],
+    "@27": [
+      [],
+      [
+        {
+          "literal": "("
+        },
+        {
+          "rule": "@28"
+        },
+        {
+          "literal": ")"
+        }
+      ],
+      [
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@29"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "@28": [
+      [],
+      [
+        {
+          "rule": "type_list"
+        }
+      ]
+    ],
+    "@29": [
+      [],
+      [
+        {
+          "rule": "fields"
+        }
+      ]
+    ],
+    "@3": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "import_name"
+        },
+        {
+          "rule": "@3"
+        }
+      ]
+    ],
+    "@30": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "gadt_constructor"
+        },
+        {
+          "rule": "@30"
+        }
+      ]
+    ],
+    "@31": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@32": [
+      [],
+      [
+        {
+          "literal": "pub"
+        }
+      ]
+    ],
+    "@33": [
+      [],
+      [
+        {
+          "literal": "intrinsic"
+        }
+      ]
+    ],
+    "@34": [
+      [],
+      [
+        {
+          "rule": "generic_params"
+        }
+      ]
+    ],
+    "@35": [
+      [],
+      [
+        {
+          "rule": "where_clause"
+        }
+      ]
+    ],
+    "@36": [
+      [],
+      [
+        {
+          "rule": "trait_member"
+        },
+        {
+          "rule": "@36"
+        }
+      ]
+    ],
+    "@37": [
+      [],
+      [
+        {
+          "literal": "unsafe"
+        }
+      ]
+    ],
+    "@38": [
+      [],
+      [
+        {
+          "rule": "generic_params"
+        }
+      ]
+    ],
+    "@39": [
+      [],
+      [
+        {
+          "rule": "where_clause"
+        }
+      ]
+    ],
+    "@4": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@40": [
+      [],
+      [
+        {
+          "rule": "decreases_clause"
+        }
+      ]
+    ],
+    "@41": [
+      [],
+      [
+        {
+          "rule": "generic_params"
+        }
+      ]
+    ],
+    "@42": [
+      [],
+      [
+        {
+          "rule": "where_clause"
+        }
+      ]
+    ],
+    "@43": [
+      [],
+      [
+        {
+          "rule": "generic_params"
+        }
+      ]
+    ],
+    "@44": [
+      [],
+      [
+        {
+          "rule": "where_clause"
+        }
+      ]
+    ],
+    "@45": [
+      [],
+      [
+        {
+          "rule": "generic_params"
+        }
+      ]
+    ],
+    "@46": [
+      [],
+      [
+        {
+          "literal": "for"
+        },
+        {
+          "rule": "type"
+        }
+      ]
+    ],
+    "@47": [
+      [],
+      [
+        {
+          "rule": "where_clause"
+        }
+      ]
+    ],
+    "@48": [
+      [],
+      [
+        {
+          "rule": "impl_member"
+        },
+        {
+          "rule": "@48"
+        }
+      ]
+    ],
+    "@49": [
+      [],
+      [
+        {
+          "literal": "pub"
+        }
+      ]
+    ],
+    "@5": [
+      [],
+      [
+        {
+          "literal": "as"
+        },
+        {
+          "token": "IDENT"
+        }
+      ]
+    ],
+    "@50": [
+      [],
+      [
+        {
+          "rule": "generic_params"
+        }
+      ]
+    ],
+    "@51": [
+      [],
+      [
+        {
+          "rule": "effect_operation"
+        },
+        {
+          "rule": "@51"
+        }
+      ]
+    ],
+    "@52": [
+      [],
+      [
+        {
+          "rule": "generic_params"
+        }
+      ]
+    ],
+    "@53": [
+      [],
+      [
+        {
+          "rule": "@54"
+        },
+        {
+          "rule": "function_decl"
+        },
+        {
+          "rule": "@53"
+        }
+      ]
+    ],
+    "@54": [
+      [],
+      [
+        {
+          "literal": "pub"
+        }
+      ]
+    ],
+    "@55": [
+      [],
+      [
+        {
+          "rule": "parameter"
+        },
+        {
+          "rule": "@56"
+        },
+        {
+          "rule": "@57"
+        }
+      ]
+    ],
+    "@56": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "parameter"
+        },
+        {
+          "rule": "@56"
+        }
+      ]
+    ],
+    "@57": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@58": [
+      [],
+      [
+        {
+          "rule": "access_mode"
+        }
+      ]
+    ],
+    "@59": [
+      [],
+      [
+        {
+          "rule": "access_mode"
+        }
+      ]
+    ],
+    "@6": [
+      [],
+      [
+        {
+          "literal": "pub"
+        }
+      ]
+    ],
+    "@60": [
+      [],
+      [
+        {
+          "rule": "effect_row"
+        }
+      ]
+    ],
+    "@61": [
+      [],
+      [
+        {
+          "rule": "capture_clause"
+        }
+      ]
+    ],
+    "@62": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "constraint"
+        },
+        {
+          "rule": "@62"
+        }
+      ]
+    ],
+    "@63": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@64": [
+      [],
+      [
+        {
+          "literal": "+"
+        },
+        {
+          "rule": "type"
+        },
+        {
+          "rule": "@64"
+        }
+      ]
+    ],
+    "@65": [
+      [],
+      [
+        {
+          "literal": "::"
+        },
+        {
+          "rule": "path_part"
+        },
+        {
+          "rule": "@65"
+        }
+      ]
+    ],
+    "@66": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "generic_param"
+        },
+        {
+          "rule": "@66"
+        }
+      ]
+    ],
+    "@67": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@68": [
+      [],
+      [
+        {
+          "literal": "<"
+        },
+        {
+          "rule": "placeholders"
+        },
+        {
+          "literal": ">"
+        }
+      ]
+    ],
+    "@69": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "literal": "_"
+        },
+        {
+          "rule": "@69"
+        }
+      ]
+    ],
+    "@7": [
+      [],
+      [
+        {
+          "literal": "unsafe"
+        }
+      ]
+    ],
+    "@70": [
+      [],
+      [
+        {
+          "rule": "mode_type"
+        },
+        {
+          "rule": "@71"
+        },
+        {
+          "rule": "@72"
+        }
+      ]
+    ],
+    "@71": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "mode_type"
+        },
+        {
+          "rule": "@71"
+        }
+      ]
+    ],
+    "@72": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@73": [
+      [],
+      [
+        {
+          "rule": "access_mode"
+        }
+      ]
+    ],
+    "@74": [
+      [],
+      [
+        {
+          "literal": "+"
+        },
+        {
+          "rule": "applied_path"
+        },
+        {
+          "rule": "@74"
+        }
+      ]
+    ],
+    "@75": [
+      [],
+      [
+        {
+          "rule": "type"
+        },
+        {
+          "rule": "@76"
+        },
+        {
+          "rule": "@77"
+        }
+      ]
+    ],
+    "@76": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "type"
+        },
+        {
+          "rule": "@76"
+        }
+      ]
+    ],
+    "@77": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@78": [
+      [],
+      [
+        {
+          "rule": "type_args"
+        }
+      ]
+    ],
+    "@79": [
+      [],
+      [
+        {
+          "literal": "::"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@80"
+        },
+        {
+          "rule": "@79"
+        }
+      ]
+    ],
+    "@8": [
+      [],
+      [
+        {
+          "rule": "generic_params"
+        }
+      ]
+    ],
+    "@80": [
+      [],
+      [
+        {
+          "rule": "type_args"
+        }
+      ]
+    ],
+    "@81": [
+      [],
+      [
+        {
+          "rule": "type_args"
+        }
+      ]
+    ],
+    "@82": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "type_arg"
+        },
+        {
+          "rule": "@82"
+        }
+      ]
+    ],
+    "@83": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@84": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "type"
+        },
+        {
+          "rule": "@84"
+        }
+      ]
+    ],
+    "@85": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@86": [
+      [],
+      [
+        {
+          "rule": "effect_entry"
+        },
+        {
+          "rule": "@87"
+        },
+        {
+          "rule": "@88"
+        }
+      ]
+    ],
+    "@87": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "effect_entry"
+        },
+        {
+          "rule": "@87"
+        }
+      ]
+    ],
+    "@88": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@89": [
+      [],
+      [
+        {
+          "rule": "capture_entry"
+        },
+        {
+          "rule": "@90"
+        },
+        {
+          "rule": "@91"
+        }
+      ]
+    ],
+    "@9": [
+      [],
+      [
+        {
+          "rule": "where_clause"
+        }
+      ]
+    ],
+    "@90": [
+      [],
+      [
+        {
+          "literal": ","
+        },
+        {
+          "rule": "capture_entry"
+        },
+        {
+          "rule": "@90"
+        }
+      ]
+    ],
+    "@91": [
+      [],
+      [
+        {
+          "literal": ","
+        }
+      ]
+    ],
+    "@92": [
+      [],
+      [
+        {
+          "literal": "+"
+        },
+        {
+          "rule": "nat_product"
+        },
+        {
+          "rule": "@92"
+        }
+      ]
+    ],
+    "@93": [
+      [],
+      [
+        {
+          "literal": "*"
+        },
+        {
+          "rule": "nat_atom"
+        },
+        {
+          "rule": "@93"
+        }
+      ]
+    ],
+    "@94": [
+      [],
+      [
+        {
+          "literal": "??"
+        },
+        {
+          "rule": "coalesce_expr"
+        }
+      ]
+    ],
+    "@95": [
+      [],
+      [
+        {
+          "rule": "equality_op"
+        },
+        {
+          "rule": "relational_expr"
+        }
+      ]
+    ],
+    "@96": [
+      [],
+      [
+        {
+          "rule": "relational_op"
+        },
+        {
+          "rule": "sum_expr"
+        }
+      ]
+    ],
+    "@97": [
+      [],
+      [
+        {
+          "literal": "+"
+        },
+        {
+          "rule": "product_expr"
+        },
+        {
+          "rule": "@97"
+        }
+      ],
+      [
+        {
+          "literal": "-"
+        },
+        {
+          "rule": "product_expr"
+        },
+        {
+          "rule": "@97"
+        }
+      ]
+    ],
+    "@98": [
+      [],
+      [
+        {
+          "literal": "*"
+        },
+        {
+          "rule": "unary_expr"
+        },
+        {
+          "rule": "@98"
+        }
+      ],
+      [
+        {
+          "literal": "/"
+        },
+        {
+          "rule": "unary_expr"
+        },
+        {
+          "rule": "@98"
+        }
+      ],
+      [
+        {
+          "literal": "%"
+        },
+        {
+          "rule": "unary_expr"
+        },
+        {
+          "rule": "@98"
+        }
+      ]
+    ],
+    "@99": [
+      [],
+      [
+        {
+          "rule": "postfix"
+        },
+        {
+          "rule": "@99"
+        }
+      ]
+    ],
+    "access_method": [
+      [
+        {
+          "rule": "access_mode"
+        },
+        {
+          "rule": "binding_name"
+        },
+        {
+          "literal": "."
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@128"
+        },
+        {
+          "rule": "arguments"
+        }
+      ]
+    ],
+    "access_mode": [
+      [
+        {
+          "literal": "view"
+        }
+      ],
+      [
+        {
+          "literal": "mut"
+        }
+      ]
+    ],
+    "acquisition": [
+      [
+        {
+          "rule": "binding_name"
+        },
+        {
+          "literal": "="
+        },
+        {
+          "rule": "expr"
+        }
+      ]
+    ],
+    "alias_decl": [
+      [
+        {
+          "literal": "type"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@52"
+        },
+        {
+          "literal": "="
+        },
+        {
+          "rule": "type"
+        },
+        {
+          "literal": ";"
+        }
+      ]
+    ],
+    "any_type": [
+      [
+        {
+          "literal": "any"
+        },
+        {
+          "rule": "applied_path"
+        },
+        {
+          "rule": "@74"
+        }
+      ]
+    ],
+    "applied_path": [
+      [
+        {
+          "rule": "path"
+        },
+        {
+          "rule": "@78"
+        },
+        {
+          "rule": "@79"
+        }
+      ]
+    ],
+    "argument": [
+      [
+        {
+          "rule": "access_mode"
+        },
+        {
+          "rule": "binding_name"
+        }
+      ],
+      [
+        {
+          "rule": "expr"
+        }
+      ]
+    ],
+    "arguments": [
+      [
+        {
+          "literal": "("
+        },
+        {
+          "rule": "@100"
+        },
+        {
+          "literal": ")"
+        }
+      ]
+    ],
+    "associated_decl": [
+      [
+        {
+          "literal": "type"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@41"
+        },
+        {
+          "rule": "@42"
+        },
+        {
+          "literal": ";"
+        }
+      ]
+    ],
+    "associated_equation": [
+      [
+        {
+          "literal": "type"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@43"
+        },
+        {
+          "rule": "@44"
+        },
+        {
+          "literal": "="
+        },
+        {
+          "rule": "type"
+        },
+        {
+          "literal": ";"
+        }
+      ]
+    ],
+    "binding_name": [
+      [
+        {
+          "token": "IDENT"
+        }
+      ],
+      [
+        {
+          "literal": "self"
+        }
+      ]
+    ],
+    "block": [
+      [
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@119"
+        },
+        {
+          "rule": "@120"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "block_statement": [
+      [
+        {
+          "rule": "while_expr"
+        }
+      ],
+      [
+        {
+          "rule": "for_expr"
+        }
+      ]
+    ],
+    "capture_bound": [
+      [
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@160"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "capture_clause": [
+      [
+        {
+          "literal": "captures"
+        },
+        {
+          "rule": "capture_set"
+        }
+      ]
+    ],
+    "capture_entry": [
+      [
+        {
+          "rule": "region_ref"
+        }
+      ],
+      [
+        {
+          "literal": ".."
+        },
+        {
+          "token": "IDENT"
+        }
+      ],
+      [
+        {
+          "rule": "path"
+        }
+      ]
+    ],
+    "capture_set": [
+      [
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@89"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "coalesce_expr": [
+      [
+        {
+          "rule": "equality_expr"
+        },
+        {
+          "rule": "@94"
+        }
+      ]
+    ],
+    "condition_equality": [
+      [
+        {
+          "rule": "condition_relation"
+        },
+        {
+          "rule": "@136"
+        }
+      ]
+    ],
+    "condition_expr": [
+      [
+        {
+          "rule": "condition_equality"
+        },
+        {
+          "rule": "@135"
+        }
+      ]
+    ],
+    "condition_primary": [
+      [
+        {
+          "rule": "literal"
+        }
+      ],
+      [
+        {
+          "rule": "path"
+        }
+      ],
+      [
+        {
+          "rule": "tuple_expr"
+        }
+      ],
+      [
+        {
+          "rule": "list_literal"
+        }
+      ],
+      [
+        {
+          "rule": "lambda"
+        }
+      ],
+      [
+        {
+          "rule": "block"
+        }
+      ],
+      [
+        {
+          "rule": "if_expr"
+        }
+      ],
+      [
+        {
+          "rule": "match_expr"
+        }
+      ],
+      [
+        {
+          "rule": "while_expr"
+        }
+      ],
+      [
+        {
+          "rule": "for_expr"
+        }
+      ],
+      [
+        {
+          "rule": "scoped_expr"
+        }
+      ],
+      [
+        {
+          "rule": "using_expr"
+        }
+      ],
+      [
+        {
+          "rule": "handle_expr"
+        }
+      ],
+      [
+        {
+          "rule": "access_method"
+        }
+      ],
+      [
+        {
+          "rule": "operation_call"
+        }
+      ],
+      [
+        {
+          "rule": "resume_expr"
+        }
+      ],
+      [
+        {
+          "rule": "exit_expr"
+        }
+      ]
+    ],
+    "condition_product": [
+      [
+        {
+          "rule": "condition_unary"
+        },
+        {
+          "rule": "@139"
+        }
+      ]
+    ],
+    "condition_relation": [
+      [
+        {
+          "rule": "condition_sum"
+        },
+        {
+          "rule": "@137"
+        }
+      ]
+    ],
+    "condition_sum": [
+      [
+        {
+          "rule": "condition_product"
+        },
+        {
+          "rule": "@138"
+        }
+      ]
+    ],
+    "condition_unary": [
+      [
+        {
+          "literal": "+"
+        },
+        {
+          "rule": "condition_unary"
+        }
+      ],
+      [
+        {
+          "literal": "-"
+        },
+        {
+          "rule": "condition_unary"
+        }
+      ],
+      [
+        {
+          "literal": "await"
+        },
+        {
+          "rule": "condition_unary"
+        }
+      ],
+      [
+        {
+          "literal": "spawn"
+        },
+        {
+          "rule": "condition_unary"
+        }
+      ],
+      [
+        {
+          "rule": "condition_primary"
+        },
+        {
+          "rule": "@140"
+        }
+      ]
+    ],
+    "constraint": [
+      [
+        {
+          "rule": "constraint_subject"
+        },
+        {
+          "literal": ":"
+        },
+        {
+          "rule": "constraint_bounds"
+        }
+      ],
+      [
+        {
+          "rule": "type"
+        },
+        {
+          "literal": "="
+        },
+        {
+          "rule": "type"
+        }
+      ]
+    ],
+    "constraint_bounds": [
+      [
+        {
+          "rule": "type"
+        },
+        {
+          "rule": "@64"
+        }
+      ]
+    ],
+    "constraint_subject": [
+      [
+        {
+          "rule": "type"
+        }
+      ],
+      [
+        {
+          "literal": ".."
+        },
+        {
+          "token": "IDENT"
+        }
+      ]
+    ],
+    "declaration": [
+      [
+        {
+          "rule": "@6"
+        },
+        {
+          "rule": "function_decl"
+        }
+      ],
+      [
+        {
+          "rule": "@6"
+        },
+        {
+          "rule": "let_decl"
+        }
+      ],
+      [
+        {
+          "rule": "@6"
+        },
+        {
+          "rule": "struct_decl"
+        }
+      ],
+      [
+        {
+          "rule": "@6"
+        },
+        {
+          "rule": "enum_decl"
+        }
+      ],
+      [
+        {
+          "rule": "@6"
+        },
+        {
+          "rule": "trait_decl"
+        }
+      ],
+      [
+        {
+          "rule": "@6"
+        },
+        {
+          "rule": "effect_decl"
+        }
+      ],
+      [
+        {
+          "rule": "@6"
+        },
+        {
+          "rule": "alias_decl"
+        }
+      ],
+      [
+        {
+          "rule": "impl_decl"
+        }
+      ],
+      [
+        {
+          "rule": "extern_block"
+        }
+      ]
+    ],
+    "decreases_clause": [
+      [
+        {
+          "literal": "decreases"
+        },
+        {
+          "rule": "condition_expr"
+        }
+      ]
+    ],
+    "effect_decl": [
+      [
+        {
+          "literal": "effect"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@50"
+        },
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@51"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "effect_entry": [
+      [
+        {
+          "rule": "path"
+        }
+      ],
+      [
+        {
+          "literal": "state"
+        },
+        {
+          "literal": "<"
+        },
+        {
+          "rule": "region_ref"
+        },
+        {
+          "literal": ">"
+        }
+      ],
+      [
+        {
+          "literal": "suspend"
+        }
+      ],
+      [
+        {
+          "literal": "diverge"
+        }
+      ]
+    ],
+    "effect_operation": [
+      [
+        {
+          "literal": "tail"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "parameters"
+        },
+        {
+          "literal": "->"
+        },
+        {
+          "rule": "type"
+        },
+        {
+          "literal": ";"
+        }
+      ],
+      [
+        {
+          "literal": "once"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "parameters"
+        },
+        {
+          "literal": "->"
+        },
+        {
+          "rule": "type"
+        },
+        {
+          "literal": ";"
+        }
+      ],
+      [
+        {
+          "literal": "affine"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "parameters"
+        },
+        {
+          "literal": "->"
+        },
+        {
+          "rule": "type"
+        },
+        {
+          "literal": ";"
+        }
+      ]
+    ],
+    "effect_row": [
+      [
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@86"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "enum_decl": [
+      [
+        {
+          "rule": "@19"
+        },
+        {
+          "literal": "enum"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@20"
+        },
+        {
+          "rule": "@21"
+        },
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@22"
+        },
+        {
+          "literal": "}"
+        }
+      ],
+      [
+        {
+          "rule": "@19"
+        },
+        {
+          "literal": "enum"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@20"
+        },
+        {
+          "literal": "where"
+        },
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@23"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "equality_expr": [
+      [
+        {
+          "rule": "relational_expr"
+        },
+        {
+          "rule": "@95"
+        }
+      ]
+    ],
+    "equality_op": [
+      [
+        {
+          "literal": "=="
+        }
+      ],
+      [
+        {
+          "literal": "!="
+        }
+      ]
+    ],
+    "exit_expr": [
+      [
+        {
+          "literal": "return"
+        },
+        {
+          "rule": "@129"
+        }
+      ],
+      [
+        {
+          "literal": "break"
+        }
+      ],
+      [
+        {
+          "literal": "continue"
+        }
+      ]
+    ],
+    "expr": [
+      [
+        {
+          "rule": "coalesce_expr"
+        }
+      ]
+    ],
+    "extern_block": [
+      [
+        {
+          "literal": "extern"
+        },
+        {
+          "token": "STRING_LITERAL"
+        },
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@53"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "ffi_clause": [
+      [
+        {
+          "rule": "ffi_property"
+        },
+        {
+          "literal": "="
+        },
+        {
+          "rule": "ffi_value"
+        },
+        {
+          "literal": ";"
+        }
+      ],
+      [
+        {
+          "rule": "ffi_subject"
+        },
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@164"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "ffi_contract": [
+      [
+        {
+          "literal": "ffi-contract"
+        },
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@163"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "ffi_property": [
+      [
+        {
+          "literal": "invocation"
+        }
+      ],
+      [
+        {
+          "literal": "blocking"
+        }
+      ],
+      [
+        {
+          "literal": "finite-return"
+        }
+      ],
+      [
+        {
+          "literal": "native-cancellation"
+        }
+      ],
+      [
+        {
+          "literal": "foreign-unwind"
+        }
+      ],
+      [
+        {
+          "literal": "ownership"
+        }
+      ],
+      [
+        {
+          "literal": "retention"
+        }
+      ],
+      [
+        {
+          "literal": "mutability"
+        }
+      ],
+      [
+        {
+          "literal": "aliasing"
+        }
+      ],
+      [
+        {
+          "literal": "stable-address"
+        }
+      ],
+      [
+        {
+          "literal": "provenance"
+        }
+      ],
+      [
+        {
+          "literal": "initialization"
+        }
+      ],
+      [
+        {
+          "literal": "failure-state"
+        }
+      ],
+      [
+        {
+          "literal": "lifetime"
+        }
+      ],
+      [
+        {
+          "literal": "cardinality"
+        }
+      ],
+      [
+        {
+          "literal": "reentrancy"
+        }
+      ],
+      [
+        {
+          "literal": "thread-affinity"
+        }
+      ],
+      [
+        {
+          "literal": "delivery-domain"
+        }
+      ],
+      [
+        {
+          "literal": "barrier"
+        }
+      ],
+      [
+        {
+          "literal": "suspension"
+        }
+      ],
+      [
+        {
+          "literal": "algebraic-crossing"
+        }
+      ],
+      [
+        {
+          "literal": "cancellation"
+        }
+      ],
+      [
+        {
+          "literal": "defect"
+        }
+      ],
+      [
+        {
+          "literal": "pending-defect-entry"
+        }
+      ],
+      [
+        {
+          "literal": "deregistration"
+        }
+      ],
+      [
+        {
+          "literal": "drain"
+        }
+      ],
+      [
+        {
+          "literal": "undelivered"
+        }
+      ],
+      [
+        {
+          "literal": "shutdown"
+        }
+      ],
+      [
+        {
+          "literal": "preconditions"
+        }
+      ]
+    ],
+    "ffi_protocol": [
+      [
+        {
+          "literal": "ffi-protocol"
+        },
+        {
+          "rule": "path"
+        },
+        {
+          "literal": "="
+        },
+        {
+          "token": "STRING_LITERAL"
+        },
+        {
+          "literal": ";"
+        }
+      ]
+    ],
+    "ffi_subject": [
+      [
+        {
+          "rule": "semantic_selector"
+        }
+      ],
+      [
+        {
+          "literal": "pointer"
+        }
+      ],
+      [
+        {
+          "literal": "output"
+        }
+      ],
+      [
+        {
+          "literal": "callback"
+        }
+      ],
+      [
+        {
+          "literal": "marshalling"
+        }
+      ]
+    ],
+    "ffi_value": [
+      [
+        {
+          "token": "IDENT"
+        }
+      ],
+      [
+        {
+          "rule": "capture_bound"
+        }
+      ],
+      [
+        {
+          "literal": "protocol"
+        },
+        {
+          "literal": "("
+        },
+        {
+          "rule": "path"
+        },
+        {
+          "literal": ")"
+        }
+      ]
+    ],
+    "field_decl": [
+      [
+        {
+          "rule": "@18"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "literal": ":"
+        },
+        {
+          "rule": "type"
+        }
+      ]
+    ],
+    "fields": [
+      [
+        {
+          "rule": "field_decl"
+        },
+        {
+          "rule": "@16"
+        },
+        {
+          "rule": "@17"
+        }
+      ]
+    ],
+    "for_expr": [
+      [
+        {
+          "literal": "for"
+        },
+        {
+          "rule": "pattern"
+        },
+        {
+          "literal": "in"
+        },
+        {
+          "rule": "condition_expr"
+        },
+        {
+          "rule": "@125"
+        },
+        {
+          "rule": "block"
+        }
+      ]
+    ],
+    "forall_type": [
+      [
+        {
+          "literal": "forall"
+        },
+        {
+          "rule": "generic_params"
+        },
+        {
+          "literal": "."
+        },
+        {
+          "rule": "type"
+        }
+      ]
+    ],
+    "function_decl": [
+      [
+        {
+          "rule": "@7"
+        },
+        {
+          "literal": "fn"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@8"
+        },
+        {
+          "rule": "parameters"
+        },
+        {
+          "rule": "result_contract"
+        },
+        {
+          "rule": "@9"
+        },
+        {
+          "rule": "@10"
+        },
+        {
+          "rule": "block"
+        }
+      ],
+      [
+        {
+          "rule": "@7"
+        },
+        {
+          "literal": "fn"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@8"
+        },
+        {
+          "rule": "parameters"
+        },
+        {
+          "rule": "result_contract"
+        },
+        {
+          "rule": "@9"
+        },
+        {
+          "rule": "@10"
+        },
+        {
+          "literal": ";"
+        }
+      ]
+    ],
+    "function_type": [
+      [
+        {
+          "literal": "fn"
+        },
+        {
+          "literal": "("
+        },
+        {
+          "rule": "@70"
+        },
+        {
+          "literal": ")"
+        },
+        {
+          "rule": "result_contract"
+        }
+      ]
+    ],
+    "gadt_constructor": [
+      [
+        {
+          "rule": "@32"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "literal": ":"
+        },
+        {
+          "rule": "type"
+        }
+      ]
+    ],
+    "gadt_constructors": [
+      [
+        {
+          "rule": "gadt_constructor"
+        },
+        {
+          "rule": "@30"
+        },
+        {
+          "rule": "@31"
+        }
+      ]
+    ],
+    "generated_capture": [
+      [
+        {
+          "literal": "captures"
+        },
+        {
+          "literal": "("
+        },
+        {
+          "rule": "binding_name"
+        },
+        {
+          "literal": ")"
+        }
+      ],
+      [
+        {
+          "literal": "captures"
+        },
+        {
+          "literal": "("
+        },
+        {
+          "literal": "parameter"
+        },
+        {
+          "literal": "("
+        },
+        {
+          "token": "INT_LITERAL"
+        },
+        {
+          "literal": ")"
+        },
+        {
+          "literal": ")"
+        }
+      ],
+      [
+        {
+          "literal": "captures"
+        },
+        {
+          "literal": "("
+        },
+        {
+          "literal": ".."
+        },
+        {
+          "literal": ")"
+        }
+      ],
+      [
+        {
+          "rule": "capture_entry"
+        }
+      ]
+    ],
+    "generic_param": [
+      [
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@68"
+        }
+      ],
+      [
+        {
+          "literal": "@"
+        },
+        {
+          "token": "IDENT"
+        }
+      ],
+      [
+        {
+          "literal": "!"
+        },
+        {
+          "token": "IDENT"
+        }
+      ],
+      [
+        {
+          "literal": ".."
+        },
+        {
+          "token": "IDENT"
+        }
+      ],
+      [
+        {
+          "literal": "#"
+        },
+        {
+          "token": "IDENT"
+        }
+      ]
+    ],
+    "generic_params": [
+      [
+        {
+          "literal": "<"
+        },
+        {
+          "rule": "generic_param"
+        },
+        {
+          "rule": "@66"
+        },
+        {
+          "rule": "@67"
+        },
+        {
+          "literal": ">"
+        }
+      ]
+    ],
+    "handle_expr": [
+      [
+        {
+          "literal": "handle"
+        },
+        {
+          "rule": "block"
+        },
+        {
+          "literal": "with"
+        },
+        {
+          "rule": "@130"
+        },
+        {
+          "literal": "handler"
+        },
+        {
+          "rule": "applied_path"
+        },
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@131"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "handler_clause": [
+      [
+        {
+          "token": "IDENT"
+        },
+        {
+          "literal": "("
+        },
+        {
+          "rule": "@132"
+        },
+        {
+          "literal": ")"
+        },
+        {
+          "literal": "=>"
+        },
+        {
+          "rule": "expr"
+        },
+        {
+          "rule": "@133"
+        }
+      ],
+      [
+        {
+          "literal": "return"
+        },
+        {
+          "rule": "pattern"
+        },
+        {
+          "literal": "=>"
+        },
+        {
+          "rule": "expr"
+        },
+        {
+          "rule": "@134"
+        }
+      ],
+      [
+        {
+          "literal": "forward"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "literal": ";"
+        }
+      ],
+      [
+        {
+          "literal": "forward"
+        },
+        {
+          "literal": ".."
+        },
+        {
+          "literal": ";"
+        }
+      ]
+    ],
+    "if_expr": [
+      [
+        {
+          "literal": "if"
+        },
+        {
+          "rule": "condition_expr"
+        },
+        {
+          "rule": "block"
+        },
+        {
+          "rule": "@121"
+        }
+      ]
+    ],
+    "impl_decl": [
+      [
+        {
+          "literal": "impl"
+        },
+        {
+          "rule": "@45"
+        },
+        {
+          "rule": "type"
+        },
+        {
+          "rule": "@46"
+        },
+        {
+          "rule": "@47"
+        },
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@48"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "impl_member": [
+      [
+        {
+          "rule": "@49"
+        },
+        {
+          "rule": "method_decl"
+        }
+      ],
+      [
+        {
+          "rule": "associated_equation"
+        }
+      ]
+    ],
+    "import_decl": [
+      [
+        {
+          "rule": "@2"
+        },
+        {
+          "literal": "import"
+        },
+        {
+          "rule": "path"
+        },
+        {
+          "literal": "::"
+        },
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "import_names"
+        },
+        {
+          "literal": "}"
+        },
+        {
+          "literal": ";"
+        }
+      ]
+    ],
+    "import_name": [
+      [
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@5"
+        }
+      ]
+    ],
+    "import_names": [
+      [
+        {
+          "rule": "import_name"
+        },
+        {
+          "rule": "@3"
+        },
+        {
+          "rule": "@4"
+        }
+      ]
+    ],
+    "index_list": [
+      [
+        {
+          "token": "INT_LITERAL"
+        },
+        {
+          "rule": "@159"
+        }
+      ]
+    ],
+    "interface_file": [
+      [
+        {
+          "literal": "module"
+        },
+        {
+          "rule": "path"
+        },
+        {
+          "literal": ";"
+        },
+        {
+          "rule": "@154"
+        }
+      ]
+    ],
+    "interface_item": [
+      [
+        {
+          "rule": "import_decl"
+        }
+      ],
+      [
+        {
+          "rule": "declaration"
+        },
+        {
+          "rule": "@155"
+        }
+      ]
+    ],
+    "lambda": [
+      [
+        {
+          "literal": "fn"
+        },
+        {
+          "literal": "("
+        },
+        {
+          "rule": "@113"
+        },
+        {
+          "literal": ")"
+        },
+        {
+          "literal": "=>"
+        },
+        {
+          "rule": "expr"
+        }
+      ],
+      [
+        {
+          "literal": "fn"
+        },
+        {
+          "literal": "("
+        },
+        {
+          "rule": "@113"
+        },
+        {
+          "literal": ")"
+        },
+        {
+          "rule": "@116"
+        },
+        {
+          "rule": "block"
+        }
+      ]
+    ],
+    "lambda_param": [
+      [
+        {
+          "rule": "@117"
+        },
+        {
+          "rule": "binding_name"
+        },
+        {
+          "rule": "@118"
+        }
+      ]
+    ],
+    "let_decl": [
+      [
+        {
+          "literal": "let"
+        },
+        {
+          "rule": "pattern"
+        },
+        {
+          "rule": "@11"
+        },
+        {
+          "literal": "="
+        },
+        {
+          "rule": "expr"
+        },
+        {
+          "literal": ";"
+        }
+      ]
+    ],
+    "list_literal": [
+      [
+        {
+          "literal": "["
+        },
+        {
+          "rule": "@110"
+        },
+        {
+          "literal": "]"
+        }
+      ]
+    ],
+    "literal": [
+      [
+        {
+          "token": "INT_LITERAL"
+        }
+      ],
+      [
+        {
+          "token": "FLOAT_LITERAL"
+        }
+      ],
+      [
+        {
+          "token": "STRING_LITERAL"
+        }
+      ],
+      [
+        {
+          "token": "CHAR_LITERAL"
+        }
+      ],
+      [
+        {
+          "literal": "true"
+        }
+      ],
+      [
+        {
+          "literal": "false"
+        }
+      ]
+    ],
+    "match_arm": [
+      [
+        {
+          "literal": "case"
+        },
+        {
+          "rule": "pattern"
+        },
+        {
+          "rule": "@123"
+        },
+        {
+          "literal": "=>"
+        },
+        {
+          "rule": "expr"
+        },
+        {
+          "literal": ";"
+        }
+      ]
+    ],
+    "match_expr": [
+      [
+        {
+          "literal": "match"
+        },
+        {
+          "rule": "condition_expr"
+        },
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@122"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "method_decl": [
+      [
+        {
+          "rule": "@37"
+        },
+        {
+          "literal": "fn"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@38"
+        },
+        {
+          "rule": "parameters"
+        },
+        {
+          "rule": "result_contract"
+        },
+        {
+          "rule": "@39"
+        },
+        {
+          "rule": "@40"
+        },
+        {
+          "rule": "block"
+        }
+      ],
+      [
+        {
+          "rule": "@37"
+        },
+        {
+          "literal": "fn"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@38"
+        },
+        {
+          "rule": "parameters"
+        },
+        {
+          "rule": "result_contract"
+        },
+        {
+          "rule": "@39"
+        },
+        {
+          "rule": "@40"
+        },
+        {
+          "literal": ";"
+        }
+      ]
+    ],
+    "mode_type": [
+      [
+        {
+          "rule": "@73"
+        },
+        {
+          "rule": "type"
+        }
+      ]
+    ],
+    "module_item": [
+      [
+        {
+          "rule": "import_decl"
+        }
+      ],
+      [
+        {
+          "rule": "declaration"
+        }
+      ]
+    ],
+    "nat_atom": [
+      [
+        {
+          "token": "INT_LITERAL"
+        }
+      ],
+      [
+        {
+          "token": "IDENT"
+        }
+      ],
+      [
+        {
+          "literal": "("
+        },
+        {
+          "rule": "nat_expr"
+        },
+        {
+          "literal": ")"
+        }
+      ]
+    ],
+    "nat_expr": [
+      [
+        {
+          "rule": "nat_product"
+        },
+        {
+          "rule": "@92"
+        }
+      ]
+    ],
+    "nat_product": [
+      [
+        {
+          "rule": "nat_atom"
+        },
+        {
+          "rule": "@93"
+        }
+      ]
+    ],
+    "operation_call": [
+      [
+        {
+          "literal": "!"
+        },
+        {
+          "rule": "path"
+        },
+        {
+          "rule": "arguments"
+        }
+      ]
+    ],
+    "parameter": [
+      [
+        {
+          "rule": "@58"
+        },
+        {
+          "rule": "binding_name"
+        },
+        {
+          "literal": ":"
+        },
+        {
+          "rule": "type"
+        }
+      ],
+      [
+        {
+          "rule": "@59"
+        },
+        {
+          "literal": "self"
+        }
+      ]
+    ],
+    "parameters": [
+      [
+        {
+          "literal": "("
+        },
+        {
+          "rule": "@55"
+        },
+        {
+          "literal": ")"
+        }
+      ]
+    ],
+    "path": [
+      [
+        {
+          "rule": "path_part"
+        },
+        {
+          "rule": "@65"
+        }
+      ]
+    ],
+    "path_part": [
+      [
+        {
+          "token": "IDENT"
+        }
+      ],
+      [
+        {
+          "literal": "self"
+        }
+      ]
+    ],
+    "pattern": [
+      [
+        {
+          "rule": "pattern_atom"
+        },
+        {
+          "rule": "@141"
+        }
+      ]
+    ],
+    "pattern_atom": [
+      [
+        {
+          "literal": "_"
+        }
+      ],
+      [
+        {
+          "rule": "signed_literal"
+        }
+      ],
+      [
+        {
+          "rule": "path"
+        },
+        {
+          "rule": "@142"
+        }
+      ],
+      [
+        {
+          "rule": "tuple_pattern"
+        }
+      ]
+    ],
+    "pattern_field": [
+      [
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@153"
+        }
+      ]
+    ],
+    "pattern_fields": [
+      [
+        {
+          "rule": "pattern_field"
+        },
+        {
+          "rule": "@151"
+        },
+        {
+          "rule": "@152"
+        }
+      ]
+    ],
+    "patterns": [
+      [
+        {
+          "rule": "pattern"
+        },
+        {
+          "rule": "@149"
+        },
+        {
+          "rule": "@150"
+        }
+      ]
+    ],
+    "placeholders": [
+      [
+        {
+          "literal": "_"
+        },
+        {
+          "rule": "@69"
+        }
+      ]
+    ],
+    "postfix": [
+      [
+        {
+          "rule": "arguments"
+        }
+      ],
+      [
+        {
+          "literal": "."
+        },
+        {
+          "token": "IDENT"
+        }
+      ],
+      [
+        {
+          "literal": ".?"
+        },
+        {
+          "token": "IDENT"
+        }
+      ],
+      [
+        {
+          "rule": "turbofish"
+        }
+      ],
+      [
+        {
+          "literal": "?"
+        }
+      ],
+      [
+        {
+          "literal": "["
+        },
+        {
+          "rule": "expr"
+        },
+        {
+          "literal": "]"
+        }
+      ]
+    ],
+    "postfix_expr": [
+      [
+        {
+          "rule": "primary"
+        },
+        {
+          "rule": "@99"
+        }
+      ]
+    ],
+    "primary": [
+      [
+        {
+          "rule": "literal"
+        }
+      ],
+      [
+        {
+          "rule": "path"
+        }
+      ],
+      [
+        {
+          "rule": "struct_literal"
+        }
+      ],
+      [
+        {
+          "rule": "tuple_expr"
+        }
+      ],
+      [
+        {
+          "rule": "list_literal"
+        }
+      ],
+      [
+        {
+          "rule": "lambda"
+        }
+      ],
+      [
+        {
+          "rule": "block"
+        }
+      ],
+      [
+        {
+          "rule": "if_expr"
+        }
+      ],
+      [
+        {
+          "rule": "match_expr"
+        }
+      ],
+      [
+        {
+          "rule": "while_expr"
+        }
+      ],
+      [
+        {
+          "rule": "for_expr"
+        }
+      ],
+      [
+        {
+          "rule": "scoped_expr"
+        }
+      ],
+      [
+        {
+          "rule": "using_expr"
+        }
+      ],
+      [
+        {
+          "rule": "handle_expr"
+        }
+      ],
+      [
+        {
+          "rule": "access_method"
+        }
+      ],
+      [
+        {
+          "rule": "operation_call"
+        }
+      ],
+      [
+        {
+          "rule": "resume_expr"
+        }
+      ],
+      [
+        {
+          "rule": "exit_expr"
+        }
+      ]
+    ],
+    "product_expr": [
+      [
+        {
+          "rule": "unary_expr"
+        },
+        {
+          "rule": "@98"
+        }
+      ]
+    ],
+    "qualified_projection": [
+      [
+        {
+          "literal": "<"
+        },
+        {
+          "rule": "type"
+        },
+        {
+          "literal": "as"
+        },
+        {
+          "rule": "applied_path"
+        },
+        {
+          "literal": ">"
+        },
+        {
+          "literal": "::"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@81"
+        }
+      ]
+    ],
+    "raw_pointer_type": [
+      [
+        {
+          "literal": "*"
+        },
+        {
+          "literal": "const"
+        },
+        {
+          "rule": "type"
+        }
+      ],
+      [
+        {
+          "literal": "*"
+        },
+        {
+          "literal": "mut"
+        },
+        {
+          "rule": "type"
+        }
+      ]
+    ],
+    "region_ref": [
+      [
+        {
+          "literal": "@"
+        },
+        {
+          "token": "IDENT"
+        }
+      ]
+    ],
+    "relational_expr": [
+      [
+        {
+          "rule": "sum_expr"
+        },
+        {
+          "rule": "@96"
+        }
+      ]
+    ],
+    "relational_op": [
+      [
+        {
+          "literal": "<"
+        }
+      ],
+      [
+        {
+          "literal": "<="
+        }
+      ],
+      [
+        {
+          "literal": ">"
+        }
+      ],
+      [
+        {
+          "literal": ">="
+        }
+      ]
+    ],
+    "result_contract": [
+      [
+        {
+          "literal": "->"
+        },
+        {
+          "rule": "@60"
+        },
+        {
+          "rule": "type"
+        },
+        {
+          "rule": "@61"
+        }
+      ]
+    ],
+    "resume_expr": [
+      [
+        {
+          "literal": "resume"
+        },
+        {
+          "rule": "arguments"
+        }
+      ]
+    ],
+    "scoped_expr": [
+      [
+        {
+          "literal": "region"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "block"
+        }
+      ],
+      [
+        {
+          "literal": "try"
+        },
+        {
+          "rule": "block"
+        }
+      ],
+      [
+        {
+          "literal": "taskgroup"
+        },
+        {
+          "rule": "block"
+        }
+      ],
+      [
+        {
+          "literal": "unsafe"
+        },
+        {
+          "rule": "block"
+        }
+      ]
+    ],
+    "semantic_block": [
+      [
+        {
+          "literal": "semantic"
+        },
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@156"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "semantic_clause": [
+      [
+        {
+          "literal": "result-captures"
+        },
+        {
+          "literal": "<="
+        },
+        {
+          "rule": "capture_bound"
+        },
+        {
+          "literal": ";"
+        }
+      ],
+      [
+        {
+          "literal": "mutable-owner-region"
+        },
+        {
+          "literal": "="
+        },
+        {
+          "rule": "region_ref"
+        },
+        {
+          "literal": ";"
+        }
+      ],
+      [
+        {
+          "literal": "finite-positive-parameters"
+        },
+        {
+          "literal": "="
+        },
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@157"
+        },
+        {
+          "literal": "}"
+        },
+        {
+          "literal": ";"
+        }
+      ],
+      [
+        {
+          "rule": "ffi_contract"
+        }
+      ],
+      [
+        {
+          "rule": "ffi_protocol"
+        }
+      ],
+      [
+        {
+          "rule": "semantic_selector"
+        },
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@158"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "semantic_selector": [
+      [
+        {
+          "literal": "parameter"
+        },
+        {
+          "literal": "("
+        },
+        {
+          "token": "INT_LITERAL"
+        },
+        {
+          "literal": ")"
+        }
+      ],
+      [
+        {
+          "literal": "result"
+        }
+      ],
+      [
+        {
+          "literal": "member"
+        },
+        {
+          "literal": "("
+        },
+        {
+          "rule": "path"
+        },
+        {
+          "literal": ")"
+        }
+      ],
+      [
+        {
+          "literal": "component"
+        },
+        {
+          "literal": "("
+        },
+        {
+          "token": "INT_LITERAL"
+        },
+        {
+          "literal": ")"
+        }
+      ]
+    ],
+    "signed_literal": [
+      [
+        {
+          "rule": "@145"
+        },
+        {
+          "token": "INT_LITERAL"
+        }
+      ],
+      [
+        {
+          "rule": "@145"
+        },
+        {
+          "token": "FLOAT_LITERAL"
+        }
+      ],
+      [
+        {
+          "token": "STRING_LITERAL"
+        }
+      ],
+      [
+        {
+          "token": "CHAR_LITERAL"
+        }
+      ],
+      [
+        {
+          "literal": "true"
+        }
+      ],
+      [
+        {
+          "literal": "false"
+        }
+      ]
+    ],
+    "source_file": [
+      [
+        {
+          "literal": "module"
+        },
+        {
+          "rule": "path"
+        },
+        {
+          "literal": ";"
+        },
+        {
+          "rule": "@1"
+        }
+      ]
+    ],
+    "statement": [
+      [
+        {
+          "rule": "let_decl"
+        }
+      ],
+      [
+        {
+          "literal": "assert"
+        },
+        {
+          "rule": "expr"
+        },
+        {
+          "literal": ";"
+        }
+      ],
+      [
+        {
+          "rule": "expr"
+        },
+        {
+          "literal": ";"
+        }
+      ],
+      [
+        {
+          "rule": "block_statement"
+        }
+      ]
+    ],
+    "struct_decl": [
+      [
+        {
+          "rule": "@12"
+        },
+        {
+          "literal": "struct"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@13"
+        },
+        {
+          "rule": "@14"
+        },
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@15"
+        },
+        {
+          "literal": "}"
+        }
+      ],
+      [
+        {
+          "rule": "@12"
+        },
+        {
+          "literal": "struct"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@13"
+        },
+        {
+          "rule": "@14"
+        },
+        {
+          "literal": ";"
+        }
+      ]
+    ],
+    "struct_literal": [
+      [
+        {
+          "rule": "path"
+        },
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@103"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "sum_expr": [
+      [
+        {
+          "rule": "product_expr"
+        },
+        {
+          "rule": "@97"
+        }
+      ]
+    ],
+    "trait_decl": [
+      [
+        {
+          "rule": "@33"
+        },
+        {
+          "literal": "trait"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@34"
+        },
+        {
+          "rule": "@35"
+        },
+        {
+          "literal": "{"
+        },
+        {
+          "rule": "@36"
+        },
+        {
+          "literal": "}"
+        }
+      ]
+    ],
+    "trait_member": [
+      [
+        {
+          "rule": "method_decl"
+        }
+      ],
+      [
+        {
+          "rule": "associated_decl"
+        }
+      ]
+    ],
+    "tuple_expr": [
+      [
+        {
+          "literal": "("
+        },
+        {
+          "literal": ")"
+        }
+      ],
+      [
+        {
+          "literal": "("
+        },
+        {
+          "rule": "expr"
+        },
+        {
+          "literal": ","
+        },
+        {
+          "rule": "@107"
+        },
+        {
+          "literal": ")"
+        }
+      ],
+      [
+        {
+          "literal": "("
+        },
+        {
+          "rule": "expr"
+        },
+        {
+          "literal": ")"
+        }
+      ]
+    ],
+    "tuple_pattern": [
+      [
+        {
+          "literal": "("
+        },
+        {
+          "literal": ")"
+        }
+      ],
+      [
+        {
+          "literal": "("
+        },
+        {
+          "rule": "pattern"
+        },
+        {
+          "literal": ","
+        },
+        {
+          "rule": "@146"
+        },
+        {
+          "literal": ")"
+        }
+      ],
+      [
+        {
+          "literal": "("
+        },
+        {
+          "rule": "pattern"
+        },
+        {
+          "literal": ")"
+        }
+      ]
+    ],
+    "tuple_type": [
+      [
+        {
+          "literal": "("
+        },
+        {
+          "literal": ")"
+        }
+      ],
+      [
+        {
+          "literal": "("
+        },
+        {
+          "rule": "type"
+        },
+        {
+          "literal": ","
+        },
+        {
+          "rule": "@75"
+        },
+        {
+          "literal": ")"
+        }
+      ],
+      [
+        {
+          "literal": "("
+        },
+        {
+          "rule": "type"
+        },
+        {
+          "literal": ")"
+        }
+      ]
+    ],
+    "turbofish": [
+      [
+        {
+          "literal": "::"
+        },
+        {
+          "rule": "type_args"
+        }
+      ]
+    ],
+    "type": [
+      [
+        {
+          "rule": "forall_type"
+        }
+      ],
+      [
+        {
+          "rule": "function_type"
+        }
+      ],
+      [
+        {
+          "rule": "raw_pointer_type"
+        }
+      ],
+      [
+        {
+          "rule": "any_type"
+        }
+      ],
+      [
+        {
+          "rule": "tuple_type"
+        }
+      ],
+      [
+        {
+          "rule": "applied_path"
+        }
+      ],
+      [
+        {
+          "rule": "qualified_projection"
+        }
+      ]
+    ],
+    "type_arg": [
+      [
+        {
+          "rule": "type"
+        }
+      ],
+      [
+        {
+          "rule": "region_ref"
+        }
+      ],
+      [
+        {
+          "rule": "effect_row"
+        }
+      ],
+      [
+        {
+          "rule": "capture_set"
+        }
+      ],
+      [
+        {
+          "literal": ".."
+        },
+        {
+          "token": "IDENT"
+        }
+      ],
+      [
+        {
+          "rule": "nat_expr"
+        }
+      ],
+      [
+        {
+          "token": "IDENT"
+        },
+        {
+          "literal": "="
+        },
+        {
+          "rule": "type"
+        }
+      ]
+    ],
+    "type_args": [
+      [
+        {
+          "literal": "<"
+        },
+        {
+          "rule": "type_arg"
+        },
+        {
+          "rule": "@82"
+        },
+        {
+          "rule": "@83"
+        },
+        {
+          "literal": ">"
+        }
+      ]
+    ],
+    "type_list": [
+      [
+        {
+          "rule": "type"
+        },
+        {
+          "rule": "@84"
+        },
+        {
+          "rule": "@85"
+        }
+      ]
+    ],
+    "unary_expr": [
+      [
+        {
+          "literal": "+"
+        },
+        {
+          "rule": "unary_expr"
+        }
+      ],
+      [
+        {
+          "literal": "-"
+        },
+        {
+          "rule": "unary_expr"
+        }
+      ],
+      [
+        {
+          "literal": "await"
+        },
+        {
+          "rule": "unary_expr"
+        }
+      ],
+      [
+        {
+          "literal": "spawn"
+        },
+        {
+          "rule": "unary_expr"
+        }
+      ],
+      [
+        {
+          "rule": "postfix_expr"
+        }
+      ]
+    ],
+    "usage_modifier": [
+      [
+        {
+          "literal": "linear"
+        }
+      ],
+      [
+        {
+          "literal": "affine"
+        }
+      ]
+    ],
+    "using_expr": [
+      [
+        {
+          "literal": "using"
+        },
+        {
+          "literal": "("
+        },
+        {
+          "rule": "acquisition"
+        },
+        {
+          "rule": "@126"
+        },
+        {
+          "rule": "@127"
+        },
+        {
+          "literal": ")"
+        },
+        {
+          "rule": "block"
+        }
+      ]
+    ],
+    "value_field": [
+      [
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@106"
+        }
+      ]
+    ],
+    "value_fields": [
+      [
+        {
+          "rule": "value_field"
+        },
+        {
+          "rule": "@104"
+        },
+        {
+          "rule": "@105"
+        }
+      ]
+    ],
+    "variant": [
+      [
+        {
+          "rule": "@26"
+        },
+        {
+          "token": "IDENT"
+        },
+        {
+          "rule": "@27"
+        }
+      ]
+    ],
+    "variants": [
+      [
+        {
+          "rule": "variant"
+        },
+        {
+          "rule": "@24"
+        },
+        {
+          "rule": "@25"
+        }
+      ]
+    ],
+    "where_clause": [
+      [
+        {
+          "literal": "where"
+        },
+        {
+          "rule": "constraint"
+        },
+        {
+          "rule": "@62"
+        },
+        {
+          "rule": "@63"
+        }
+      ]
+    ],
+    "while_expr": [
+      [
+        {
+          "literal": "while"
+        },
+        {
+          "rule": "condition_expr"
+        },
+        {
+          "rule": "@124"
+        },
+        {
+          "rule": "block"
+        }
+      ]
+    ]
+  }
+}

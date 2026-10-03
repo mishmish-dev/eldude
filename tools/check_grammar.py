@@ -1,0 +1,366 @@
+"""Check Eldude EBNF and its Markdown/JSON publications; recognize syntax only."""
+import argparse
+import json
+import re
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+GRAMMAR = ROOT / 'design-docs/eldude.ebnf'
+SPEC = ROOT / 'design-docs/ELDUDE-LANGUAGE-SPECIFICATION.md'
+FORMAL = ROOT / 'design-docs/ELDUDE-FORMAL-GRAMMAR.md'
+MACHINE = ROOT / 'design-docs/eldude-grammar.json'
+BEGIN = '<!-- BEGIN GENERATED ELDUDE GRAMMAR -->'
+END = '<!-- END GENERATED ELDUDE GRAMMAR -->'
+META = re.compile(r'\s*(::=|"(?:[^"\\]|\\.)*"|[A-Za-z_][A-Za-z_0-9]*|[;|()?*+])')
+
+class Grammar:
+    def __init__(self, text):
+        self.rules = {}
+        self.patterns = {}
+        self.skips = {}
+        self.keywords = set()
+        body = []
+        for line in text.splitlines():
+            if line.lstrip().startswith('#') or not line.strip():
+                continue
+            if line.startswith('%keywords '):
+                self.keywords.update(json.loads(line[len('%keywords '):-1]).split())
+            elif line.startswith(('%token ', '%skip ')):
+                kind, name, pattern = re.fullmatch(r'%(token|skip) (\w+) = (".*");', line).groups()
+                regex = re.compile(json.loads(pattern))
+                if regex.match(''):
+                    raise ValueError(f'Empty lexical rule: {name}')
+                if kind == 'skip':
+                    if name in self.skips:
+                        raise ValueError(f'Duplicate skip rule: {name}')
+                    self.skips[name] = regex
+                else:
+                    if name in self.patterns:
+                        raise ValueError(f'Duplicate token: {name}')
+                    self.patterns[name] = regex
+            else:
+                body.append(line)
+        body = '\n'.join(body)
+        tokens = []
+        pos = 0
+        while body[pos:].strip():
+            match = META.match(body, pos)
+            if not match:
+                raise ValueError(f'Invalid EBNF near {body[pos:pos+30]!r}')
+            tokens.append(match[1])
+            pos = match.end()
+        self.tokens, self.pos = tokens, 0
+        while self.pos < len(tokens):
+            name = self.take()
+            if not re.fullmatch(r'[A-Za-z_][A-Za-z_0-9]*', name):
+                raise ValueError(f'Invalid production name: {name}')
+            self.take('::=')
+            ast = self.choice()
+            self.take(';')
+            if name in self.rules or name in self.patterns:
+                raise ValueError(f'Duplicate production: {name}')
+            self.rules[name] = ast
+        known = set(self.rules) | set(self.patterns)
+        for name, ast in self.rules.items():
+            missing = self.references(ast) - known
+            if missing:
+                raise ValueError(f'{name}: undefined symbols {sorted(missing)}')
+        literal_words = set()
+        def collect_literals(ast):
+            kind, value = ast
+            if kind == 'literal':
+                literal_words.add(value)
+            elif kind in ('choice', 'sequence'):
+                for item in value:
+                    collect_literals(item)
+            elif kind != 'name':
+                collect_literals(value)
+        for ast in self.rules.values():
+            collect_literals(ast)
+        if self.keywords - literal_words:
+            raise ValueError(f'Reserved syntax has no production: {sorted(self.keywords - literal_words)}')
+        self.bnf = {}
+        self.serial = 0
+        for name, ast in self.rules.items():
+            self.bnf[name] = self.expand(ast)
+
+    def take(self, expected=None):
+        if self.pos >= len(self.tokens):
+            raise ValueError('Unexpected end of EBNF')
+        value = self.tokens[self.pos]
+        if expected is not None and value != expected:
+            raise ValueError(f'Expected {expected}, got {value}')
+        self.pos += 1
+        return value
+
+    def choice(self):
+        alternatives = [self.sequence()]
+        while self.pos < len(self.tokens) and self.tokens[self.pos] == '|':
+            self.take('|')
+            alternatives.append(self.sequence())
+        return ('choice', alternatives)
+
+    def sequence(self):
+        terms = []
+        while self.pos < len(self.tokens) and self.tokens[self.pos] not in ('|', ')', ';'):
+            value = self.take()
+            if value == '(':
+                node = self.choice()
+                self.take(')')
+            elif value.startswith('"'):
+                node = ('literal', json.loads(value))
+            elif re.fullmatch(r'[A-Za-z_][A-Za-z_0-9]*', value):
+                node = ('name', value)
+            else:
+                raise ValueError(f'Unexpected EBNF term: {value}')
+            if self.pos < len(self.tokens) and self.tokens[self.pos] in ('?', '*', '+'):
+                node = (self.take(), node)
+            terms.append(node)
+        return ('sequence', terms)
+
+    def references(self, ast):
+        kind, value = ast
+        if kind == 'name':
+            return {value}
+        if kind == 'literal':
+            return set()
+        if kind in ('choice', 'sequence'):
+            return set().union(*(self.references(x) for x in value))
+        return self.references(value)
+
+    def expand(self, ast):
+        kind, value = ast
+        if kind == 'name':
+            return [(('token', value) if value in self.patterns else value,)]
+        if kind == 'literal':
+            return [(('literal', value),)]
+        if kind == 'choice':
+            return [rhs for item in value for rhs in self.expand(item)]
+        if kind == 'sequence':
+            result = [()]
+            for item in value:
+                result = [a+b for a in result for b in self.expand(item)]
+            return result
+        self.serial += 1
+        helper = f'@{self.serial}'
+        options = self.expand(value)
+        if kind == '?':
+            self.bnf[helper] = [()] + options
+        elif kind == '*':
+            self.bnf[helper] = [()] + [rhs+(helper,) for rhs in options]
+        else:
+            self.bnf[helper] = options + [rhs+(helper,) for rhs in options]
+        return [(helper,)]
+
+    def literals(self, start):
+        pending, visited, literals = [start], set(), set()
+        while pending:
+            rule = pending.pop()
+            if rule in visited:
+                continue
+            visited.add(rule)
+            for rhs in self.bnf[rule]:
+                for symbol in rhs:
+                    if isinstance(symbol, str):
+                        pending.append(symbol)
+                    elif symbol[0] == 'literal':
+                        literals.add(symbol[1])
+        return sorted(literals)
+
+    def vocabulary(self, start):
+        return sorted((s for s in self.literals(start) if not re.fullmatch(r'\w+', s)), key=lambda s: (-len(s), s))
+
+    def machine_format(self):
+        return {
+            'format': 'eldude-grammar',
+            'format_version': 1,
+            'language': {'name': 'Eldude', 'version': '0.0.2'},
+            'entry_points': {'source': 'source_file', 'interface': 'interface_file'},
+            'lexical': {
+                'encoding': 'UTF-8',
+                'regex_dialect': 'Python re',
+                'matching': 'longest; ties prefer tokens in declaration order before punctuation',
+                'tokens': [{'name': name, 'pattern': regex.pattern} for name, regex in self.patterns.items()],
+                'skip': [{'name': name, 'pattern': regex.pattern} for name, regex in self.skips.items()],
+                'reserved_words': sorted(self.keywords),
+                'contextual_words': sorted(s for s in self.literals('source_file') if re.fullmatch(r'[A-Za-z]+', s) and s not in self.keywords),
+                'literal_vocabulary': {entry: self.literals(entry) for entry in ('source_file', 'interface_file')},
+                'unicode_scalar_range': [0, 0x10FFFF],
+                'excluded_scalar_ranges': [[0xD800, 0xDFFF]],
+            },
+            'productions': {
+                name: [[{'rule': symbol} if isinstance(symbol, str) else {symbol[0]: symbol[1]} for symbol in rhs] for rhs in alternatives]
+                for name, alternatives in self.bnf.items()
+            },
+        }
+
+    def lex(self, text, start):
+        punctuation = self.vocabulary(start)
+        result, pos = [], 0
+        while pos < len(text):
+            skipped = next((m for regex in self.skips.values() if (m := regex.match(text, pos))), None)
+            if skipped:
+                pos = skipped.end()
+                continue
+            candidates = [(len(m[0]), name, m[0]) for name, regex in self.patterns.items()
+                          if (m := regex.match(text, pos))]
+            candidates += [(len(s), 'PUNCT', s) for s in punctuation if text.startswith(s, pos)]
+            if not candidates:
+                raise ValueError(f'Invalid source token at {pos}: {text[pos:pos+20]!r}')
+            _, kind, value = max(candidates, key=lambda item: item[0])
+            if kind == 'IDENT' and value in self.keywords:
+                kind = 'KEYWORD'
+            if kind in ('STRING_LITERAL', 'CHAR_LITERAL'):
+                if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
+                    raise ValueError('Surrogate scalar in literal')
+                for escape in re.finditer(r"\\(?:[\"'\\nrt0]|u\{[0-9a-fA-F]{1,6}\})", value):
+                    if escape[0].startswith('\\u{'):
+                        scalar = int(escape[0][3:-1], 16)
+                        if scalar > 0x10FFFF or 0xD800 <= scalar <= 0xDFFF:
+                            raise ValueError('Invalid Unicode scalar escape')
+            result.append((kind, value))
+            pos += len(value)
+        return result
+
+    def accepts(self, text, start='source_file'):
+        if start not in self.bnf:
+            raise ValueError(f'Unknown grammar entry point: {start}')
+        try:
+            tokens = self.lex(text, start)
+        except ValueError:
+            return False
+        chart = [set() for _ in range(len(tokens)+1)]
+        initial = ('@start', (start,), 0, 0)
+        chart[0].add(initial)
+        for index in range(len(chart)):
+            changed = True
+            while changed:
+                before = len(chart[index])
+                for lhs, rhs, dot, origin in tuple(chart[index]):
+                    if dot == len(rhs):
+                        for outer_lhs, outer_rhs, outer_dot, outer_origin in tuple(chart[origin]):
+                            if outer_dot < len(outer_rhs) and outer_rhs[outer_dot] == lhs:
+                                chart[index].add((outer_lhs, outer_rhs, outer_dot+1, outer_origin))
+                    else:
+                        symbol = rhs[dot]
+                        if isinstance(symbol, str):
+                            chart[index].update((symbol, option, 0, index) for option in self.bnf[symbol])
+                        elif index < len(tokens):
+                            kind, value = tokens[index]
+                            if (symbol[0] == 'token' and kind == symbol[1]) or (symbol[0] == 'literal' and value == symbol[1]):
+                                chart[index+1].add((lhs, rhs, dot+1, origin))
+                changed = len(chart[index]) != before
+        return ('@start', (start,), 1, 0) in chart[-1]
+
+def section(spec, number):
+    heading = re.search(r'^#{2,3} '+re.escape(number)+r'\.? [^\n]+\n', spec, re.M)
+    if heading is None:
+        raise ValueError(f'Missing specification section: {number}')
+    body = spec[heading.end():]
+    next_heading = re.search(r'^#{1,3} ', body, re.M)
+    return body[:next_heading.start() if next_heading else len(body)].strip()
+
+def formal_markdown(text, spec):
+    return '''# Eldude Formal Grammar
+
+**Version:** 0.0.2
+
+**Status:** pre-implementation normative grammar
+
+This complete grammar covers ordinary Eldude source and generated canonical semantic interfaces. It is generated from [eldude.ebnf](eldude.ebnf) and the parsing/interface clauses of the [language specification](ELDUDE-LANGUAGE-SPECIFICATION.md). Numbered section references below refer to that specification. The [manifesto](ELDUDE-MANIFESTO.md) describes the design principles.
+
+The machine-readable forms are the EBNF artifact and [eldude-grammar.json](eldude-grammar.json), which contains normalized BNF, lexical rules, and parsing conventions. Syntax acceptance does not establish typing, visibility, usage, effects, termination, exhaustiveness, or audited native validity. Those judgments remain in the language specification.
+
+## Entry points and notation
+
+`source_file` parses an ordinary file, beginning with exactly one `module path;` declaration. `interface_file` parses generated canonical interfaces and additionally permits `semantic` blocks. The interface-only productions are unreachable from `source_file`; generated native contracts are not source annotations.
+
+In EBNF, `::=` defines a production, `|` selects an alternative, parentheses group, `?` means zero or one, `*` means zero or more, and `+` means one or more. A sequence matches left to right. JSON strings quote exact terminals and regular expressions. Unquoted names reference productions or lexical token categories. An empty sequence matches no tokens. `#` starts a whole-line artifact comment.
+
+`%token NAME = "regex";` defines a lexical category, `%skip NAME = "regex";` defines trivia, and `%keywords "words";` excludes reserved words from `IDENT`. Regexes use Python's `re` syntax without additional flags. Skip rules are considered in declaration order before token recognition. Otherwise choose the longest lexical match; ties prefer token categories in declaration order before punctuation. Reserved identifier lexemes become keyword tokens. Literal productions match exact spelling; lexical-category productions match category. Punctuation comes from the selected entry point's reachable literal vocabulary, so interface-only compound words do not alter ordinary source lexing. There is no implicit end-of-file token: the selected entry point must consume the entire token stream.
+
+## Reserved words, sigils, and tokens
+
+'''+section(spec, '2.6')+'''
+
+## Lexical payloads and source forms
+
+'''+section(spec, '2.9')+'''
+
+## Operators and precedence
+
+'''+section(spec, '2.7')+'''
+
+## Parsing and derivation selection
+
+'''+section(spec, '2.8')+'''
+
+These rules select association among grammar derivations using syntax alone. The conformance recognizer checks token-stream membership and does not construct an AST or perform derivation selection; compiler parsers must also implement the stated association rules.
+
+## Complete lexical and syntactic grammar
+
+'''+BEGIN+'\n```ebnf\n'+text.rstrip()+'\n```\n'+END+'''
+
+## Generated semantic clauses
+
+'''+section(spec, '72.7')+'''
+
+## Generated native contracts
+
+'''+section(spec, '72.9')+'''
+
+## Canonical interface ordering
+
+'''+section(spec, '77')+'''
+
+## JSON representation
+
+`eldude-grammar.json` uses format `eldude-grammar`, format version `1`, and language version `0.0.2`. `entry_points` names the ordinary source and generated interface starts. `lexical.tokens` and `lexical.skip` are ordered arrays of `{ "name": ..., "pattern": ... }`; array order retains lexical priority. `reserved_words` and `contextual_words` expose the word categories. `literal_vocabulary` lists the reachable literals for each entry point. String/character token recognition additionally validates the Unicode scalar range and excluded surrogate interval recorded in `lexical`.
+
+`productions` maps each nonterminal to an array of alternatives. Each alternative is an ordered array of symbols; `[]` means epsilon. A symbol has exactly one key: `rule` references a nonterminal, `token` references a lexical category, and `literal` matches exact spelling. Names beginning with `@` are generated repetition helpers, not Eldude source tokens. This representation expands EBNF options and repetitions into ordinary BNF. `parsing_conventions` preserves the normative derivation/association rules above; consumers must apply them when building syntax trees.
+
+## Regeneration and verification
+
+From the repository root:
+
+```sh
+python3 tools/check_grammar.py --write
+python3 tools/check_grammar.py
+python3 -m unittest discover -s tools -p 'test_grammar*.py'
+```
+
+The first command regenerates Appendix F, this document, and the JSON export. The second rejects undefined symbols, duplicate productions, malformed EBNF, reserved-word drift, or stale generated publications. Tests cover accepted/rejected syntax, source/interface separation, JSON consumption, and stale-publication detection. Edit the EBNF or originating specification clauses, then regenerate; do not edit generated presentations directly.
+'''
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--write', action='store_true', help='Refresh Appendix F, standalone Markdown, and JSON')
+    args = parser.parse_args()
+    text = GRAMMAR.read_text(encoding='utf-8')
+    grammar = Grammar(text)
+    for entry in ('source_file', 'interface_file'):
+        grammar.vocabulary(entry)
+    generated = f'{BEGIN}\n```ebnf\n{text.rstrip()}\n```\n{END}'
+    spec = SPEC.read_text(encoding='utf-8')
+    keyword_section = spec.split('### 2.6 ', 1)[1].split('```text\n', 1)[1].split('```', 1)[0]
+    if set(keyword_section.split()) != grammar.keywords:
+        raise SystemExit('Reserved words differ between §2.6 and the lexical grammar')
+    pattern = re.compile(re.escape(BEGIN)+'.*?'+re.escape(END), re.S)
+    if len(pattern.findall(spec)) != 1:
+        raise SystemExit('Expected exactly one generated grammar block in Appendix F')
+    machine = grammar.machine_format()
+    machine['parsing_conventions'] = [line[2:] for line in section(spec, '2.8').splitlines() if line.startswith('- ')]
+    publications = {
+        SPEC: pattern.sub(lambda _: generated, spec),
+        FORMAL: formal_markdown(text, spec),
+        MACHINE: json.dumps(machine, indent=2, sort_keys=True, ensure_ascii=False)+'\n',
+    }
+    for path, expected in publications.items():
+        if args.write:
+            path.write_text(expected, encoding='utf-8', newline='\n')
+        elif not path.exists() or path.read_text(encoding='utf-8') != expected:
+            raise SystemExit(f'{path.name} is stale; run python3 tools/check_grammar.py --write')
+    print(f'Grammar checked: {len(grammar.rules)} productions, all symbols defined; Appendix F, formal Markdown, and JSON synchronized')
+
+if __name__ == '__main__':
+    main()
