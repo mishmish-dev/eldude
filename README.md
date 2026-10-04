@@ -1,6 +1,8 @@
 # Eldude
 
-Eldude is a programming-language design in the pre-implementation stage. This repository contains its design contracts, a grammar recognizer, staged example programs, and an initial standard-library API.
+Eldude is a programming-language design with an experimental implementation. This repository contains its design contracts, a grammar recognizer, a bounded source-to-execution pipeline, staged example programs, and an initial standard-library API.
+
+Release **0.0.5** adds the first source-to-execution pipeline, implementing a subset of the unchanged Eldude **0.0.4** language contract.
 
 - [Manifesto](design-docs/ELDUDE-MANIFESTO.md): goals and design principles.
 - [Language specification](design-docs/ELDUDE-LANGUAGE-SPECIFICATION.md): normative semantics.
@@ -10,6 +12,7 @@ Eldude is a programming-language design in the pre-implementation stage. This re
 - [Effect-row prototype](tools/effect_rows.py): scoped-row equality and closed-row opening on resolved labels, with [counterexample tests](tools/test_effect_rows.py).
 - [Expression inference experiment](tools/inference.py): effectful traversal, nested handlers, scoped state, cancellation checks, and imported capture contracts, with [executable cases](tools/test_inference.py).
 - [Handler experiment](tools/handlers.py): clause checking, ownership across resumption, explicit evidence lowering, and a small interpreter, with [accepted programs and counterexamples](tools/test_handlers.py).
+- [Source pipeline](tools/source_pipeline.py): located parsing, declaration resolution, contract checking, and execution of the [source fixtures](examples/README.md#executable-source-fixtures).
 
 The repository's Python tools share a uv project pinned to Python 3.14.8 and use only the standard library. Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then check grammar publications, source syntax, and the prototypes:
 
@@ -17,9 +20,33 @@ The repository's Python tools share a uv project pinned to Python 3.14.8 and use
 uv sync --locked
 uv run python tools/check_grammar.py
 uv run python -m unittest discover -s tools -p 'test_*.py'
+uv run python tools/run_eldude.py examples/07_source_pipeline/combined.eld
+git diff --check
 ```
 
-After editing the normative EBNF or the specification excerpts used by the grammar publication, regenerate artifacts with `uv run python tools/check_grammar.py --write`. These checks do not establish type correctness of the `.eld` programs or execute them; there is no Eldude source compiler or production runtime yet.
+After editing the normative EBNF or the specification excerpts used by the grammar publication, regenerate artifacts with `uv run python tools/check_grammar.py --write`. Grammar acceptance alone does not establish type correctness or execute a program. The source runner checks and executes the subset below; this is not a production compiler or runtime.
+
+## Source-to-execution experiment
+
+The combined command above prints `42`. Its source program installs nested handlers, forwards an inner `Read` to its outer instance, resumes a deep `once` handler twice at distinct operation sites, and uses simulated resources. The trace verifies clause-local cleanup before tail resumption, exactly one close of the retained handler-frame resource, legal work after resume, and final cleanup of the protected body resource.
+
+`tools/source_syntax.py` reuses the normative lexer's tokens and first checks full EBNF membership. It then constructs a filename/span-bearing AST for the executable subset. Malformed syntax reports `syntax`; valid syntax outside the subset reports `unsupported: Implementation limit`. The legacy `Grammar.lex` token-pair API remains available alongside `lex_spanned`. No grammar productions were changed.
+
+`tools/source_pipeline.py` resolves declarations and fresh binding identities into the existing expression IR. Nonrecursive named functions become checked closures in dependency order, including forward references; every body is checked, even if unused. Closures execute their checked bodies, receiving invocation evidence for ambient calls and retaining lexical evidence for named calls. Source annotations are checked with the existing type matcher and effect-row solver. Written effect rows remain admitted contracts, including when they are wider than the body's inferred effects or occur on returned callable types. Whole-value result-capture bounds remain inferred metadata.
+
+The supported forms are module declarations; explicit fixture imports and aliases; named functions and typed parameters; `Int`/`Unit`, fixture resource and function types; closed effect rows; integer/Unit literals; local bindings, blocks and sequencing; typed-parameter closures and calls (including computed callees); single-operation nullary effect families; lexical handlers, normal-return clauses, named dispatch, forwarding, `resume`, and `using`. Signed integer literals, decimal/binary/octal/hexadecimal spelling, `int`/`i64` suffixes and the fixed `Int64` range are checked. A semicolon discards an expression under the ordinary usage rules; the final unterminated expression supplies the block result.
+
+The explicit **`eldude::fixture` host profile** supplies simulated `File`/`AsyncFile` ownership tokens, acquisition, consuming close, canonical cleanup, and suspension events. Source must import the names it uses; there is no implicit wildcard prelude or special interpretation of user-defined functions named `acquire` or `close`. The profile's complete contracts and limitations are in [examples/README.md](examples/README.md#fixture-host-profile). The runner calls an exported, nullary `main` returning `Int` or `Unit` as a fixture convention, not a language entry-point rule. Its residual row must have no unhandled algebraic slots; intrinsic `suspend`/`diverge` may be admitted.
+
+`compile_source(text, filename)` and `compile_file(path)` return a `SourceProgram` with `ast`, `expression`, `program`, `inferred`, `functions` and `handled_rows`. With `tools` on Python's import path, pass `checked.program` to `handlers.run` to inspect `Execution.value` and `Execution.events`; `execute_file(path)` combines checking and execution. `Program.origins` maps lowered-node identities to source spans. `Diagnostic` exposes a category, message, primary span and related declaration/transfer spans. CLI failures go to stderr with filename, line and column and exit nonzero before execution.
+
+The source tests exercise accepted traces and static rejections for all three resumption modes, frame transfer, clause-local resources, unsafe abandonment, skipped enclosing obligations, complete deep-resumption residuals and post-resume outward control. Every semantic-rejection fixture is also recognized by the normative grammar. Source integration exposed and corrected a core discrepancy: normal-return clauses had allowed unqualified same-family operation syntax, although §26.4 forbids it inside clauses.
+
+The verified milestone has **132 passing tests on Python 3.14.8**, including all 91 prior regressions, and **133 synchronized grammar productions**. The combined CLI returns `42`; syntax, semantic and unsupported-feature CLI fixtures exit with status `1` and source-located diagnostics.
+
+This remains a single-file, monomorphic, straight-line experiment. Generic/open-row source contracts, nonempty capture annotations, untyped closure parameters, general operators, branches/loops/recursion, early returns, multi-operation/generic families, operation arguments, non-scalar handler results, `self` recursion, top-level value initialization, traits, general imported-code execution, regions and tasks receive implementation-limit diagnostics. Broader inference capabilities remain available in the standalone Python IR tests. Resources are simulated, and suspension/masked cleanup only emit events: there is no scheduler, cancellation delivery, foreign execution or production runtime optimization. The rest of the example corpus retains its staged meanings and expected results; it is not claimed to execute.
+
+One inherited handler boundary is now explicit: an enclosing operation clause's resumption cannot currently be invoked from a nested handler's normal-return clause. This valid lexical use under §25.1 reports an implementation limit; supporting it requires threading the capability and its ownership state through normal completion.
 
 ## Inference experiment
 
@@ -68,4 +95,4 @@ For this fragment, explicit evidence selects the intended instances and single-u
 
 The experiment has one nullary operation per family, `Int`/`Unit` operation and handler results, and straight-line clauses. The executable subset covers literals, bindings, closures/calls, resource acquisition/close, `using`, suspension events, and handlers/resumptions. It conservatively requires non-`Dup` frame captures to remain available until transfer and rejects affine changes needing general usage joins. An opaque `tail`/`once` continuation is treated as non-discardable when a clause attempts outward abandonment. These are prototype restrictions, not new language rules.
 
-Resources are simulated ownership tokens; `yield` and masked asynchronous cleanup emit events without scheduling or delivering cancellation. There is no source parser, general return/branch/loop elaboration, operation arguments, multi-operation families, `self` recursion, task execution, or imported-code execution. The interpreter uses recursive Python continuation closures, including for `tail`; it does not demonstrate optimized tail lowering or production runtime performance.
+Resources are simulated ownership tokens; `yield` and masked asynchronous cleanup emit events without scheduling or delivering cancellation. The source frontend above feeds this same experiment. General return/branch/loop elaboration, operation arguments, multi-operation families, `self` recursion, task execution, and imported-code execution remain outside it. The interpreter uses recursive Python continuation closures, including for `tail`; it does not demonstrate optimized tail lowering or production runtime performance.

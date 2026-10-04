@@ -1,6 +1,6 @@
 # Eldude implementation targets
 
-These small `.eld` programs are staged targets for a future compiler. They are syntax-checked today; there is no Eldude type checker or runtime in this repository yet. Each positive file is a separate program. A future test harness should call its exported `main` and compare its returned value below; `main` is a corpus convention, not a new language entry-point rule. Task examples need a root supporting `suspend`.
+These small `.eld` programs are staged implementation targets. All positive files are syntax-checked; the literal example and the [source fixtures below](#executable-source-fixtures) also run through the bounded source checker and interpreter. Each positive file is a separate program. The fixture harness calls its exported `main` and compares the returned value; `main` is a corpus convention, not a new language entry-point rule. Task examples still need a future root supporting scheduling and `suspend`.
 
 Resolve explicit library imports using the module declarations in [stdlib](../stdlib/README.md). Primitive types and intrinsic constraints have their predefined meanings. There is no implied wildcard library prelude. The bundled profile binds list literals, `?`/`try`, optional access, `for`, cleanup, and task handles to their corresponding library identities.
 
@@ -42,7 +42,7 @@ Resolve explicit library imports using the module declarations in [stdlib](../st
 
 ## Rejection targets
 
-`reject/syntax` must fail the grammar recognizer now. `reject/semantics` must parse, but a future type checker must reject it for the stated reason. Passing the current syntax suite does not establish any of these semantic rejections.
+`reject/syntax` must fail the grammar recognizer. `reject/semantics` must parse; the source pipeline enforces the new `source_pipeline` counterexamples below. The older targets in this table retain their required failures; syntax acceptance alone does not establish their semantic rejection, and unsupported source features may prevent this prototype reaching those checks.
 
 | Program | Required failure |
 | --- | --- |
@@ -66,6 +66,109 @@ Resolve explicit library imports using the module declarations in [stdlib](../st
 Run the checks from the repository root:
 
 ```sh
-PYTHONDONTWRITEBYTECODE=1 python3 tools/check_grammar.py
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_*.py'
+uv sync --locked
+uv run python tools/check_grammar.py
+uv run python -m unittest discover -s tools -p 'test_*.py'
 ```
+
+## Executable source fixtures
+
+Run the complete source milestone from the repository root:
+
+```sh
+uv run python tools/run_eldude.py examples/07_source_pipeline/combined.eld
+# 42
+uv run python -m unittest discover -s tools -p 'test_source*.py' -v
+```
+
+All these files execute real Eldude syntax through a located AST, declaration resolution, the existing checked expression IR, explicit handler evidence and the existing interpreter. `tools/test_source_pipeline.py` asserts literal expected values and event ordering; it does not infer expectations from the implementation.
+
+| Program | Result | Checked execution |
+| --- | --- | --- |
+| [literal](01_values/literal.eld) | `42` | Existing scalar fixture |
+| [functions](07_source_pipeline/functions.eld) | `42` | Forward function reference, typed callback, closure capture |
+| [tail cleanup](07_source_pipeline/tail_cleanup.eld) | `40` | Clause-local close precedes implicit resume and caller acquisition |
+| [tail output](07_source_pipeline/tail_output.eld) | `()` | Operation returns `Int` even though handler output is `Unit` |
+| [deep once](07_source_pipeline/once_deep.eld) | `99` | Two deep entries, one close of the frame resource, legal post-resume work |
+| [clause local](07_source_pipeline/clause_local.eld) | `()` | Local resource remains owned after resume, then closes |
+| [affine scope](07_source_pipeline/affine_scope.eld) | `7` | Frame closes, captured body cleanup unwinds, outside resource closes afterward |
+| [affine asynchronous cleanup](07_source_pipeline/affine_async.eld) | `()` | Abandonment triggers masked suspension and cleanup; body yield is skipped |
+| [forwarding](07_source_pipeline/forwarding.eld) | `42` | Inner then outer dispatch, outer then inner resumption; outer residual slot retained |
+| [callbacks](07_source_pipeline/callbacks.eld) | `20` | Fixed callback dispatches outer (`10`); ambient callback/source function dispatches inner (`20`) |
+| [combined](07_source_pipeline/combined.eld) | `42` | Nested handlers, forwarding, deep once resumption and resource cleanup |
+
+In `combined`, allocation identities are deterministic: frame `1`, protected body `2`, tail-clause temporary `3`, and post-resume locals `4` and `5`. The significant ordering is:
+
+```text
+acquire 1, 2
+Step dispatch → resume → Step dispatch → resume
+Read inner dispatch → Read outer dispatch
+acquire 3 → cleanup 3 → resume outer(42) → resume inner(42)
+explicit close 1
+acquire 4 → cleanup 4 → acquire 5 → cleanup 5
+cleanup 2
+```
+
+The existing broader [forwarding](04_effects/forwarding.eld), [tail result](04_effects/tail_result.eld) and [tail cleanup](05_state_and_collections/tail_cleanup.eld) are unchanged. Multiple operations/arithmetic, `Result`/matching/`?`, and regions/traits/references/early return remain their future targets. The smaller fixtures above do not redefine those programs.
+
+## Fixture host profile
+
+The runner provides exactly one built-in module profile, `eldude::fixture`. It is a test host contract, not a standard-library implementation or arbitrary imported-code loader. Import only the names required by the file, with optional aliases:
+
+```eldude
+import eldude::fixture::{File, acquire as open, close};
+
+fn consume(file: File) -> Unit { close(file) }
+```
+
+| Export | Contract | Simulation |
+| --- | --- | --- |
+| `File` | Linear, non-`Dup`, non-`Discard`; canonical cleanup `{}` | Owned token, no filesystem handle |
+| `AsyncFile` | Linear; canonical cleanup `{suspend}` | Owned token with suspending cleanup |
+| `acquire` | `fn() -> File` | Fresh token; `('acquire', 'File', id)` |
+| `acquireAsync` | `fn() -> AsyncFile` | Fresh token; `('acquire', 'AsyncFile', id)` |
+| `close` | `fn(File) -> Unit` | Consumes token; `('close', id, 'explicit')` |
+| `closeAsync` | `fn(AsyncFile) ->{suspend} Unit` | Unmasked suspension event, then consuming close |
+| `yield` | `fn() ->{suspend} Unit` | `('suspend', False)` |
+
+Acquisition is pure in this simulated profile. `using` owns any acquired resource until consumption or scope exit. Multiple acquisitions evaluate left to right and cleanup runs right to left. Still-live `File` cleanup emits `('close', id, 'cleanup')`; `AsyncFile` cleanup first emits `('suspend', True)` to record its cancellation mask. Explicitly discharged tokens do not close again, although cleanup effects remain conservatively admitted by the static row. No actual suspension, cancellation delivery, I/O or foreign calls occur.
+
+Fixture primitives must be called directly by their imported names/aliases. Use a source closure, such as `fn() => acquire()`, when passing one as a callback. There is no implicit prelude, and user declarations with these spellings execute their own checked bodies. Fixture type names also require imports. Ordinary module loading, generic cleanup/trait solving and real resource management are deferred.
+
+Source functions have annotated parameters and signatures; closures require parameter annotations but may infer their result/effect contract. Function types and closed effect rows are supported; omitted rows mean pure. Annotations cannot hide effects, replace a lambda's own contract, or erase whole-value capture bounds. Only empty source `captures {}` clauses are currently supported. Local and handler names have distinct binding identities across shadowing; qualified references to this file's module select its declarations.
+
+The runner requires exported nullary `main` returning `Int` or `Unit`, with only intrinsic effects left at the root. This is a fixture convention. Other functions, including unused functions, are checked before execution. General operators (beyond signed integer literals), branches, loops, recursion, open rows/generics, operation arguments, multiple operations, non-scalar handler results, early returns, nonempty capture annotations, top-level `let`, `self`, traits, regions and tasks produce explicit implementation-limit diagnostics.
+
+The existing checker also does not thread an enclosing once/affine resumption through a nested handler's normal-return clause. That lexical use is valid under §25.1 but reports `unsupported`; it must not be confused with capturing a resumption in a nested function, which is a semantic error.
+
+## Enforced source rejections
+
+Each file below is valid normative syntax and is rejected during compilation, before `run` is called. Tests assert the reason, filename, line and column. Ownership diagnostics include related binding/transfer locations where applicable.
+
+| Fixture under `reject/semantics/source_pipeline` | Required static failure |
+| --- | --- |
+| [wrong operation result](reject/semantics/source_pipeline/wrong_operation_result.eld) | `tail` supplies `Unit` to an `Int` operation |
+| [tail resume](reject/semantics/source_pipeline/tail_resume.eld) | Explicit resume in a tail clause |
+| [missing resume](reject/semantics/source_pipeline/missing_resume.eld) | Once clause completes without resuming |
+| [repeated resume](reject/semantics/source_pipeline/repeated_resume.eld) | Second resume consumes an already-used capability |
+| [escaping resume](reject/semantics/source_pipeline/escaping_resume.eld) | Nested closure cannot capture resumption |
+| [frame transfer](reject/semantics/source_pipeline/frame_transfer.eld) | Frame resource used after transfer to resumption |
+| [clause local](reject/semantics/source_pipeline/clause_local.eld) | Resumption does not dispose of a clause-local resource |
+| [unsafe affine](reject/semantics/source_pipeline/unsafe_affine.eld) | Naked resource in abandoned segment |
+| [skipped consumption](reject/semantics/source_pipeline/skipped_consumption.eld) | Affine completion could skip outside linear consumption |
+| [skipped outer resume](reject/semantics/source_pipeline/skipped_outer_resume.eld) | Affine completion could skip enclosing once resumption |
+| [outward pending](reject/semantics/source_pipeline/outward_pending.eld) | Outward affine operation could abandon a suspended once segment |
+| [deep residual](reject/semantics/source_pipeline/deep_residual.eld) | Complete re-entered clause residual could abandon a local at resume |
+| [post resume](reject/semantics/source_pipeline/post_resume.eld) | Outside obligation remains live after resume returns |
+| [same family](reject/semantics/source_pipeline/same_family.eld) | Clause must name an outer instance explicitly |
+
+For example:
+
+```sh
+uv run python tools/run_eldude.py examples/reject/semantics/source_pipeline/frame_transfer.eld
+# .../frame_transfer.eld:9:19: semantic: file was already consumed
+# ...:5:9: note: Binding declared here
+# ...:8:13: note: Ownership transferred here
+```
+
+The [missing-semicolon fixture](reject/syntax/source_pipeline/missing_semicolon.eld) reports `syntax`. The valid [branch fixture](07_source_pipeline/unsupported/branch.eld) reports `unsupported: Implementation limit`. Both exit nonzero without executing. Tests additionally cover unknown/duplicate names, malformed tokens, incorrect annotations, root evidence, named dispatch scope and source/host call contracts. Existing Python IR tests remain regressions for the broader inference and handler experiments.

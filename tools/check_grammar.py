@@ -2,6 +2,7 @@
 import argparse
 import json
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,6 +13,21 @@ MACHINE = ROOT / 'design-docs/eldude-grammar.json'
 BEGIN = '<!-- BEGIN GENERATED ELDUDE GRAMMAR -->'
 END = '<!-- END GENERATED ELDUDE GRAMMAR -->'
 META = re.compile(r'\s*(::=|"(?:[^"\\]|\\.)*"|[A-Za-z_][A-Za-z_0-9]*|[;|()?*+])')
+
+
+@dataclass(frozen=True)
+class Token:
+    kind: str
+    value: str
+    start: int
+    end: int
+
+
+class LexError(ValueError):
+    def __init__(self, message, offset):
+        super().__init__(message)
+        self.offset = offset
+
 
 class Grammar:
     def __init__(self, text):
@@ -195,6 +211,10 @@ class Grammar:
         }
 
     def lex(self, text, start):
+        """Legacy token-pair API, also used by exported-grammar consumers."""
+        return [(t.kind, t.value) for t in self.lex_spanned(text, start)]
+
+    def lex_spanned(self, text, start='source_file'):
         punctuation = self.vocabulary(start)
         result, pos = [], 0
         while pos < len(text):
@@ -206,19 +226,19 @@ class Grammar:
                           if (m := regex.match(text, pos))]
             candidates += [(len(s), 'PUNCT', s) for s in punctuation if text.startswith(s, pos)]
             if not candidates:
-                raise ValueError(f'Invalid source token at {pos}: {text[pos:pos+20]!r}')
+                raise LexError(f'Invalid source token: {text[pos:pos+20]!r}', pos)
             _, kind, value = max(candidates, key=lambda item: item[0])
             if kind == 'IDENT' and value in self.keywords:
                 kind = 'KEYWORD'
             if kind in ('STRING_LITERAL', 'CHAR_LITERAL'):
                 if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
-                    raise ValueError('Surrogate scalar in literal')
+                    raise LexError('Surrogate scalar in literal', pos)
                 for escape in re.finditer(r"\\(?:[\"'\\nrt0]|u\{[0-9a-fA-F]{1,6}\})", value):
                     if escape[0].startswith('\\u{'):
                         scalar = int(escape[0][3:-1], 16)
                         if scalar > 0x10FFFF or 0xD800 <= scalar <= 0xDFFF:
-                            raise ValueError('Invalid Unicode scalar escape')
-            result.append((kind, value))
+                            raise LexError('Invalid Unicode scalar escape', pos + escape.start())
+            result.append(Token(kind, value, pos, pos + len(value)))
             pos += len(value)
         return result
 
@@ -229,6 +249,10 @@ class Grammar:
             tokens = self.lex(text, start)
         except ValueError:
             return False
+        return self.syntax_failure(tokens, start) is None
+
+    def syntax_failure(self, tokens, start='source_file'):
+        """Recognize token pairs; return the failing token index, or None."""
         chart = [set() for _ in range(len(tokens)+1)]
         initial = ('@start', (start,), 0, 0)
         chart[0].add(initial)
@@ -250,7 +274,9 @@ class Grammar:
                             if (symbol[0] == 'token' and kind == symbol[1]) or (symbol[0] == 'literal' and value == symbol[1]):
                                 chart[index+1].add((lhs, rhs, dot+1, origin))
                 changed = len(chart[index]) != before
-        return ('@start', (start,), 1, 0) in chart[-1]
+        if ('@start', (start,), 1, 0) in chart[-1]:
+            return None
+        return max(i for i, states in enumerate(chart) if states)
 
 def section(spec, number):
     heading = re.search(r'^#{2,3} '+re.escape(number)+r'\.? [^\n]+\n', spec, re.M)

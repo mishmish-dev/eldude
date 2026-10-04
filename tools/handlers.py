@@ -78,7 +78,7 @@ class HandlerChecker(Checker):
             outside = frame.outside if frame else set()
             for name, retained, managed, identity in obligations:
                 if identity not in outside and not managed and not permissions(retained.type)[1]:
-                    raise InferenceError(f'Effects may abandon live resource {name}')
+                    raise InferenceError(f'Effects may abandon live resource {name}', subject=name)
 
     def _apply(self, function, arguments, context):
         previous, self.in_call = self.in_call, True
@@ -90,6 +90,11 @@ class HandlerChecker(Checker):
     def _resume(self, supplied, context, implicit=False):
         resume = context.resumption
         if resume is None:
+            if context.return_resumption is not None:
+                if context.return_resumption.operation.mode == 'tail':
+                    raise InferenceError('Explicit resume is forbidden in a tail clause')
+                raise InferenceError('Implementation limit: resuming an enclosing clause from a nested normal-return clause',
+                                     code='unsupported')
             raise InferenceError('resume is available only inside an operation clause')
         if resume.operation.mode == 'tail' and not implicit:
             raise InferenceError('Explicit resume is forbidden in a tail clause')
@@ -100,8 +105,9 @@ class HandlerChecker(Checker):
         for name, binding in resume.captures.items():
             if not permissions(binding.value.type)[0]:
                 if binding.consumed:
-                    raise InferenceError(f'Frame capture {name} was consumed before transfer')
+                    raise InferenceError(f'Frame capture {name} was consumed before transfer', subject=name)
                 binding.consumed = True
+                self.transfers[name] = self.current_expression
         resume.used = True
         self._control(resume.effects, context)
         return value(resume.output, ambient(supplied.effects, resume.effects))
@@ -116,7 +122,7 @@ class HandlerChecker(Checker):
     def _discharge(bindings):
         for name, binding in bindings.items():
             if not binding.consumed and not permissions(binding.value.type)[1]:
-                raise InferenceError(f'Unconsumed handler obligation {name}')
+                raise InferenceError(f'Unconsumed handler obligation {name}', subject=name)
 
     def _handler(self, family, name, body, clause, returning, context):
         if family not in self.operations:
@@ -129,7 +135,7 @@ class HandlerChecker(Checker):
         for captured in sorted(free & context.bindings.keys()):
             original = context.bindings[captured]
             if original.consumed:
-                raise InferenceError(f'{captured} was already consumed')
+                raise InferenceError(f'{captured} was already consumed', subject=captured)
             captures[captured] = replace(original, managed=False)
             context.references.add(original)
             if not permissions(original.value.type)[0]:
@@ -156,23 +162,31 @@ class HandlerChecker(Checker):
                 raise InferenceError('Affine completion may skip an enclosing resume')
             for outer_name, binding in incoming:
                 if binding.consumed:
-                    raise InferenceError(f'Affine completion may skip consumption of {outer_name}')
+                    raise InferenceError(f'Affine completion may skip consumption of {outer_name}', subject=outer_name, expression=body)
         if normal.type not in (INT, UNIT):
-            raise InferenceError('Handler experiment requires a scalar body result')
+            raise InferenceError('Implementation limit: handler body results must be Int or Unit',
+                                 expression=body, code='unsupported')
         labels = list(normal.effects.labels)
         if key in labels:
             labels.remove(key)
         body_effects = Row(tuple(labels), normal.effects.tail)
 
         returned_context, returned_captures = self._clause_context(context, frame)
+        returned_context.blocked_family = family
+        returned_context.return_resumption = context.resumption or context.return_resumption
         returned_context.suspended = self._obligations(context)
         result_binding = Binding(replace(normal, effects=Row()))
         returned_context.bindings[result_name] = result_binding
         returned_context.live.append((result_name, result_binding))
         returned = self._infer(result_body, returned_context)
-        self._discharge(returned_captures)
+        try:
+            self._discharge(returned_captures)
+        except InferenceError as error:
+            error.expression = result_body
+            raise
         if returned.type not in (INT, UNIT):
-            raise InferenceError('Handler experiment requires a scalar output')
+            raise InferenceError('Implementation limit: handler output must be Int or Unit',
+                                 expression=result_body, code='unsupported')
 
         own_ids = {id(b) for b in captures.values()}
         pending = tuple(entry for entry in frame.sites if entry[3] not in own_ids)
@@ -180,7 +194,7 @@ class HandlerChecker(Checker):
             unknown = value(Ty('Owned', (Ty('Continuation'),)))
             pending += (('opaque suspended continuation', unknown, False, id(frame)),)
 
-        def check_clause(residual):
+        def check_clause_body(residual):
             clause_context, clause_captures = self._clause_context(context, frame)
             # Resources outside this delimiter survive a successful resume.
             clause_context.suspended = self._obligations(context)
@@ -203,16 +217,27 @@ class HandlerChecker(Checker):
             self._discharge(clause_captures)
             return ambient(residual, handled.effects)
 
+        def check_clause(residual):
+            previous, self.current_expression = self.current_expression, clause
+            try:
+                return check_clause_body(residual)
+            except InferenceError as error:
+                if error.expression is None:
+                    error.expression = clause
+                raise
+            finally:
+                self.current_expression = previous
+
         residual = ambient(body_effects, returned.effects)
         effects = check_clause(residual)
         # Deep resumption may re-enter this clause. Check its complete residual
         # at resume sites, including effects inferred from the clause itself.
         if effects != residual and check_clause(effects) != effects:
-            raise InferenceError('Handler residual did not stabilize in the supported fragment')
+            raise InferenceError('Implementation limit: handler residual did not stabilize', code='unsupported')
         self.handled_rows[name] = effects
         return value(returned.type, effects)
 
-    def _infer(self, expression, context):
+    def _infer_expression(self, expression, context):
         match expression:
             case ('handle', family, name, body, clause, returning):
                 return self._handler(family, name, body, clause, returning, context)
@@ -223,10 +248,10 @@ class HandlerChecker(Checker):
                     raise InferenceError('An unqualified same-family operation is forbidden inside its clause')
                 if named == ['self']:
                     raise InferenceError('Self recursion is outside the handler experiment')
-                result = super()._infer(expression, context)
+                result = super()._infer_expression(expression, context)
                 return replace(result, type=self.operations[family].result)
             case _:
-                return super()._infer(expression, context)
+                return super()._infer_expression(expression, context)
 
 
 @dataclass(frozen=True)
@@ -240,11 +265,12 @@ class Program:
     core: tuple
     inferred: object
     operations: dict
+    origins: dict = field(default_factory=dict)
 
 
-def compile_program(expression, *, operations=None):
+def compile_program(expression, *, operations=None, checker=None, origins=None):
     """Check first, then lower dispatch and hidden evidence arguments explicitly."""
-    checker = HandlerChecker(operations=operations)
+    checker = checker or HandlerChecker(operations=operations)
     inferred = checker.infer(expression)
     serial = 0
 
@@ -255,7 +281,15 @@ def compile_program(expression, *, operations=None):
             return set().union(*(evidence_used(part) for part in term))
         return set()
 
+    lowered_origins = {}
+
     def lower(expr, names):
+        core = lower_expression(expr, names)
+        if origins and id(expr) in origins:
+            lowered_origins[id(core)] = origins[id(expr)]
+        return core
+
+    def lower_expression(expr, names):
         nonlocal serial
         match expr:
             case ('int', _) | ('unit',) | ('var', _) | ('acquire', _):
@@ -289,7 +323,7 @@ def compile_program(expression, *, operations=None):
             case _:
                 raise InferenceError(f'Expression is outside the executable handler fragment: {expr[0]}')
 
-    return Program(lower(expression, {}), inferred, checker.operations)
+    return Program(lower(expression, {}), inferred, checker.operations, lowered_origins)
 
 
 @dataclass
@@ -348,7 +382,7 @@ def _dup(retained):
 
 
 def _read(name, environment):
-    if name not in environment and name in ('close', 'yield'):
+    if name not in environment and name in ('close', 'close_async', 'yield'):
         return name
     slot = environment[name]
     if slot.consumed:
@@ -397,7 +431,7 @@ class _Machine:
         return _Request(target, lambda supplied: supplied, lambda: None)
 
     def invoke(self, function, evidence, arguments):
-        if function == 'close':
+        if function in ('close', 'close_async'):
             self.close(arguments[0], 'explicit')
             return None
         if function == 'yield':
@@ -504,7 +538,7 @@ class _Machine:
             case ('install', selected, name, captures, body, clause, result_name, result_body, forwarding):
                 retained = {n: _Slot(_read(n, environment)) for n in captures if n in environment}
                 mode = self.operations[selected.family].mode
-                frame = _Handler(selected, name, retained, evidence, clause, result_name, result_body,
+                frame = _Handler(selected, str(name), retained, evidence, clause, result_name, result_body,
                                  mode, mode == 'tail' or forwarding)
                 inner = evidence | {selected: frame, Evidence(selected.family): frame}
                 return self.handle(frame, self.evaluate(body, environment, inner, resume))

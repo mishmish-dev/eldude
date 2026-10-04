@@ -15,7 +15,9 @@ from effect_rows import Row, Solver, Var
 
 
 class InferenceError(ValueError):
-    pass
+    def __init__(self, message, *, expression=None, subject=None, code='semantic'):
+        super().__init__(message)
+        self.expression, self.subject, self.code = expression, subject, code
 
 
 @dataclass(frozen=True)
@@ -109,6 +111,7 @@ class Context:
     resumption: object = None
     suspended: tuple = ()
     blocked_family: str | None = None
+    return_resumption: object = None
 
 
 def state(region):
@@ -209,6 +212,8 @@ class Checker:
         self.dispatches, self.cleanups, self.handled_rows = [], [], {}
         self.scope_depth = {}
         self.counter = 0
+        self.current_expression = None
+        self.transfers = {}
 
     def fresh(self, name):
         self.counter += 1
@@ -238,10 +243,11 @@ class Checker:
             raise InferenceError(f'Unknown value {name}')
         binding = context.bindings[name]
         if binding.consumed:
-            raise InferenceError(f'{name} was already consumed')
+            raise InferenceError(f'{name} was already consumed', subject=name)
         context.references.add(binding)
         if not permissions(binding.value.type)[0]:
             binding.consumed = True
+            self.transfers[name] = self.current_expression
         return binding.value
 
     def _resolve(self, row, context):
@@ -334,7 +340,7 @@ class Checker:
     def _apply(self, function, arguments, context):
         signature = function.type
         if not isinstance(signature, Fn) or len(arguments) != len(signature.parameters):
-            raise InferenceError('Callable arity mismatch')
+            raise InferenceError('Callable arity mismatch', code='type')
         types, regions, row_checks = {}, {}, []
         variables = {v: Var(v.name) for v in signature.effect_vars}
 
@@ -362,7 +368,7 @@ class Checker:
                 row_checks.append((expected, actual, invariant))
                 return
             if not isinstance(expected, Ty) or not isinstance(actual, Ty) or expected.name != actual.name:
-                raise InferenceError('Type mismatch')
+                raise InferenceError('Type mismatch', code='type')
             if expected.region in signature.regions:
                 previous = regions.setdefault(expected.region, actual.region)
                 if previous != actual.region:
@@ -418,6 +424,17 @@ class Checker:
         return value(substitute(signature.result), effects, captures)
 
     def _infer(self, expression, context):
+        previous, self.current_expression = self.current_expression, expression
+        try:
+            return self._infer_expression(expression, context)
+        except InferenceError as error:
+            if error.expression is None:
+                error.expression = expression
+            raise
+        finally:
+            self.current_expression = previous
+
+    def _infer_expression(self, expression, context):
         match expression:
             case ('int', number) if type(number) is int:
                 return value(INT)
@@ -446,7 +463,7 @@ class Checker:
                     if not binding.consumed:
                         self.cleanups.append((name, True))
                 elif not binding.consumed and not permissions(initial.type)[1]:
-                    raise InferenceError(f'Unconsumed resource {name}')
+                    raise InferenceError(f'Unconsumed resource {name}', subject=name)
                 if previous is None:
                     del context.bindings[name]
                 else:
@@ -459,7 +476,7 @@ class Checker:
                     result = self._infer(item, context)
                     rows.append(result.effects)
                     if index != len(expressions) - 1 and not permissions(result.type)[1]:
-                        raise InferenceError('Cannot discard an owned intermediate value')
+                        raise InferenceError('Cannot discard an owned intermediate value', expression=item)
                 return replace(result, effects=ambient(*rows))
             case ('call', name, *expressions):
                 function = self._lookup(name, context)
