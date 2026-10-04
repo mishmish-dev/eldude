@@ -90,6 +90,11 @@ All these files execute real Eldude syntax through a located AST, declaration re
 | [tail cleanup](07_source_pipeline/tail_cleanup.eld) | `40` | Clause-local close precedes implicit resume and caller acquisition |
 | [tail output](07_source_pipeline/tail_output.eld) | `()` | Operation returns `Int` even though handler output is `Unit` |
 | [deep once](07_source_pipeline/once_deep.eld) | `99` | Two deep entries, one close of the frame resource, legal post-resume work |
+| [nested normal return](07_source_pipeline/nested_return.eld) | `42` | Nested normal-return clauses resume the enclosing operation; deep re-entry closes one shared frame and preserves local cleanup |
+| [operation arguments](07_source_pipeline/operation_arguments.eld) | `42` | Scalar arguments pass through source functions, forwarding and deep once resumption without becoming frame captures |
+| [multiple operations](07_source_pipeline/multi_operations.eld) | `42` | Mixed modes, nested instances, selective forwarding and tail cleanup |
+| [multiple operations with shared frame](07_source_pipeline/multi_operations_deep.eld) | `42` | Deep re-entry through different operations, one frame close, lexical normal-return resumption and complete sibling residual |
+| [multiple operations with affine exit](07_source_pipeline/multi_operations_affine.eld) | `7` | Forwarded affine exit skips the later read, unwinds body cleanup and preserves an outside resource |
 | [clause local](07_source_pipeline/clause_local.eld) | `()` | Local resource remains owned after resume, then closes |
 | [affine scope](07_source_pipeline/affine_scope.eld) | `7` | Frame closes, captured body cleanup unwinds, outside resource closes afterward |
 | [affine asynchronous cleanup](07_source_pipeline/affine_async.eld) | `()` | Abandonment triggers masked suspension and cleanup; body yield is skipped |
@@ -109,7 +114,19 @@ acquire 4 → cleanup 4 → acquire 5 → cleanup 5
 cleanup 2
 ```
 
-The existing broader [forwarding](04_effects/forwarding.eld), [tail result](04_effects/tail_result.eld) and [tail cleanup](05_state_and_collections/tail_cleanup.eld) are unchanged. Multiple operations/arithmetic, `Result`/matching/`?`, and regions/traits/references/early return remain their future targets. The smaller fixtures above do not redefine those programs.
+`uv run python tools/run_eldude.py examples/07_source_pipeline/nested_return.eld` also prints `42`. Each `Step` clause installs a `Read` handler whose normal-return clause resumes `Step`. The trace orders cleanup of temporary `2` before the first `Step` resume, cleanup of temporary `3` before the second, then one explicit close of frame `1` and post-resume cleanup of locals `4` and `5`.
+
+`uv run python tools/run_eldude.py examples/07_source_pipeline/operation_arguments.eld` prints `42`. It passes `7` and `42` through `request`, the inner forwarding `Echo`, and the outer `Echo` clause. Cleanup of each tail-clause temporary precedes the corresponding outer/inner/`Step` resumptions. The retained frame then closes once, followed by cleanup of the two post-resume locals.
+
+`uv run python tools/run_eldude.py examples/07_source_pipeline/multi_operations.eld` prints `42`. Its order is inner `step` dispatch/resume, inner then outer `read` dispatch, acquisition/cleanup of temporary `2`, outer then inner tail resume, and cleanup of protected body `1`. The handler has separate `tail read(Int) -> Int`, `once step() -> Unit`, and `affine stop(Int) -> Unit` contracts.
+
+`multi_operations_deep.eld` also prints `42`. Named dispatch enters the shared outer `step`; its nested empty handler's normal return resumes that operation. Inner `step` resumes, then inner `read` forwards to the same outer frame. Tail cleanup precedes resumption, normal return closes frame `1` exactly once, and independent post-resume cleanup finishes afterward. The scalar `read(frame)` parameter shadows the retained frame resource without acquiring its ownership. An outward `Mark` effect from `read` forces the checker to validate the earlier `step` resume against the complete residual using fresh states.
+
+`multi_operations_affine.eld` prints `7`. After inner `step` resumes, inner `stop(7)` forwards to outer `stop`; both captured segments are abandoned, body resource `2` is cleaned, and outside resource `1` is explicitly closed. No read dispatch or read-clause temporary acquisition occurs.
+
+For families with several operations, dispatch events are `('dispatch', family, instance, operation)`. Singleton families retain the previous three-field dispatch events. Other event shapes are unchanged.
+
+The existing broader [forwarding](04_effects/forwarding.eld), [tail result](04_effects/tail_result.eld) and [tail cleanup](05_state_and_collections/tail_cleanup.eld) are unchanged. Checked arithmetic, `Result`/matching/`?`, and regions/traits/references/early return remain their future targets. The smaller fixtures above do not redefine those programs.
 
 ## Fixture host profile
 
@@ -137,9 +154,15 @@ Fixture primitives must be called directly by their imported names/aliases. Use 
 
 Source functions have annotated parameters and signatures; closures require parameter annotations but may infer their result/effect contract. Function types and closed effect rows are supported; omitted rows mean pure. Annotations cannot hide effects, replace a lambda's own contract, or erase whole-value capture bounds. Only empty source `captures {}` clauses are currently supported. Local and handler names have distinct binding identities across shadowing; qualified references to this file's module select its declarations.
 
-The runner requires exported nullary `main` returning `Int` or `Unit`, with only intrinsic effects left at the root. This is a fixture convention. Other functions, including unused functions, are checked before execution. General operators (beyond signed integer literals), branches, loops, recursion, open rows/generics, operation arguments, multiple operations, non-scalar handler results, early returns, nonempty capture annotations, top-level `let`, `self`, traits, regions and tasks produce explicit implementation-limit diagnostics.
+Effect declarations may specify positional `Int`/`Unit` parameters, for example `effect Echo { tail echo(value: Int, marker: Unit) -> Int; }`. Call arguments evaluate once, left to right, before dispatch. A clause such as `echo(value, _) => value;` binds fresh local parameters using the declaration's types; `_` discards a scalar argument. Parameter arity, types, duplicate names and scope are checked. Both named calls and `forward operation;`/`forward ..;` preserve evaluated arguments and instance evidence. Clause parameters remain available after resume when their scalar types allow duplication; they do not replace retained frame obligations. Resource/callback operation parameters and destructuring clause patterns are implementation limits.
 
-The existing checker also does not thread an enclosing once/affine resumption through a nested handler's normal-return clause. That lexical use is valid under §25.1 but reports `unsupported`; it must not be confused with capturing a resumption in a nested function, which is a semantic error.
+Operation names are scoped to their family; unrelated families may reuse a spelling with different signatures. Every operation is independently checked, including clauses not reached at runtime. A handler must cover all declarations with operation clauses or explicit `forward name;` entries. A single `forward ..;` covers only omitted operations and may coexist with explicit entries in any order. Empty families need no operation clauses. Unknown or duplicate operations, duplicate explicit entries and duplicate fallback forwards are rejected. A clause cannot dispatch unqualified to another operation of its own family; name an outer instance explicitly. Effect slots still belong to family instances, so forwarding preserves the outer slot without re-evaluating arguments.
+
+Direct dispatch applies the selected operation's mode. Ordinary calls admitting the family and complete resumption residuals retain the conservative abandonment envelope of all declared operations, including affine siblings. A naked resource cannot cross such a call merely because its available implementation currently calls only a tail operation. Every resumption includes outward effects from all sibling clauses, with fresh ownership states for validation. Frame captures transfer once and never return to post-resume ownership; clause-local resources must be discharged separately. General usage/control joins remain outside this experiment.
+
+The runner requires exported nullary `main` returning `Int` or `Unit`, with only intrinsic effects left at the root. This is a fixture convention. Other functions, including unused functions, are checked before execution. General operators (beyond signed integer literals), branches, loops, recursion, open rows/generics, non-scalar operation parameters/results, non-scalar handler results, early returns, nonempty capture annotations, top-level `let`, `self`, traits, regions and tasks produce explicit implementation-limit diagnostics.
+
+Normal-return clauses preserve the enclosing operation's lexical resumption, including through multiple nested handlers (§25.1). Nested operation clauses instead use their own capability; explicit tail resume and capture by a nested function remain semantic errors. The checker shares the enclosing capability's used state and frame ownership, so a resume inside a normal-return clause counts toward exactly-once checking and transferred frame captures remain unavailable afterward. Inner affine handlers that could skip that resume are conservatively rejected, just as when the resume occurs in their body.
 
 ## Enforced source rejections
 
@@ -161,6 +184,26 @@ Each file below is valid normative syntax and is rejected during compilation, be
 | [deep residual](reject/semantics/source_pipeline/deep_residual.eld) | Complete re-entered clause residual could abandon a local at resume |
 | [post resume](reject/semantics/source_pipeline/post_resume.eld) | Outside obligation remains live after resume returns |
 | [same family](reject/semantics/source_pipeline/same_family.eld) | Clause must name an outer instance explicitly |
+| [nested return skips resume](reject/semantics/source_pipeline/nested_return_affine_skip.eld) | Affine completion could skip the normal-return clause's enclosing resume |
+| [nested return repeats resume](reject/semantics/source_pipeline/nested_return_repeated.eld) | A resume after the nested handler reuses the same capability |
+| [nested return frame transfer](reject/semantics/source_pipeline/nested_return_frame_transfer.eld) | The enclosing frame remains unavailable after resumption through a return clause |
+| [nested return outward effect](reject/semantics/source_pipeline/nested_return_outward.eld) | Post-resume outward control still owes outside resource consumption |
+| [nested return deep residual](reject/semantics/source_pipeline/nested_return_residual.eld) | Re-entered clauses may abandon a local held across normal-return resumption |
+
+The argument fixtures under `reject/semantics/operation_arguments` are also valid grammar and fail before execution:
+
+| Fixture | Required static failure |
+| --- | --- |
+| [type](reject/semantics/operation_arguments/type.eld) | `Unit` supplied to an `Int` parameter |
+| [arity](reject/semantics/operation_arguments/arity.eld) | Missing operation argument |
+| [clause arity](reject/semantics/operation_arguments/clause_arity.eld) | Missing clause parameter |
+| [abandonment](reject/semantics/operation_arguments/abandonment.eld) | Argument evaluation may suspend while an unprotected resource remains live |
+
+The 29 [multi-operation rejection fixtures](reject/semantics/multi_operations) cover incomplete/duplicate/unknown declarations and handler entries; call/clause arity and scalar types; mode-specific results; same-family sibling dispatch; explicit tail, missing/repeated once and escaping resumes; transferred frame use; undisposed clause locals; unsafe affine exit; skipped outside consumption/enclosing resume; post-resume outward abandonment; and argument effects. Each `/*error*/` marker immediately precedes the required diagnostic location; tests assert filename, offset, line, column and related ownership notes.
+
+In particular, [sibling residual](reject/semantics/multi_operations/sibling_residual.eld) rejects the earlier resume because a sibling clause can perform an outward affine operation during deep re-entry. [Opaque family call](reject/semantics/multi_operations/opaque_affine_family.eld) rejects a source function call whose admitted family includes `affine`, even though its body currently invokes only `tail read`. These fail statically, before the interpreter runs.
+
+The complete suite currently has **171 passing tests on Python 3.14.8** and **133 synchronized grammar productions**; all previous pipeline tests remain regressions.
 
 For example:
 

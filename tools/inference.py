@@ -111,7 +111,6 @@ class Context:
     resumption: object = None
     suspended: tuple = ()
     blocked_family: str | None = None
-    return_resumption: object = None
 
 
 def state(region):
@@ -190,6 +189,15 @@ def free_names(expression, bound=frozenset()):
             return free_names(initializer, bound) | free_names(body, bound | {name})
         case ('lambda', parameters, body):
             return free_names(body, bound | {name for name, _ in parameters})
+        case ('clause', parameters, body):
+            return free_names(body, bound | set(parameters))
+        case ('perform_args', _, arguments, *_):
+            return set().union(*(free_names(a, bound) for a in arguments))
+        case ('perform_op', _, _, arguments, *_):
+            return set().union(*(free_names(a, bound) for a in arguments))
+        case ('handle_ops', _, _, body, clauses, returning):
+            return free_names(body, bound) | free_names(returning, bound) | set().union(
+                *(free_names(clause, bound) for _, clause in clauses))
         case ('returning', name, body):
             return free_names(body, bound | {name})
         case _:
@@ -283,6 +291,19 @@ class Checker:
             if (family == 'suspend' and not masked) or self.modes.get(family) == 'affine':
                 return True
         return False
+
+    def _operation_effects(self, family, named, context):
+        if family not in self.modes:
+            raise InferenceError('Unknown effect family')
+        label = family
+        if named:
+            if len(named) != 1 or named[0] not in context.names:
+                raise InferenceError('Unknown handler name')
+            label = context.names[named[0]]
+            if self.handler_ids[label][0] != family:
+                raise InferenceError('Named handler family mismatch')
+            context.named_references.add(label)
+        return self._resolve(Row((label,)), context)
 
     def _control(self, row, context):
         if not self._abandoning(row):
@@ -503,17 +524,7 @@ class Checker:
                     raise InferenceError('Traversal callback must return Unit')
                 return value(UNIT, ambient(xs.effects, f.effects, result.effects))
             case ('perform', family, *named):
-                if family not in self.modes:
-                    raise InferenceError('Unknown effect family')
-                label = family
-                if named:
-                    if len(named) != 1 or named[0] not in context.names:
-                        raise InferenceError('Unknown handler name')
-                    label = context.names[named[0]]
-                    if self.handler_ids[label][0] != family:
-                        raise InferenceError('Named handler family mismatch')
-                    context.named_references.add(label)
-                effects = self._resolve(Row((label,)), context)
+                effects = self._operation_effects(family, named, context)
                 self._control(effects, context)
                 return value(UNIT, effects)
             case ('handle', family, name, body):

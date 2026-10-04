@@ -1,6 +1,6 @@
 """Bounded handler experiment over inference.py's annotated expression IR.
 
-One nullary operation per family, scalar operation/handler results, straight-line
+Named operations per family, scalar parameters/results, straight-line
 clauses and identity or explicit return clauses. Non-Dup frame captures obey an
 availability invariant at every resumption; consuming one before resuming is
 conservatively rejected. Self recursion, source returns and general control-flow
@@ -9,7 +9,7 @@ inference are outside this experiment. This is not an Eldude compiler.
 from dataclasses import dataclass, field, replace
 
 from effect_rows import Row
-from inference import (Binding, Checker, Context, E, INT, UNIT, Ty, InferenceError,
+from inference import (Binding, Checker, Context, E, Fn, INT, UNIT, Ty, InferenceError,
                        ambient, free_names, permissions, value)
 
 
@@ -17,10 +17,13 @@ from inference import (Binding, Checker, Context, E, INT, UNIT, Ty, InferenceErr
 class Operation:
     mode: str
     result: object
+    parameters: tuple = ()
 
     def __post_init__(self):
         if self.mode not in ('tail', 'once', 'affine') or self.result not in (INT, UNIT):
             raise InferenceError('Handler experiment requires a valid mode and scalar operation result')
+        if any(t not in (INT, UNIT) for t in self.parameters):
+            raise InferenceError('Implementation limit: operation parameters must be Int or Unit', code='unsupported')
 
 
 @dataclass
@@ -32,6 +35,7 @@ class Frame:
     sites: list = field(default_factory=list)
     opaque: bool = False
     collecting: bool = True
+    may_abandon: bool = False
 
 
 @dataclass
@@ -48,10 +52,25 @@ class Resumption:
 class HandlerChecker(Checker):
     def __init__(self, *, operations=None, **kwargs):
         super().__init__(**kwargs)
-        self.operations = {'Log': Operation('tail', UNIT), 'Abort': Operation('affine', UNIT)} | (operations or {})
-        self.modes = {family: operation.mode for family, operation in self.operations.items()}
+        declared = {'Log': Operation('tail', UNIT), 'Abort': Operation('affine', UNIT)} | (operations or {})
+        self.operations = {family: {None: contract} if isinstance(contract, Operation) else dict(contract)
+                           for family, contract in declared.items()}
+        if any(not isinstance(op, Operation) for ops in self.operations.values() for op in ops.values()):
+            raise InferenceError('Invalid operation contract')
+        # Opaque calls admit the entire family, regardless of declaration order.
+        # Retain once too: the inherited inference-only delimiter is tail-only.
+        self.modes = {family: 'affine' if any(op.mode == 'affine' for op in ops.values()) else
+                             'once' if any(op.mode == 'once' for op in ops.values()) else 'tail'
+                      for family, ops in self.operations.items()}
         self.frames = {}
         self.in_call = False
+
+    def sole_operation(self, family):
+        if family not in self.operations:
+            raise InferenceError('Unknown effect family')
+        if len(self.operations[family]) != 1:
+            raise InferenceError('Ambiguous legacy operation: use an explicit operation name')
+        return next(iter(self.operations[family]))
 
     def _obligations(self, context):
         # Snapshot identities as well as values: later straight-line consumption
@@ -63,7 +82,7 @@ class HandlerChecker(Checker):
             entries.extend(context.resumption.pending)
         return tuple(entries)
 
-    def _control(self, row, context):
+    def _control(self, row, context, *, mode=None):
         obligations = self._obligations(context)
         for label in row.labels:
             frame = self.frames.get(label)
@@ -72,9 +91,11 @@ class HandlerChecker(Checker):
                 frame.opaque |= self.in_call
         for label in (*row.labels, *(['unknown tail'] if row.tail else [])):
             family = self.handler_ids[label][0] if label in self.handler_ids else label
-            if family not in ('suspend', 'unknown tail') and self.modes.get(family) != 'affine':
+            if family not in ('suspend', 'unknown tail') and (mode or self.modes.get(family)) != 'affine':
                 continue
             frame = self.frames.get(label)
+            if frame and frame.collecting:
+                frame.may_abandon = True
             outside = frame.outside if frame else set()
             for name, retained, managed, identity in obligations:
                 if identity not in outside and not managed and not permissions(retained.type)[1]:
@@ -90,11 +111,6 @@ class HandlerChecker(Checker):
     def _resume(self, supplied, context, implicit=False):
         resume = context.resumption
         if resume is None:
-            if context.return_resumption is not None:
-                if context.return_resumption.operation.mode == 'tail':
-                    raise InferenceError('Explicit resume is forbidden in a tail clause')
-                raise InferenceError('Implementation limit: resuming an enclosing clause from a nested normal-return clause',
-                                     code='unsupported')
             raise InferenceError('resume is available only inside an operation clause')
         if resume.operation.mode == 'tail' and not implicit:
             raise InferenceError('Explicit resume is forbidden in a tail clause')
@@ -124,13 +140,28 @@ class HandlerChecker(Checker):
             if not binding.consumed and not permissions(binding.value.type)[1]:
                 raise InferenceError(f'Unconsumed handler obligation {name}', subject=name)
 
-    def _handler(self, family, name, body, clause, returning, context):
+    def _handler(self, family, name, body, clauses, returning, context):
         if family not in self.operations:
             raise InferenceError('Unknown effect family')
+        operations = self.operations[family]
+        seen = set()
+        for operation_name, clause in clauses:
+            if operation_name in seen:
+                raise InferenceError('Duplicate handler operation', expression=clause)
+            if operation_name not in operations:
+                raise InferenceError(f'Unknown operation {operation_name} for {family}', expression=clause)
+            seen.add(operation_name)
+            parameters = clause[1] if clause[0] == 'clause' else ()
+            if clause != E('forward') and len(parameters) != len(operations[operation_name].parameters):
+                raise InferenceError('Operation clause arity mismatch', expression=clause, code='type')
+            if len(set(parameters)) != len(parameters):
+                raise InferenceError('Duplicate operation clause parameter', expression=clause)
+        if seen != operations.keys():
+            raise InferenceError('Incomplete handler: missing operations')
         if len(returning) != 3 or returning[0] != 'returning':
             raise InferenceError('Expected a return clause')
         _, result_name, result_body = returning
-        free = free_names(clause) | free_names(returning)
+        free = free_names(returning) | set().union(*(free_names(clause) for _, clause in clauses))
         captures = {}
         for captured in sorted(free & context.bindings.keys()):
             original = context.bindings[captured]
@@ -157,7 +188,7 @@ class HandlerChecker(Checker):
         del context.live[start:]
         context.handlers, context.names, context.active = old_handlers, old_names, old_active
         frame.collecting = False
-        if self.operations[family].mode == 'affine' and key in normal.effects.labels:
+        if frame.may_abandon:
             if context.resumption and context.resumption.used != previously_resumed:
                 raise InferenceError('Affine completion may skip an enclosing resume')
             for outer_name, binding in incoming:
@@ -173,12 +204,20 @@ class HandlerChecker(Checker):
 
         returned_context, returned_captures = self._clause_context(context, frame)
         returned_context.blocked_family = family
-        returned_context.return_resumption = context.resumption or context.return_resumption
-        returned_context.suspended = self._obligations(context)
+        # A normal-return clause keeps the enclosing lexical capability. Share
+        # its usage state and live bindings so transfer removes its own frame
+        # obligations without dropping outside resources or suspended segments.
+        returned_context.resumption = context.resumption
+        returned_context.live.extend(context.live)
+        returned_context.temporaries = list(context.temporaries)
+        returned_context.suspended = context.suspended
         result_binding = Binding(replace(normal, effects=Row()))
         returned_context.bindings[result_name] = result_binding
         returned_context.live.append((result_name, result_binding))
         returned = self._infer(result_body, returned_context)
+        if (frame.may_abandon
+                and context.resumption and context.resumption.used != previously_resumed):
+            raise InferenceError('Affine completion may skip an enclosing resume', expression=result_body)
         try:
             self._discharge(returned_captures)
         except InferenceError as error:
@@ -190,24 +229,31 @@ class HandlerChecker(Checker):
 
         own_ids = {id(b) for b in captures.values()}
         pending = tuple(entry for entry in frame.sites if entry[3] not in own_ids)
-        if frame.opaque and self.operations[family].mode != 'affine':
-            unknown = value(Ty('Owned', (Ty('Continuation'),)))
-            pending += (('opaque suspended continuation', unknown, False, id(frame)),)
 
-        def check_clause_body(residual):
+        def check_clause_body(operation_name, clause, residual):
+            operation = operations[operation_name]
+            parameters, clause_body = clause[1:] if clause[0] == 'clause' else ((), clause)
             clause_context, clause_captures = self._clause_context(context, frame)
+            for parameter, declared in zip(parameters, operation.parameters):
+                binding = Binding(value(declared))
+                clause_context.bindings[parameter] = binding
+                clause_context.live.append((parameter, binding))
             # Resources outside this delimiter survive a successful resume.
             clause_context.suspended = self._obligations(context)
-            resume = Resumption(frame, self.operations[family], returned.type,
-                                residual, clause_captures, pending)
+            clause_pending = pending
+            if frame.opaque and operation.mode != 'affine':
+                unknown = value(Ty('Owned', (Ty('Continuation'),)))
+                clause_pending += (('opaque suspended continuation', unknown, False, id(frame)),)
+            resume = Resumption(frame, operation, returned.type,
+                                residual, clause_captures, clause_pending)
             clause_context.resumption = resume
             clause_context.blocked_family = family
             if clause == E('forward'):
                 effects = self._resolve(Row((family,)), clause_context)
-                self._control(effects, clause_context)
+                self._control(effects, clause_context, mode=operation.mode)
                 handled = self._resume(value(resume.operation.result, effects), clause_context, implicit=True)
             else:
-                handled = self._infer(clause, clause_context)
+                handled = self._infer(clause_body, clause_context)
                 if resume.operation.mode == 'tail':
                     handled = self._resume(handled, clause_context, implicit=True)
             if resume.operation.mode == 'once' and not resume.used:
@@ -217,39 +263,77 @@ class HandlerChecker(Checker):
             self._discharge(clause_captures)
             return ambient(residual, handled.effects)
 
-        def check_clause(residual):
+        def check_clause(operation_name, clause, residual):
             previous, self.current_expression = self.current_expression, clause
+            # Diagnostic transfers belong to this alternative's fresh usage
+            # state, not normal return or a successful preliminary clause pass.
+            transfers = self.transfers
+            self.transfers = {n: origin for n, origin in transfers.items() if n not in frame.captures}
             try:
-                return check_clause_body(residual)
+                result = check_clause_body(operation_name, clause, residual)
             except InferenceError as error:
                 if error.expression is None:
                     error.expression = clause
                 raise
+            else:
+                self.transfers = transfers
+                return result
             finally:
                 self.current_expression = previous
 
         residual = ambient(body_effects, returned.effects)
-        effects = check_clause(residual)
-        # Deep resumption may re-enter this clause. Check its complete residual
-        # at resume sites, including effects inferred from the clause itself.
-        if effects != residual and check_clause(effects) != effects:
-            raise InferenceError('Implementation limit: handler residual did not stabilize', code='unsupported')
+        effects = ambient(residual, *(check_clause(op, clause, residual) for op, clause in clauses))
+        # In this straight-line slice, resume adds its supplied row; it cannot
+        # select new syntax. Union ALL clauses first, then validate every resume
+        # against that complete row with fresh bindings/capabilities per clause.
+        # Nested handlers follow the same rule. Refuse any unstabilized result.
+        if effects != residual:
+            checked = ambient(effects, *(check_clause(op, clause, effects) for op, clause in clauses))
+            if checked != effects:
+                raise InferenceError('Implementation limit: handler residual did not stabilize', code='unsupported')
         self.handled_rows[name] = effects
         return value(returned.type, effects)
+
+    def _operation(self, family, operation_name, named, expressions, context):
+        if family not in self.operations:
+            raise InferenceError('Unknown effect family')
+        if context.blocked_family == family and not named:
+            raise InferenceError('An unqualified same-family operation is forbidden inside its clause')
+        if named == ['self']:
+            raise InferenceError('Self recursion is outside the handler experiment')
+        if operation_name not in self.operations[family]:
+            raise InferenceError(f'Unknown operation {operation_name} for {family}')
+        operation = self.operations[family][operation_name]
+        if len(expressions) != len(operation.parameters):
+            raise InferenceError('Operation arity mismatch', code='type')
+        start = len(context.temporaries)
+        arguments = []
+        for expression in expressions:
+            argument = self._infer(expression, context)
+            arguments.append(argument)
+            context.temporaries.append(argument)
+        del context.temporaries[start:]
+        # Reuse call contract matching without marking a direct operation's
+        # continuation as opaque. Arguments finish before operation dispatch.
+        super()._apply(value(Fn(operation.parameters, operation.result, Row())), arguments, context)
+        effects = self._operation_effects(family, named, context)
+        self._control(effects, context, mode=operation.mode)
+        return value(operation.result, ambient(*(a.effects for a in arguments), effects))
 
     def _infer_expression(self, expression, context):
         match expression:
             case ('handle', family, name, body, clause, returning):
-                return self._handler(family, name, body, clause, returning, context)
+                return self._handler(family, name, body, ((self.sole_operation(family), clause),), returning, context)
+            case ('handle_ops', family, name, body, clauses, returning):
+                return self._handler(family, name, body, clauses, returning, context)
             case ('resume', argument):
                 return self._resume(self._infer(argument, context), context)
             case ('perform', family, *named):
-                if context.blocked_family == family and not named:
-                    raise InferenceError('An unqualified same-family operation is forbidden inside its clause')
-                if named == ['self']:
-                    raise InferenceError('Self recursion is outside the handler experiment')
-                result = super()._infer_expression(expression, context)
-                return replace(result, type=self.operations[family].result)
+                return self._operation(family, self.sole_operation(family), named, (), context)
+            case ('perform_args', family, arguments, *named):
+                return self._operation(family, self.sole_operation(family), named, arguments, context)
+            case ('perform_op', family, operation_name, arguments, *named):
+                return self._operation(family, operation_name, named, arguments, context)
             case _:
                 return super()._infer_expression(expression, context)
 
@@ -307,19 +391,40 @@ def compile_program(expression, *, operations=None, checker=None, origins=None):
                 captures = tuple(sorted(free_names(body, {name for name, _ in parameters})))
                 return E('closure', tuple(name for name, _ in parameters), captures, fixed, core)
             case ('perform', family, *named):
+                return lower_expression(E('perform_op', family, checker.sole_operation(family), (), *named), names)
+            case ('perform_args', family, arguments, *named):
+                return lower_expression(E('perform_op', family, checker.sole_operation(family), arguments, *named), names)
+            case ('perform_op', family, operation_name, arguments, *named):
                 selected = names[named[0]] if named else Evidence(family)
-                return E('dispatch', selected)
+                return E('dispatch', selected, operation_name, tuple(lower(a, names) for a in arguments))
+            case ('clause', parameters, body):
+                return E('clause', parameters, lower(body, names))
             case ('resume', supplied):
                 return E('resume', lower(supplied, names))
-            case ('handle', family, name, body, clause, ('returning', result_name, result_body)):
+            case ('handle', family, name, body, clause, returning):
+                return lower_expression(E('handle_ops', family, name, body,
+                                         ((checker.sole_operation(family), clause),), returning), names)
+            case ('handle_ops', family, name, body, clauses, ('returning', result_name, result_body)):
                 serial += 1
                 selected = Evidence(family, serial)
-                captures = tuple(sorted(free_names(clause) | free_names(E('returning', result_name, result_body))))
-                forwarding = clause == E('forward')
-                clause_core = E('dispatch', Evidence(family)) if forwarding else lower(clause, names)
+                captures = tuple(sorted(free_names(E('returning', result_name, result_body)) |
+                                        set().union(*(free_names(clause) for _, clause in clauses))))
+                clause_cores = []
+                for operation_name, clause in clauses:
+                    forwarding = clause == E('forward')
+                    if forwarding:
+                        parameters = tuple(f'$argument:{i}' for i in range(len(checker.operations[family][operation_name].parameters)))
+                        dispatch = E('dispatch', Evidence(family), operation_name, tuple(E('var', p) for p in parameters))
+                        clause_core = E('clause', parameters, dispatch)
+                        if origins and id(clause) in origins:
+                            lowered_origins[id(clause_core)] = origins[id(clause)]
+                            lowered_origins[id(dispatch)] = origins[id(clause)]
+                    else:
+                        clause_core = lower(clause, names)
+                    clause_cores.append((operation_name, clause_core, forwarding))
                 return E('install', selected, name, captures,
-                         lower(body, names | {name: selected}), clause_core,
-                         result_name, lower(result_body, names), forwarding)
+                         lower(body, names | {name: selected}), tuple(clause_cores),
+                         result_name, lower(result_body, names))
             case _:
                 raise InferenceError(f'Expression is outside the executable handler fragment: {expr[0]}')
 
@@ -353,18 +458,19 @@ class _Handler:
     name: str
     captures: dict
     outer_evidence: dict
-    clause: tuple
+    clauses: dict
     result_name: str
     result_body: tuple
-    mode: str
-    implicit: bool
+    enclosing_resume: object
 
 
 @dataclass
 class _Request:
     target: _Handler
+    operation: object
     continue_with: object
     abandon: object
+    arguments: tuple
 
 
 @dataclass(frozen=True)
@@ -394,9 +500,7 @@ def _read(name, environment):
 
 def _bind(computation, then):
     if isinstance(computation, _Request):
-        return _Request(computation.target,
-                        lambda result: _bind(computation.continue_with(result), then),
-                        computation.abandon)
+        return replace(computation, continue_with=lambda result: _bind(computation.continue_with(result), then))
     return then(computation)
 
 
@@ -405,8 +509,8 @@ def _protect(computation, finish):
         def abandon():
             computation.abandon()
             finish()
-        return _Request(computation.target,
-                        lambda result: _protect(computation.continue_with(result), finish), abandon)
+        return replace(computation,
+                       continue_with=lambda result: _protect(computation.continue_with(result), finish), abandon=abandon)
     finish()
     return computation
 
@@ -423,12 +527,15 @@ class _Machine:
         resource.closed = True
         self.events.append(('close', resource.identity, reason))
 
-    def dispatch(self, selected, evidence):
+    def dispatch(self, selected, operation, evidence, arguments):
         if selected not in evidence:
             raise RuntimeError(f'Unbound handler evidence for {selected.family}')
         target = evidence[selected]
-        self.events.append(('dispatch', selected.family, target.name))
-        return _Request(target, lambda supplied: supplied, lambda: None)
+        event = ('dispatch', selected.family, target.name)
+        if len(self.operations[selected.family]) > 1:
+            event += (operation,)
+        self.events.append(event)
+        return _Request(target, operation, lambda supplied: supplied, lambda: None, tuple(arguments))
 
     def invoke(self, function, evidence, arguments):
         if function in ('close', 'close_async'):
@@ -446,12 +553,18 @@ class _Machine:
     def handle(self, frame, computation):
         if not isinstance(computation, _Request):
             environment = frame.captures | {frame.result_name: _Slot(computation)}
-            return self.evaluate(frame.result_body, environment, frame.outer_evidence)
+            return self.evaluate(frame.result_body, environment, frame.outer_evidence, frame.enclosing_resume)
         if computation.target is not frame:
-            return _Request(computation.target,
-                            lambda supplied: self.handle(frame, computation.continue_with(supplied)),
-                            computation.abandon)
-        clause_environment = {name: replace(slot) for name, slot in frame.captures.items()}
+            return replace(computation,
+                           continue_with=lambda supplied: self.handle(frame, computation.continue_with(supplied)))
+        clause, forwarding = frame.clauses[computation.operation]
+        parameters = ()
+        if clause[0] == 'clause':
+            _, parameters, clause = clause
+        mode = self.operations[frame.evidence.family][computation.operation].mode
+        implicit = mode == 'tail' or forwarding
+        clause_captures = {name: replace(slot) for name, slot in frame.captures.items()}
+        clause_environment = clause_captures | {name: _Slot(a) for name, a in zip(parameters, computation.arguments)}
         resumed, abandoned = False, False
 
         def resume(supplied):
@@ -459,8 +572,8 @@ class _Machine:
             if resumed or abandoned:
                 raise RuntimeError('Runtime resumption capability already used')
             resumed = True
-            frame.captures = {name: replace(slot) for name, slot in clause_environment.items()}
-            for name, slot in clause_environment.items():
+            frame.captures = {name: replace(slot) for name, slot in clause_captures.items()}
+            for name, slot in clause_captures.items():
                 if not _dup(slot.value):
                     if slot.consumed:
                         raise RuntimeError(f'Consumed frame capture {name} cannot be transferred')
@@ -475,16 +588,24 @@ class _Machine:
                 self.events.append(('abandon', frame.name))
                 computation.abandon()
 
-        clause = self.evaluate(frame.clause, clause_environment, frame.outer_evidence,
-                               None if frame.implicit else resume)
-        if frame.implicit:
+        clause = self.evaluate(clause, clause_environment, frame.outer_evidence,
+                               None if implicit else resume)
+        if implicit:
             clause = _bind(clause, resume)
 
         def completed(result):
-            if frame.mode == 'once' and not resumed:
+            if mode == 'once' and not resumed:
                 raise RuntimeError('Once clause completed without resuming')
             return result
         return _protect(_bind(clause, completed), abandon)
+
+    def evaluate_arguments(self, arguments, environment, evidence, resume, then):
+        def argument(index, values):
+            if index == len(arguments):
+                return then(values)
+            return _bind(self.evaluate(arguments[index], environment, evidence, resume),
+                         lambda retained: argument(index + 1, values + [retained]))
+        return argument(0, [])
 
     def evaluate(self, term, environment, evidence, resume=None):
         # ponytail: recursive continuation closures suffice for these finite
@@ -522,24 +643,20 @@ class _Machine:
             case ('invoke', name, supplied_evidence, arguments):
                 function = _read(name, environment)
                 passed = self.evaluate(supplied_evidence, environment, evidence, resume)
-
-                def argument(index, values):
-                    if index == len(arguments):
-                        return self.invoke(function, passed, values)
-                    return _bind(self.evaluate(arguments[index], environment, evidence, resume),
-                                 lambda retained: argument(index + 1, values + [retained]))
-                return argument(0, [])
-            case ('dispatch', selected):
-                return self.dispatch(selected, evidence)
+                return self.evaluate_arguments(arguments, environment, evidence, resume,
+                                               lambda values: self.invoke(function, passed, values))
+            case ('dispatch', selected, operation, arguments):
+                return self.evaluate_arguments(arguments, environment, evidence, resume,
+                                               lambda values: self.dispatch(selected, operation, evidence, values))
             case ('resume', supplied):
                 if resume is None:
                     raise RuntimeError('No runtime resumption capability')
                 return _bind(self.evaluate(supplied, environment, evidence, resume), resume)
-            case ('install', selected, name, captures, body, clause, result_name, result_body, forwarding):
+            case ('install', selected, name, captures, body, clauses, result_name, result_body):
                 retained = {n: _Slot(_read(n, environment)) for n in captures if n in environment}
-                mode = self.operations[selected.family].mode
-                frame = _Handler(selected, str(name), retained, evidence, clause, result_name, result_body,
-                                 mode, mode == 'tail' or forwarding)
+                frame = _Handler(selected, str(name), retained, evidence,
+                                 {op: (clause, forwarding) for op, clause, forwarding in clauses},
+                                 result_name, result_body, resume)
                 inner = evidence | {selected: frame, Evidence(selected.family): frame}
                 return self.handle(frame, self.evaluate(body, environment, inner, resume))
             case _:

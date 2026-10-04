@@ -41,9 +41,18 @@ OTHER_PRIMITIVES = {'Bool', 'Never', 'Text', 'Nat', 'UInt', 'Char', 'Bytes', 'By
 
 
 def children(expression):
+    if expression[0] in ('perform_args', 'perform_op'):
+        yield from expression[2 if expression[0] == 'perform_args' else 3]
+        return
+    if expression[0] == 'handle_ops':
+        yield expression[3]
+        for _, clause in expression[4]:
+            yield clause[2] if clause[0] == 'clause' else clause
+        yield expression[5]
+        return
     for part in expression[1:]:
         if isinstance(part, tuple) and part and isinstance(part[0], str):
-            yield part
+            yield part[2] if part[0] == 'clause' else part
 
 
 def result_expression(expression):
@@ -202,15 +211,24 @@ class Elaborator:
                 if name.items[0] in names:
                     self.error('name', 'Duplicate operation declaration', name)
                 names.add(name.items[0])
-            if len(operations) != 1:
-                self.limit('exactly one operation per family is supported', operations[1] if len(operations) > 1 else declaration)
-            mode, name, parameters, result = operations[0].items
-            if parameters:
-                self.limit('operation parameters are not implemented', parameters[0])
-            result_type = self.type(result)
-            if result_type not in (INT, UNIT):
-                self.limit('operation results must currently be Int or Unit', result)
-            self.operations[family] = Operation(mode, result_type)
+            self.operations[family] = {}
+            for operation in operations:
+                mode, name, parameters, result = operation.items
+                parameter_types, names = [], set()
+                for parameter in parameters:
+                    parameter_name, annotation = parameter.items
+                    spelling = parameter_name.items[0]
+                    if spelling != '_' and spelling in names:
+                        self.error('name', 'Duplicate operation parameter', parameter_name)
+                    names.add(spelling)
+                    declared = self.type(annotation)
+                    if declared not in (INT, UNIT):
+                        self.limit('operation parameters must currently be Int or Unit', annotation)
+                    parameter_types.append(declared)
+                result_type = self.type(result)
+                if result_type not in (INT, UNIT):
+                    self.limit('operation results must currently be Int or Unit', result)
+                self.operations[family][name.items[0]] = Operation(mode, result_type, tuple(parameter_types))
 
     def type(self, node):
         if node.kind == 'type':
@@ -331,8 +349,6 @@ class Elaborator:
                     self.error('type', 'resume requires exactly one operation result', node)
                 return self.ir(node, 'resume', self.expression(arguments[0], environment, handlers))
             case 'perform', (path, arguments):
-                if arguments:
-                    self.limit('operation arguments are not implemented', node)
                 name = self.local_name(path)
                 if '::' not in name:
                     self.error('name', 'Operation requires an effect family or instance qualifier', path)
@@ -347,10 +363,10 @@ class Elaborator:
                     family = qualifier
                     if family not in self.effects:
                         self.error('name', f'Unknown effect or handler instance {family}', path)
-                declared = self.effects[family].items[2][0].items[1].items[0]
-                if operation != declared:
+                if operation not in self.operations[family]:
                     self.error('name', f'Unknown operation {operation} for {family}', path)
-                return self.ir(node, 'perform', family, *named)
+                args = tuple(self.expression(a, environment, handlers) for a in arguments)
+                return self.ir(node, 'perform_op', family, operation, args, *named)
             case 'using', (acquisitions, body):
                 def acquire(index, local):
                     if index == len(acquisitions):
@@ -369,33 +385,48 @@ class Elaborator:
                 symbol = self.symbol(name or Node('name', family_node.span, (family,)))
                 inner = handlers | ({name.items[0]: (family, symbol)} if name else {})
                 handled = self.expression(body, environment, inner)
-                operation = self.effects[family].items[2][0].items[1].items[0]
-                operation_clause = returning = fallback = None
+                operation_clauses = {}
+                returning = fallback = None
                 for clause in clauses:
                     if clause.kind == 'returning':
                         if returning is not None:
                             self.error('name', 'Duplicate return clause', clause)
                         returning = clause
                     elif clause.kind == 'forward' and clause.items[0].items[0] == '..':
-                        if fallback:
+                        if fallback is not None:
                             self.error('name', 'Duplicate forwarding clause', clause)
                         fallback = clause
                     else:
-                        if clause.items[0].items[0] != operation:
+                        operation = clause.items[0].items[0]
+                        if operation not in self.operations[family]:
                             self.error('name', f'Unknown handler operation for {family}', clause.items[0])
-                        if operation_clause is not None:
+                        if operation in operation_clauses:
                             self.error('name', 'Duplicate handler operation', clause.items[0])
-                        operation_clause = clause
-                operation_clause = operation_clause or fallback
-                if operation_clause is None:
-                    self.error('semantic', f'Incomplete handler: missing {operation}', family_node)
-                if operation_clause.kind == 'forward':
-                    operation_body = self.ir(operation_clause, 'forward')
-                else:
-                    _, parameters, clause_body = operation_clause.items
-                    if parameters:
-                        self.limit('operation clause parameters are not implemented', parameters[0])
-                    operation_body = self.expression(clause_body, environment, handlers)
+                        operation_clauses[operation] = clause
+                checked_clauses = []
+                for operation, signature in self.operations[family].items():
+                    operation_clause = operation_clauses.get(operation, fallback)
+                    if operation_clause is None:
+                        self.error('semantic', f'Incomplete handler: missing {operation}', family_node)
+                    if operation_clause.kind == 'forward':
+                        operation_body = self.ir(operation_clause, 'forward')
+                    else:
+                        _, parameters, clause_body = operation_clause.items
+                        if len(parameters) != len(signature.parameters):
+                            self.error('type', 'Operation clause arity mismatch', operation_clause.items[0])
+                        local, bound, names = dict(environment), [], set()
+                        for parameter in parameters:
+                            spelling = parameter.items[0]
+                            if spelling != '_' and spelling in names:
+                                self.error('name', 'Duplicate operation clause parameter', parameter)
+                            names.add(spelling)
+                            parameter_symbol = self.symbol(parameter)
+                            local[spelling] = parameter_symbol
+                            bound.append(parameter_symbol)
+                        operation_body = self.expression(clause_body, local, handlers)
+                        if bound:
+                            operation_body = self.ir(clause_body, 'clause', tuple(bound), operation_body)
+                    checked_clauses.append((operation, operation_body))
                 if returning:
                     result, result_body = returning.items
                     result_symbol = self.symbol(result)
@@ -403,7 +434,7 @@ class Elaborator:
                 else:
                     result_symbol = self.symbol(Node('name', node.span, ('answer',)))
                     returned = self.ir(node, 'var', result_symbol)
-                return self.ir(node, 'handle', family, symbol, handled, operation_body,
+                return self.ir(node, 'handle_ops', family, symbol, handled, tuple(checked_clauses),
                                self.ir(returning or node, 'returning', result_symbol, returned))
         self.limit(f'{node.kind} is not implemented', node)
 
