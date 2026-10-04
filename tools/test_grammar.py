@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from check_grammar import Grammar
 
-GRAMMAR = Path(__file__).resolve().parents[1] / 'design-docs/eldude.ebnf'
+GRAMMAR = Path(__file__).resolve().parents[1] / 'docs/eldude.ebnf'
 
 class GrammarTests(unittest.TestCase):
     @classmethod

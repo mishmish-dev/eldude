@@ -4,11 +4,11 @@ Eldude is a programming-language design with an experimental implementation. Thi
 
 Release **0.0.5** adds the first source-to-execution pipeline, implementing a subset of the unchanged Eldude **0.0.4** language contract.
 
-- [Manifesto](design-docs/ELDUDE-MANIFESTO.md): goals and design principles.
-- [Language specification](design-docs/ELDUDE-LANGUAGE-SPECIFICATION.md): normative semantics.
-- [Formal grammar](design-docs/ELDUDE-FORMAL-GRAMMAR.md): generated presentation of [eldude.ebnf](design-docs/eldude.ebnf), also published as [JSON](design-docs/eldude-grammar.json).
+- [Documentation](docs/index.md): start here for the manifesto and documentation guide.
+- [Language specification](docs/language-specification.md): twelve chapters, reader and implementer paths, and stable section links.
+- [Formal grammar](docs/formal-grammar.md): generated presentation of [eldude.ebnf](docs/eldude.ebnf), also published as [JSON](docs/eldude-grammar.json).
 - [Example programs](examples/README.md): incremental `.eld` implementation targets and expected outcomes.
-- [Standard-library API](stdlib/README.md) and [profile](design-docs/ELDUDE-STANDARD-LIBRARY.md): initial declarations, ownership contracts, and implementation priorities.
+- [Standard-library API](stdlib/README.md) and [profile](docs/standard-library.md): initial declarations, ownership contracts, and implementation priorities.
 - [Effect-row prototype](tools/effect_rows.py): scoped-row equality and closed-row opening on resolved labels, with [counterexample tests](tools/test_effect_rows.py).
 - [Expression inference experiment](tools/inference.py): effectful traversal, nested handlers, scoped state, cancellation checks, and imported capture contracts, with [executable cases](tools/test_inference.py).
 - [Handler experiment](tools/handlers.py): clause checking, ownership across resumption, explicit evidence lowering, and a small interpreter, with [accepted programs and counterexamples](tools/test_handlers.py).
@@ -24,7 +24,7 @@ uv run python tools/run_eldude.py examples/07_source_pipeline/combined.eld
 git diff --check
 ```
 
-After editing the normative EBNF or the specification excerpts used by the grammar publication, regenerate artifacts with `uv run python tools/check_grammar.py --write`. Grammar acceptance alone does not establish type correctness or execute a program. The source runner checks and executes the subset below; this is not a production compiler or runtime.
+After editing the normative EBNF or the parsing/interface clauses in the [foundations](docs/language-spec/01-foundations.md) and [interfaces](docs/language-spec/12-interfaces-and-tooling.md) chapters, regenerate the standalone grammar Markdown and JSON with `uv run python tools/check_grammar.py --write`. The specification chapters are inputs and are not rewritten. Grammar acceptance alone does not establish type correctness or execute a program. The source runner checks and executes the subset below; this is not a production compiler or runtime.
 
 ## Source-to-execution experiment
 
@@ -40,13 +40,13 @@ The explicit **`eldude::fixture` host profile** supplies simulated `File`/`Async
 
 `compile_source(text, filename)` and `compile_file(path)` return a `SourceProgram` with `ast`, `expression`, `program`, `inferred`, `functions` and `handled_rows`. With `tools` on Python's import path, pass `checked.program` to `handlers.run` to inspect `Execution.value` and `Execution.events`; `execute_file(path)` combines checking and execution. `Program.origins` maps lowered-node identities to source spans. `Diagnostic` exposes a category, message, primary span and related declaration/transfer spans. CLI failures go to stderr with filename, line and column and exit nonzero before execution.
 
-The source tests exercise accepted traces and static rejections for all three resumption modes, frame transfer, clause-local resources, unsafe abandonment, skipped enclosing obligations, complete deep-resumption residuals and post-resume outward control. Every semantic-rejection fixture is also recognized by the normative grammar. Source integration exposed and corrected a core discrepancy: normal-return clauses had allowed unqualified same-family operation syntax, although §26.4 forbids it inside clauses.
+The source tests exercise accepted traces and static rejections for all three resumption modes, frame transfer, clause-local resources, unsafe abandonment, skipped enclosing obligations, complete deep-resumption residuals and post-resume outward control. Every semantic-rejection fixture is also recognized by the normative grammar. Source integration exposed and corrected a core discrepancy: normal-return clauses had allowed unqualified same-family operation syntax, although [§26.4](docs/language-spec/06-handlers.md#264-same-family-operations-inside-clauses) forbids it inside clauses.
 
-The verified pipeline has **171 passing tests on Python 3.14.8**, including all 91 original IR/grammar regressions, and **133 synchronized grammar productions**. The combined, nested-return, operation-argument and multi-operation CLIs return `42`; the multi-operation affine fixture returns `7`. Syntax, semantic, type and unsupported-feature CLI fixtures exit with status `1` and source-located diagnostics.
+The verified pipeline has **172 passing tests on Python 3.14.8**, including all 91 original IR/grammar regressions, and **133 synchronized grammar productions**. The combined, nested-return, operation-argument and multi-operation CLIs return `42`; the multi-operation affine fixture returns `7`. Syntax, semantic, type and unsupported-feature CLI fixtures exit with status `1` and source-located diagnostics.
 
 This remains a single-file, monomorphic, straight-line experiment. Generic/open-row source contracts, nonempty capture annotations, untyped closure parameters, general operators, branches/loops/recursion, early returns, generic families, non-scalar operation parameters/results or handler results, `self` recursion, top-level value initialization, traits, general imported-code execution, regions and tasks receive implementation-limit diagnostics. Broader inference capabilities remain available in the standalone Python IR tests. Resources are simulated, and suspension/masked cleanup only emit events: there is no scheduler, cancellation delivery, foreign execution or production runtime optimization. The rest of the example corpus retains its staged meanings and expected results; it is not claimed to execute.
 
-The next extension after 0.0.5 supports an enclosing `once`/`affine` operation's `resume` inside a nested handler's normal-return clause, as required by §25.1. Normal completion shares that lexical capability and its ownership state; a nested operation clause introduces its own capability, and a nested function cannot capture either. Resuming transfers the enclosing frame's non-`Dup` captures exactly once while keeping outside obligations live. An inner affine completion that could skip the enclosing resume remains rejected under the prototype's conservative usage rules.
+The next extension after 0.0.5 supports an enclosing `once`/`affine` operation's `resume` inside a nested handler's normal-return clause, as required by [§25.1](docs/language-spec/06-handlers.md#251-lexical-resumption). Normal completion shares that lexical capability and its ownership state; a nested operation clause introduces its own capability, and a nested function cannot capture either. Resuming transfers the enclosing frame's non-`Dup` captures exactly once while keeping outside obligations live. An inner affine completion that could skip the enclosing resume remains rejected under the prototype's conservative usage rules.
 
 ```sh
 uv run python tools/run_eldude.py examples/07_source_pipeline/nested_return.eld
@@ -77,7 +77,7 @@ uv run python tools/run_eldude.py examples/07_source_pipeline/multi_operations_a
 
 The first fixture combines mixed modes, nested instances and selective forwarding. The deep fixture adds one shared linear frame, parameter shadowing, lexical resumption through an empty handler's normal-return clause, an outward sibling-clause effect and independent work after resume. Its frame closes exactly once. The affine variant forwards `stop(7)`, skips the later read, unwinds protected body cleanup and leaves an outside resource available for explicit close.
 
-Effects and evidence still name family instances: two operations on one instance share a slot, while forwarding retains the outer slot. Direct operations use the selected declaration's mode; ordinary calls and complete resumption residuals use the family-level abandonment envelope, including every declared affine operation (§17.3). Conservative segment/usage checks remain in force even if an admitted operation is not reached in one execution. No grammar, language version, dependency or host-profile change accompanies this extension.
+Effects and evidence still name family instances: two operations on one instance share a slot, while forwarding retains the outer slot. Direct operations use the selected declaration's mode; ordinary calls and complete resumption residuals use the family-level abandonment envelope, including every declared affine operation ([§17.3](docs/language-spec/05-effects-and-failure.md#173-derived-continuation-control-envelope)). Conservative segment/usage checks remain in force even if an admitted operation is not reached in one execution. No grammar, language version, dependency or host-profile change accompanies this extension.
 
 ## Inference experiment
 
@@ -97,7 +97,7 @@ The cases exercise these outcomes:
 | Nested same-family handlers | An ambient callback selects the inner `Log`; a lexically named callback retains the outer instance. Removing the inner handler leaves the outer slot. | A closure retaining a named handler cannot escape its delimiter. |
 | Scoped state | Reading a local `Ref<Int>` yields `Int`, an empty residual row, and no captures after leaving the region. | Returning the reference or a closure retaining it, or storing an inner closure in an outer cell, fails. |
 | Cancellation with ownership | `using` protects a resource across `suspend`; suspending canonical cleanup is checked under its cancellation mask. | An unprotected resource, including a shadowed binding or an argument awaiting later argument evaluation, cannot cross a potentially abandoning call. Masking does not neutralize an affine cleanup effect. |
-| Imported `DynArray::freeze` wrapper | The wrapper's contract is inferred, serialized, and loaded into a fresh checker without its body. Instantiating it at `Int` gives a capture-free `List<Int>` that can leave the allocation region. | A list of references to an outer region still retains the inner array's whole bound and cannot leave it. This is the deliberate precision cost of §13.6. |
+| Imported `DynArray::freeze` wrapper | The wrapper's contract is inferred, serialized, and loaded into a fresh checker without its body. Instantiating it at `Int` gives a capture-free `List<Int>` that can leave the allocation region. | A list of references to an outer region still retains the inner array's whole bound and cannot leave it. This is the deliberate precision cost of [§13.6](docs/language-spec/04-captures-and-access.md#136-canonical-interfaces-and-conservative-mutation). |
 
 A combined case traverses a list, mutates a local cell, handles logging, and suspends while a resource is protected by `using`. It returns `Int` with only `{suspend}` and no retained captures.
 

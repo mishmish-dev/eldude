@@ -1,4 +1,4 @@
-# Normative Eldude 0.0.4 EBNF. Generated presentations: Appendix F and the Formal Grammar.
+# Normative Eldude 0.0.4 EBNF. Generated presentations: the Formal Grammar and JSON export.
 # EBNF: ::= definition; | choice; () grouping; ? optional; * repetition; + one or more.
 # JSON strings quote terminals and lexical regular expressions; # begins a whole-line comment.
 %skip SPACE = "[ \\t\\r\\n]+";

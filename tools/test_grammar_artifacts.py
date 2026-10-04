@@ -40,15 +40,29 @@ class ArtifactTests(unittest.TestCase):
     def test_checker_rejects_stale_markdown_and_json(self):
         self.assertTrue(hasattr(check_grammar, 'FORMAL'), 'Standalone Markdown is not checked')
         self.assertTrue(hasattr(check_grammar, 'MACHINE'), 'Machine-readable grammar is not checked')
+        self.assertTrue(hasattr(check_grammar, 'FOUNDATIONS'), 'Grammar generation must read the foundations chapter')
+        self.assertTrue(hasattr(check_grammar, 'INTERFACES'), 'Grammar generation must read the interfaces chapter')
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            grammar, spec = root/'eldude.ebnf', root/'spec.md'
+            grammar = root/'eldude.ebnf'
             formal, machine = root/'formal.md', root/'eldude-grammar.json'
             grammar.write_text(check_grammar.GRAMMAR.read_text(encoding='utf-8'), encoding='utf-8')
-            spec.write_text(check_grammar.SPEC.read_text(encoding='utf-8'), encoding='utf-8')
-            with patch.multiple(check_grammar, GRAMMAR=grammar, SPEC=spec, FORMAL=formal, MACHINE=machine), contextlib.redirect_stdout(io.StringIO()):
+            (root/'language-spec').mkdir()
+            sources = {}
+            originals = {}
+            for name in ('FOUNDATIONS', 'INTERFACES'):
+                source = getattr(check_grammar, name)
+                target = root/'language-spec'/source.name
+                target.write_bytes(source.read_bytes())
+                os.utime(target, (1, 1))
+                sources[name] = target
+                originals[target] = (target.read_bytes(), target.stat().st_mtime_ns)
+            with patch.multiple(check_grammar, GRAMMAR=grammar, FORMAL=formal, MACHINE=machine, **sources), contextlib.redirect_stdout(io.StringIO()):
                 with patch.object(sys, 'argv', ['check_grammar.py', '--write']):
                     check_grammar.main()
+                for source, (content, mtime) in originals.items():
+                    self.assertEqual(source.read_bytes(), content)
+                    self.assertEqual(source.stat().st_mtime_ns, mtime)
                 with patch.object(sys, 'argv', ['check_grammar.py']):
                     check_grammar.main()
                     for target in (formal, machine):
@@ -57,6 +71,33 @@ class ArtifactTests(unittest.TestCase):
                         with self.assertRaisesRegex(SystemExit, 'stale'):
                             check_grammar.main()
                         target.write_text(original, encoding='utf-8')
+                    for name, sentence in (
+                        ('FOUNDATIONS', 'Source is UTF-8.'),
+                        ('INTERFACES', 'A deterministic formatter is part of the standard toolchain.'),
+                    ):
+                        target = sources[name]
+                        original = target.read_text(encoding='utf-8')
+                        self.assertIn(sentence, original)
+                        target.write_text(original.replace(sentence, sentence+' Changed source contract.'), encoding='utf-8')
+                        with self.assertRaisesRegex(SystemExit, 'stale'):
+                            check_grammar.main()
+                        target.write_text(original, encoding='utf-8')
+
+    def test_excerpt_links_resolve_from_publication_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root/'language-spec').mkdir()
+            chapter = root/'language-spec'/'foundations.md'
+            chapter.write_text(
+                '### 2.8 Parsing\n\n'
+                '[grammar](../eldude.ebnf), [local](#rule), '
+                '[contracts](interfaces.md#72), [web](https://example.com/rules).\n\n'
+                '### 2.9 Next\n\nNot part of the excerpt.\n', encoding='utf-8')
+            with patch.object(check_grammar, 'FORMAL', root/'formal.md'):
+                excerpt = check_grammar.section(chapter, '2.8')
+            self.assertEqual(excerpt,
+                '[grammar](eldude.ebnf), [local](language-spec/foundations.md#rule), '
+                '[contracts](language-spec/interfaces.md#72), [web](https://example.com/rules).')
 
 if __name__ == '__main__':
     unittest.main()

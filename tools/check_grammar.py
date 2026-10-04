@@ -1,15 +1,17 @@
 """Check Eldude EBNF and its Markdown/JSON publications; recognize syntax only."""
 import argparse
 import json
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-GRAMMAR = ROOT / 'design-docs/eldude.ebnf'
-SPEC = ROOT / 'design-docs/ELDUDE-LANGUAGE-SPECIFICATION.md'
-FORMAL = ROOT / 'design-docs/ELDUDE-FORMAL-GRAMMAR.md'
-MACHINE = ROOT / 'design-docs/eldude-grammar.json'
+GRAMMAR = ROOT / 'docs/eldude.ebnf'
+FOUNDATIONS = ROOT / 'docs/language-spec/01-foundations.md'
+INTERFACES = ROOT / 'docs/language-spec/12-interfaces-and-tooling.md'
+FORMAL = ROOT / 'docs/formal-grammar.md'
+MACHINE = ROOT / 'docs/eldude-grammar.json'
 BEGIN = '<!-- BEGIN GENERATED ELDUDE GRAMMAR -->'
 END = '<!-- END GENERATED ELDUDE GRAMMAR -->'
 META = re.compile(r'\s*(::=|"(?:[^"\\]|\\.)*"|[A-Za-z_][A-Za-z_0-9]*|[;|()?*+])')
@@ -278,22 +280,33 @@ class Grammar:
             return None
         return max(i for i, states in enumerate(chart) if states)
 
-def section(spec, number):
+def section(source, number):
+    spec = source.read_text(encoding='utf-8')
     heading = re.search(r'^#{2,3} '+re.escape(number)+r'\.? [^\n]+\n', spec, re.M)
     if heading is None:
         raise ValueError(f'Missing specification section: {number}')
     body = spec[heading.end():]
     next_heading = re.search(r'^#{1,3} ', body, re.M)
-    return body[:next_heading.start() if next_heading else len(body)].strip()
+    body = body[:next_heading.start() if next_heading else len(body)].strip()
 
-def formal_markdown(text, spec):
+    def publication_link(match):
+        target = match[0]
+        if re.match(r'[A-Za-z][A-Za-z0-9+.-]*:|//', target):
+            return target
+        name, separator, anchor = target.partition('#')
+        original = source.parent / name if name else source
+        return Path(os.path.relpath(original, FORMAL.parent)).as_posix() + separator + anchor
+
+    return re.sub(r'(?<=\]\()[^)\n]+(?=\))', publication_link, body)
+
+def formal_markdown(text):
     return '''# Eldude Formal Grammar
 
 **Version:** 0.0.4
 
 **Status:** pre-implementation normative grammar
 
-This complete grammar covers ordinary Eldude source and generated canonical semantic interfaces. It is generated from [eldude.ebnf](eldude.ebnf) and the parsing/interface clauses of the [language specification](ELDUDE-LANGUAGE-SPECIFICATION.md). Numbered section references below refer to that specification. The [manifesto](ELDUDE-MANIFESTO.md) describes the design principles.
+This complete grammar covers ordinary Eldude source and generated canonical semantic interfaces. It is generated from [eldude.ebnf](eldude.ebnf), the parsing clauses in [Foundations and programs](language-spec/01-foundations.md), and the interface clauses in [Interfaces, compilation, and tooling](language-spec/12-interfaces-and-tooling.md). Numbered references retain their identifiers in the [language specification](language-specification.md). The [manifesto](index.md#the-eldude-manifesto) describes the design principles.
 
 The machine-readable forms are the EBNF artifact and [eldude-grammar.json](eldude-grammar.json), which contains normalized BNF, lexical rules, and parsing conventions. Syntax acceptance does not establish typing, visibility, usage, effects, termination, exhaustiveness, or audited native validity. Those judgments remain in the language specification.
 
@@ -307,19 +320,19 @@ In EBNF, `::=` defines a production, `|` selects an alternative, parentheses gro
 
 ## Reserved words, sigils, and tokens
 
-'''+section(spec, '2.6')+'''
+'''+section(FOUNDATIONS, '2.6')+'''
 
 ## Lexical payloads and source forms
 
-'''+section(spec, '2.9')+'''
+'''+section(FOUNDATIONS, '2.9')+'''
 
 ## Operators and precedence
 
-'''+section(spec, '2.7')+'''
+'''+section(FOUNDATIONS, '2.7')+'''
 
 ## Parsing and derivation selection
 
-'''+section(spec, '2.8')+'''
+'''+section(FOUNDATIONS, '2.8')+'''
 
 These rules select association among grammar derivations using syntax alone. The conformance recognizer checks token-stream membership and does not construct an AST or perform derivation selection; compiler parsers must also implement the stated association rules.
 
@@ -329,15 +342,15 @@ These rules select association among grammar derivations using syntax alone. The
 
 ## Generated semantic clauses
 
-'''+section(spec, '72.7')+'''
+'''+section(INTERFACES, '72.7')+'''
 
 ## Generated native contracts
 
-'''+section(spec, '72.9')+'''
+'''+section(INTERFACES, '72.9')+'''
 
 ## Canonical interface ordering
 
-'''+section(spec, '77')+'''
+'''+section(INTERFACES, '77')+'''
 
 ## JSON representation
 
@@ -355,30 +368,24 @@ python3 tools/check_grammar.py
 python3 -m unittest discover -s tools -p 'test_grammar*.py'
 ```
 
-The first command regenerates Appendix F, this document, and the JSON export. The second rejects undefined symbols, duplicate productions, malformed EBNF, reserved-word drift, or stale generated publications. Tests cover accepted/rejected syntax, source/interface separation, JSON consumption, and stale-publication detection. Edit the EBNF or originating specification clauses, then regenerate; do not edit generated presentations directly.
+The first command regenerates this document and the JSON export; the specification chapters are inputs and are not rewritten. The second rejects undefined symbols, duplicate productions, malformed EBNF, reserved-word drift, or stale generated publications. Tests cover accepted/rejected syntax, source/interface separation, JSON consumption, and stale-publication detection. Edit the EBNF or originating specification clauses, then regenerate; do not edit generated presentations directly.
 '''
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--write', action='store_true', help='Refresh Appendix F, standalone Markdown, and JSON')
+    parser.add_argument('--write', action='store_true', help='Refresh standalone grammar Markdown and JSON')
     args = parser.parse_args()
     text = GRAMMAR.read_text(encoding='utf-8')
     grammar = Grammar(text)
     for entry in ('source_file', 'interface_file'):
         grammar.vocabulary(entry)
-    generated = f'{BEGIN}\n```ebnf\n{text.rstrip()}\n```\n{END}'
-    spec = SPEC.read_text(encoding='utf-8')
-    keyword_section = spec.split('### 2.6 ', 1)[1].split('```text\n', 1)[1].split('```', 1)[0]
+    keyword_section = section(FOUNDATIONS, '2.6').split('```text\n', 1)[1].split('```', 1)[0]
     if set(keyword_section.split()) != grammar.keywords:
         raise SystemExit('Reserved words differ between §2.6 and the lexical grammar')
-    pattern = re.compile(re.escape(BEGIN)+'.*?'+re.escape(END), re.S)
-    if len(pattern.findall(spec)) != 1:
-        raise SystemExit('Expected exactly one generated grammar block in Appendix F')
     machine = grammar.machine_format()
-    machine['parsing_conventions'] = [line[2:] for line in section(spec, '2.8').splitlines() if line.startswith('- ')]
+    machine['parsing_conventions'] = [line[2:] for line in section(FOUNDATIONS, '2.8').splitlines() if line.startswith('- ')]
     publications = {
-        SPEC: pattern.sub(lambda _: generated, spec),
-        FORMAL: formal_markdown(text, spec),
+        FORMAL: formal_markdown(text),
         MACHINE: json.dumps(machine, indent=2, sort_keys=True, ensure_ascii=False)+'\n',
     }
     for path, expected in publications.items():
@@ -386,7 +393,7 @@ def main():
             path.write_text(expected, encoding='utf-8', newline='\n')
         elif not path.exists() or path.read_text(encoding='utf-8') != expected:
             raise SystemExit(f'{path.name} is stale; run python3 tools/check_grammar.py --write')
-    print(f'Grammar checked: {len(grammar.rules)} productions, all symbols defined; Appendix F, formal Markdown, and JSON synchronized')
+    print(f'Grammar checked: {len(grammar.rules)} productions, all symbols defined; formal Markdown and JSON synchronized')
 
 if __name__ == '__main__':
     main()

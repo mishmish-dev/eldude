@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class ProgramSyntaxTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.grammar = Grammar((ROOT / 'design-docs/eldude.ebnf').read_text(encoding='utf-8'))
+        cls.grammar = Grammar((ROOT / 'docs/eldude.ebnf').read_text(encoding='utf-8'))
 
     def check_files(self, directory, expected, exclude_rejects=False):
         paths = sorted((ROOT / directory).rglob('*.eld'))
