@@ -1,16 +1,91 @@
 """Bounded handler experiment over inference.py's annotated expression IR.
 
-Named operations per family, scalar parameters/results, straight-line
-clauses and identity or explicit return clauses. Non-Dup frame captures obey an
+Named operations per family, scalar parameters/results, conditionals,
+and identity or explicit return clauses. Non-Dup frame captures obey an
 availability invariant at every resumption; consuming one before resuming is
 conservatively rejected. Self recursion, source returns and general control-flow
 inference are outside this experiment. This is not an Eldude compiler.
 """
 from dataclasses import dataclass, field, replace
+import operator
 
 from effect_rows import Row
 from inference import (Binding, Checker, Context, E, Fn, INT, UNIT, Ty, InferenceError,
                        ambient, free_names, permissions, value)
+
+
+class Defect(RuntimeError):
+    def __init__(self, message, expression):
+        super().__init__(message)
+        self.expression = expression
+        self.events = ()
+
+
+def scalar_operation(expression, arguments):
+    op = expression[1]
+    if expression[0] == 'unary':
+        result = arguments[0] if op == '+' else -arguments[0]
+    else:
+        left, right = arguments
+        if op in ('/', '%'):
+            if right == 0:
+                raise Defect('Integer division or remainder by zero', expression)
+            quotient = abs(left) // abs(right) * (-1 if (left < 0) != (right < 0) else 1)
+            result = quotient if op == '/' else left - quotient * right
+        else:
+            operations = {'+': operator.add, '-': operator.sub, '*': operator.mul,
+                          '==': operator.eq, '!=': operator.ne, '<': operator.lt,
+                          '<=': operator.le, '>': operator.gt, '>=': operator.ge}
+            result = operations[op](left, right)
+    if expression[0] == 'binary_nat':
+        if type(result) is int and result < 0:
+            raise Defect('Nat arithmetic produced a negative result', expression)
+        return result
+    if type(result) is int and not -(2**63) <= result < 2**63:
+        raise Defect('Integer arithmetic overflow', expression)
+    return result
+
+
+def operation_type(t):
+    return isinstance(t, Ty) and (t.name in ('Int', 'Unit', 'Bool', 'Nat', 'Unknown') or
+        ((t.name in ('Option', 'Result', 'Tuple') or t.name.startswith('Enum:')) and all(operation_type(a) for a in t.args)))
+
+
+def preserves_handler_result(expression, source=None, *, resume=False, aliases=frozenset()):
+    """Prove transfer of one opaque result without assuming Dup or Discard.
+
+    The ordinary clause checker still checks types, effects and resources.
+    This conservative identity proof additionally rejects any inspection,
+    packaging, arbitrary call, duplicate use or loss of the unknown result.
+    """
+    aliases = aliases | ({source} if source is not None else set())
+
+    def contains_resume(term):
+        return isinstance(term, tuple) and (term[:1] == ('resume',) or any(contains_resume(item) for item in term))
+
+    def independent(term):
+        return not contains_resume(term) and not (free_names(term) & aliases)
+
+    def transfer(term):
+        return preserves_handler_result(term, source, resume=resume, aliases=aliases)
+
+    match expression:
+        case ('var', name):
+            return source is not None and name == source
+        case ('resume', argument):
+            return resume and source is None and independent(argument)
+        case ('seq', *items) if items:
+            return all(independent(item) for item in items[:-1]) and transfer(items[-1])
+        case ('if', condition, left, right):
+            return independent(condition) and transfer(left) and transfer(right)
+        case ('let', name, initial, body):
+            if transfer(initial):
+                return preserves_handler_result(body, name, aliases=aliases)
+            return name != source and independent(initial) and transfer(body)
+        case ('using', name, initial, body):
+            return name != source and independent(initial) and transfer(body)
+        case _:
+            return False
 
 
 @dataclass(frozen=True)
@@ -20,9 +95,9 @@ class Operation:
     parameters: tuple = ()
 
     def __post_init__(self):
-        if self.mode not in ('tail', 'once', 'affine') or self.result not in (INT, UNIT):
+        if self.mode not in ('tail', 'once', 'affine') or not operation_type(self.result):
             raise InferenceError('Handler experiment requires a valid mode and scalar operation result')
-        if any(t not in (INT, UNIT) for t in self.parameters):
+        if any(not operation_type(t) for t in self.parameters):
             raise InferenceError('Implementation limit: operation parameters must be Int or Unit', code='unsupported')
 
 
@@ -176,6 +251,13 @@ class HandlerChecker(Checker):
         outside = {entry[3] for entry in self._obligations(context)} | {id(b) for b in captures.values()}
         frame = Frame(key, family, outside, captures)
         self.frames[key] = frame
+        if hasattr(self, 'baselines'):
+            self.baselines[key] = (
+                all(permissions(b.value.type)[0] for b in captures.values())
+                and preserves_handler_result(result_body, result_name)
+                and all(clause == E('forward') or operations[op].mode == 'tail'
+                        or preserves_handler_result(clause[2] if clause[0] == 'clause' else clause, resume=True)
+                        for op, clause in clauses))
         old_handlers, old_names, old_active = context.handlers, context.names, context.active
         context.handlers += ((family, key),)
         context.names = context.names | {name: key}
@@ -194,7 +276,7 @@ class HandlerChecker(Checker):
             for outer_name, binding in incoming:
                 if binding.consumed:
                     raise InferenceError(f'Affine completion may skip consumption of {outer_name}', subject=outer_name, expression=body)
-        if normal.type not in (INT, UNIT):
+        if not operation_type(normal.type):
             raise InferenceError('Implementation limit: handler body results must be Int or Unit',
                                  expression=body, code='unsupported')
         labels = list(normal.effects.labels)
@@ -223,7 +305,7 @@ class HandlerChecker(Checker):
         except InferenceError as error:
             error.expression = result_body
             raise
-        if returned.type not in (INT, UNIT):
+        if not operation_type(returned.type):
             raise InferenceError('Implementation limit: handler output must be Int or Unit',
                                  expression=result_body, code='unsupported')
 
@@ -283,8 +365,8 @@ class HandlerChecker(Checker):
 
         residual = ambient(body_effects, returned.effects)
         effects = ambient(residual, *(check_clause(op, clause, residual) for op, clause in clauses))
-        # In this straight-line slice, resume adds its supplied row; it cannot
-        # select new syntax. Union ALL clauses first, then validate every resume
+        # Resume adds its supplied row; both conditional branches are checked.
+        # Union ALL clauses first, then validate every resume
         # against that complete row with fresh bindings/capabilities per clause.
         # Nested handlers follow the same rule. Refuse any unstabilized result.
         if effects != residual:
@@ -376,11 +458,31 @@ def compile_program(expression, *, operations=None, checker=None, origins=None):
     def lower_expression(expr, names):
         nonlocal serial
         match expr:
-            case ('int', _) | ('unit',) | ('var', _) | ('acquire', _):
+            case ('int', _) | ('bool', _) | ('unit',) | ('var', _) | ('acquire', _):
                 return expr
+            case ('unary' | 'binary' as kind, operator, *operands):
+                if kind == 'binary' and getattr(checker, 'results', {}).get(id(operands[0]), None) is not None:
+                    if checker.results[id(operands[0])].type == Ty('Nat'):
+                        kind = 'binary_nat'
+                return E(kind, operator, *(lower(item, names) for item in operands))
+            case ('if' | 'while' as kind, *items):
+                return E(kind, *(lower(item, names) for item in items))
             case ('seq', *items):
                 return E('seq', *(lower(item, names) for item in items))
+            case ('tuple', *items):
+                return E('tuple', *(lower(item, names) for item in items))
+            case ('record', t, fields, *items):
+                return E('record', t, fields, *(lower(item, names) for item in items))
+            case ('field', name, base):
+                return E('field', name, lower(base, names))
+            case ('specialize', callee, _):
+                return lower(callee, names)
+            case ('unpack', pattern, initial, body):
+                return E('unpack', pattern, lower(initial, names), lower(body, names))
             case ('let' | 'using' as kind, name, initial, body):
+                target = getattr(checker, 'cleanup_targets', {}).get(id(expr))
+                if target is not None:
+                    return E('using_method', name, lower(initial, names), lower(body, names), target)
                 return E(kind, name, lower(initial, names), lower(body, names))
             case ('call', name, *arguments):
                 return E('invoke', name, E('evidence'), tuple(lower(a, names) for a in arguments))
@@ -388,7 +490,9 @@ def compile_program(expression, *, operations=None, checker=None, origins=None):
                 core = lower(body, names)
                 fixed = tuple(sorted(evidence_used(core) & set(names.values()),
                                      key=lambda e: (e.family, e.instance)))
-                captures = tuple(sorted(free_names(body, {name for name, _ in parameters})))
+                hidden = {target[0] for target in getattr(checker, 'method_calls', {}).values()}
+                hidden.update(getattr(checker, 'cleanup_targets', {}).values())
+                captures = tuple(sorted(free_names(body, {name for name, _ in parameters}) | hidden))
                 return E('closure', tuple(name for name, _ in parameters), captures, fixed, core)
             case ('perform', family, *named):
                 return lower_expression(E('perform_op', family, checker.sole_operation(family), (), *named), names)
@@ -408,7 +512,9 @@ def compile_program(expression, *, operations=None, checker=None, origins=None):
                 serial += 1
                 selected = Evidence(family, serial)
                 captures = tuple(sorted(free_names(E('returning', result_name, result_body)) |
-                                        set().union(*(free_names(clause) for _, clause in clauses))))
+                                        set().union(*(free_names(clause) for _, clause in clauses)) |
+                                        {target[0] for target in getattr(checker, 'method_calls', {}).values()} |
+                                        set(getattr(checker, 'cleanup_targets', {}).values())))
                 clause_cores = []
                 for operation_name, clause in clauses:
                     forwarding = clause == E('forward')
@@ -426,6 +532,10 @@ def compile_program(expression, *, operations=None, checker=None, origins=None):
                          lower(body, names | {name: selected}), tuple(clause_cores),
                          result_name, lower(result_body, names))
             case _:
+                from source_features import lower_feature
+                extended = lower_feature(expr, names, lower, checker)
+                if extended is not None:
+                    return extended
                 raise InferenceError(f'Expression is outside the executable handler fragment: {expr[0]}')
 
     return Program(lower(expression, {}), inferred, checker.operations, lowered_origins)
@@ -480,17 +590,40 @@ class Execution:
 
 
 def _dup(retained):
+    from source_features import Variant, Record, Cell, Buffer
+    from task_runtime import TaskHandle
+    if isinstance(retained, (Buffer, TaskHandle)):
+        return False
+    if isinstance(retained, Cell):
+        return True
+    if isinstance(retained, Record):
+        # Constructor types can retain generic placeholders; the actual fields
+        # determine structural usage, while nominal restrictions remain binding.
+        return retained.type.name not in ('Linear', 'Affine') and all(_dup(v) for v in retained.fields.values())
+    if isinstance(retained, Variant):
+        return (retained.type is None or retained.type.name not in ('Linear', 'Affine')) and all(_dup(v) for v in retained.fields)
+    from source_declarations import DeclarationClosure
+    if isinstance(retained, DeclarationClosure):
+        return True
+    if isinstance(retained, tuple):
+        return all(_dup(item) for item in retained)
+    if isinstance(retained, dict):
+        return all(_dup(item) for item in retained.values())
     if isinstance(retained, _Resource):
         return False
     if isinstance(retained, _Closure):
-        return all(_dup(s.value) for s in retained.environment.values())
+        from source_declarations import GlobalSlot
+        return all(isinstance(s, GlobalSlot) or _dup(s.value) for s in retained.environment.values())
     return True
 
 
-def _read(name, environment):
+def _read(name, environment, expression=None):
     if name not in environment and name in ('close', 'close_async', 'yield'):
         return name
     slot = environment[name]
+    from source_declarations import GlobalSlot, read_slot
+    if isinstance(slot, GlobalSlot):
+        return read_slot(name, slot, expression)
     if slot.consumed:
         raise RuntimeError(f'Consumed runtime binding {name}')
     if not _dup(slot.value):
@@ -510,14 +643,27 @@ def _protect(computation, finish):
             computation.abandon()
             finish()
         return replace(computation,
-                       continue_with=lambda result: _protect(computation.continue_with(result), finish), abandon=abandon)
+                       continue_with=lambda result: _protect_call(lambda: computation.continue_with(result), finish), abandon=abandon)
     finish()
     return computation
+
+
+def _protect_call(compute, finish):
+    from source_features import EarlyExit
+    from task_runtime import TaskCancelled
+    try:
+        computation = compute()
+    except (Defect, EarlyExit, TaskCancelled):
+        finish()
+        raise
+    return _protect(computation, finish)
 
 
 class _Machine:
     def __init__(self, operations):
         self.operations, self.events, self.resources = operations, [], []
+        from task_runtime import TaskScheduler
+        self.tasks = TaskScheduler()
 
     def close(self, resource, reason):
         if not isinstance(resource, _Resource) or resource.closed:
@@ -543,6 +689,7 @@ class _Machine:
             return None
         if function == 'yield':
             self.events.append(('suspend', False))
+            self.tasks.yield_now()
             return None
         if not isinstance(function, _Closure):
             raise RuntimeError('Unknown executable callable')
@@ -588,16 +735,16 @@ class _Machine:
                 self.events.append(('abandon', frame.name))
                 computation.abandon()
 
-        clause = self.evaluate(clause, clause_environment, frame.outer_evidence,
-                               None if implicit else resume)
-        if implicit:
-            clause = _bind(clause, resume)
+        def evaluate_clause():
+            result = self.evaluate(clause, clause_environment, frame.outer_evidence,
+                                   None if implicit else resume)
+            return _bind(result, resume) if implicit else result
 
         def completed(result):
             if mode == 'once' and not resumed:
                 raise RuntimeError('Once clause completed without resuming')
             return result
-        return _protect(_bind(clause, completed), abandon)
+        return _protect_call(lambda: _bind(evaluate_clause(), completed), abandon)
 
     def evaluate_arguments(self, arguments, environment, evidence, resume, then):
         def argument(index, values):
@@ -611,12 +758,57 @@ class _Machine:
         # ponytail: recursive continuation closures suffice for these finite
         # examples; an explicit machine stack is needed for unbounded programs.
         match term:
-            case ('int', number):
+            case ('int' | 'bool', number):
                 return number
+            case ('unary' | 'binary' | 'binary_nat', _, *operands):
+                return self.evaluate_arguments(operands, environment, evidence, resume,
+                                               lambda values: scalar_operation(term, values))
+            case ('if', condition, then, otherwise):
+                return _bind(self.evaluate(condition, environment, evidence, resume),
+                             lambda condition: self.evaluate(then if condition else otherwise,
+                                                             environment, evidence, resume))
+            case ('while', condition, body):
+                def after_test(test):
+                    if test:
+                        return _bind(self.evaluate(body, environment, evidence, resume), lambda _: loop())
+                    return None
+                def loop():
+                    while True:
+                        test = self.evaluate(condition, environment, evidence, resume)
+                        if isinstance(test, _Request):
+                            return _bind(test, after_test)
+                        if not test:
+                            return None
+                        result = self.evaluate(body, environment, evidence, resume)
+                        if isinstance(result, _Request):
+                            return _bind(result, lambda _: loop())
+                return loop()
             case ('unit',):
                 return None
+            case ('tuple', *items):
+                return self.evaluate_arguments(items, environment, evidence, resume, tuple)
+            case ('record', t, fields, *items):
+                from source_features import Record
+                return self.evaluate_arguments(items, environment, evidence, resume,
+                                               lambda values: Record(t, dict(zip(fields, values))))
+            case ('field', name, base):
+                from source_features import Record
+                source = environment[base[1]].value if base[0] == 'var' else self.evaluate(base, environment, evidence, resume)
+                return _bind(source, lambda record: record.fields[name] if isinstance(record, Record) else record[name])
+            case ('unpack', pattern, initial, body):
+                def enter_tuple(retained):
+                    local = dict(environment)
+                    def bind(pattern, retained):
+                        if isinstance(pattern, tuple):
+                            for p, item in zip(pattern, retained):
+                                bind(p, item)
+                        else:
+                            local[pattern] = _Slot(retained)
+                    bind(pattern, retained)
+                    return self.evaluate(body, local, evidence, resume)
+                return _bind(self.evaluate(initial, environment, evidence, resume), enter_tuple)
             case ('var', name):
-                return _read(name, environment)
+                return _read(name, environment, term)
             case ('evidence',):
                 return evidence
             case ('acquire', name):
@@ -625,17 +817,20 @@ class _Machine:
                 self.events.append(('acquire', name, resource.identity))
                 return resource
             case ('closure', parameters, captures, fixed, body):
-                retained = {name: _Slot(_read(name, environment)) for name in captures if name in environment}
+                from source_declarations import GlobalSlot
+                retained = {name: environment[name] if isinstance(environment[name], GlobalSlot) else _Slot(_read(name, environment))
+                            for name in captures if name in environment}
                 return _Closure(parameters, body, retained, {key: evidence[key] for key in fixed})
             case ('let' | 'using' as kind, name, initial, body):
                 def enter(retained):
-                    result = self.evaluate(body, environment | {name: _Slot(retained)}, evidence, resume)
+                    def evaluate_body():
+                        return self.evaluate(body, environment | {name: _Slot(retained)}, evidence, resume)
                     if kind == 'using':
                         def cleanup():
                             if not retained.closed:
                                 self.close(retained, 'cleanup')
-                        return _protect(result, cleanup)
-                    return result
+                        return _protect_call(evaluate_body, cleanup)
+                    return evaluate_body()
                 return _bind(self.evaluate(initial, environment, evidence, resume), enter)
             case ('seq', first, *rest):
                 result = self.evaluate(first, environment, evidence, resume)
@@ -653,14 +848,17 @@ class _Machine:
                     raise RuntimeError('No runtime resumption capability')
                 return _bind(self.evaluate(supplied, environment, evidence, resume), resume)
             case ('install', selected, name, captures, body, clauses, result_name, result_body):
-                retained = {n: _Slot(_read(n, environment)) for n in captures if n in environment}
+                from source_declarations import GlobalSlot
+                retained = {n: environment[n] if isinstance(environment[n], GlobalSlot) else _Slot(_read(n, environment))
+                            for n in captures if n in environment}
                 frame = _Handler(selected, str(name), retained, evidence,
                                  {op: (clause, forwarding) for op, clause, forwarding in clauses},
                                  result_name, result_body, resume)
                 inner = evidence | {selected: frame, Evidence(selected.family): frame}
                 return self.handle(frame, self.evaluate(body, environment, inner, resume))
             case _:
-                raise RuntimeError(f'Unknown lowered expression: {term!r}')
+                from source_features import evaluate_feature
+                return evaluate_feature(self, term, environment, evidence, resume)
 
 
 def run(program):
@@ -669,7 +867,11 @@ def run(program):
                                            for label in program.inferred.effects.labels):
         raise InferenceError('Execution requires closed handler evidence')
     machine = _Machine(program.operations)
-    result = machine.evaluate(program.core, {}, {})
+    try:
+        result = machine.evaluate(program.core, {}, {})
+    except Defect as error:
+        error.events = tuple(machine.events)
+        raise
     if isinstance(result, _Request):
         result.abandon()
         raise RuntimeError('Unhandled runtime evidence target')

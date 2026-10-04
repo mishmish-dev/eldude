@@ -1,6 +1,23 @@
 # Eldude implementation targets
 
-These small `.eld` programs are staged implementation targets. All positive files are syntax-checked; the literal example and the [source fixtures below](#executable-source-fixtures) also run through the bounded source checker and interpreter. Each positive file is a separate program. The fixture harness calls its exported `main` and compares the returned value; `main` is a corpus convention, not a new language entry-point rule. Task examples still need a future root supporting scheduling and `suspend`.
+All **49 positive examples** execute through the source checker and interpreter, with their original source and expected results. Each file is a separate program. The harness calls its exported `main`; this is a corpus convention, not a language entry-point rule. Task examples run in a cooperative scheduler owned by each execution.
+
+```sh
+uv run python tools/run_eldude.py --examples --strict
+# 49 passed, 0 unsupported, 0 failed
+```
+
+[manifest.json](manifest.json) records independently specified expected values for every positive file. Corpus execution fails for wrong values, unexpected diagnostics, missing manifest entries, or regressions. `--strict` also rejects pending implementation limits; there are currently none in this corpus. Rejection fixtures are checked separately by the test suite.
+
+| Stage | Runnable | Capabilities exercised |
+| --- | ---: | --- |
+| Values | 9 / 9 | Arithmetic, closures, generics, records, tuples, enums and startup |
+| Ownership | 5 / 5 | Linear nominal types, inspection, recursion and traits |
+| Results | 3 / 3 | Library imports, matching, `?` and `try` |
+| Effects | 6 / 6 | Generic instances, handlers, forwarding and `Result` payloads |
+| State and collections | 6 / 6 | Regions, collection primitives, iteration and cleanup traits |
+| Tasks | 4 / 4 | Cooperative scheduling, task groups, spawn/await and library join |
+| Source pipeline | 16 / 16 | Handler evidence, ownership, resumption and cleanup regressions |
 
 Resolve explicit library imports using the module declarations in [stdlib](../stdlib/README.md). Primitive types and intrinsic constraints have their predefined meanings. There is no implied wildcard library prelude. The bundled profile binds list literals, `?`/`try`, optional access, `for`, cleanup, and task handles to their corresponding library identities.
 
@@ -42,7 +59,7 @@ Resolve explicit library imports using the module declarations in [stdlib](../st
 
 ## Rejection targets
 
-`reject/syntax` must fail the grammar recognizer. `reject/semantics` must parse; the source pipeline enforces the new `source_pipeline` counterexamples below. The older targets in this table retain their required failures; syntax acceptance alone does not establish their semantic rejection, and unsupported source features may prevent this prototype reaching those checks.
+`reject/syntax` must fail the grammar recognizer. `reject/semantics` must parse; the source pipeline enforces the new `source_pipeline` counterexamples below. The older targets in this table also reject; the runner remains a bounded implementation, so rejection does not establish complete language conformance.
 
 | Program | Required failure |
 | --- | --- |
@@ -126,7 +143,7 @@ cleanup 2
 
 For families with several operations, dispatch events are `('dispatch', family, instance, operation)`. Singleton families retain the previous three-field dispatch events. Other event shapes are unchanged.
 
-The existing broader [forwarding](04_effects/forwarding.eld), [tail result](04_effects/tail_result.eld) and [tail cleanup](05_state_and_collections/tail_cleanup.eld) are unchanged. Checked arithmetic, `Result`/matching/`?`, and regions/traits/references/early return remain their future targets. The smaller fixtures above do not redefine those programs.
+The broader [forwarding](04_effects/forwarding.eld) now executes unchanged using checked arithmetic. [Tail result](04_effects/tail_result.eld) still needs `Result`/matching/`?`, and [tail cleanup](05_state_and_collections/tail_cleanup.eld) needs regions/traits/references/early return. The smaller fixtures above do not redefine those programs.
 
 ## Fixture host profile
 
@@ -148,9 +165,9 @@ fn consume(file: File) -> Unit { close(file) }
 | `closeAsync` | `fn(AsyncFile) ->{suspend} Unit` | Unmasked suspension event, then consuming close |
 | `yield` | `fn() ->{suspend} Unit` | `('suspend', False)` |
 
-Acquisition is pure in this simulated profile. `using` owns any acquired resource until consumption or scope exit. Multiple acquisitions evaluate left to right and cleanup runs right to left. Still-live `File` cleanup emits `('close', id, 'cleanup')`; `AsyncFile` cleanup first emits `('suspend', True)` to record its cancellation mask. Explicitly discharged tokens do not close again, although cleanup effects remain conservatively admitted by the static row. No actual suspension, cancellation delivery, I/O or foreign calls occur.
+Acquisition is pure in this simulated profile. `using` owns any acquired resource until consumption or scope exit. Multiple acquisitions evaluate left to right and cleanup runs right to left. Still-live `File` cleanup emits `('close', id, 'cleanup')`; `AsyncFile` cleanup first emits `('suspend', True)` to record its cancellation mask. Explicitly discharged tokens do not close again, although cleanup effects remain conservatively admitted by the static row. Within task groups, yield points also advance the cooperative scheduler and deliver pending cancellation. Resources remain simulated; no real I/O or foreign calls occur.
 
-Fixture primitives must be called directly by their imported names/aliases. Use a source closure, such as `fn() => acquire()`, when passing one as a callback. There is no implicit prelude, and user declarations with these spellings execute their own checked bodies. Fixture type names also require imports. Ordinary module loading, generic cleanup/trait solving and real resource management are deferred.
+Fixture primitives must be called directly by their imported names/aliases. Use a source closure, such as `fn() => acquire()`, when passing one as a callback. There is no implicit prelude, and user declarations with these spellings execute their own checked bodies. Fixture type names also require imports. Ordinary source module loading and the cleanup implementations used by the examples execute; real resource management remains deferred.
 
 Source functions have annotated parameters and signatures; closures require parameter annotations but may infer their result/effect contract. Function types and closed effect rows are supported; omitted rows mean pure. Annotations cannot hide effects, replace a lambda's own contract, or erase whole-value capture bounds. Only empty source `captures {}` clauses are currently supported. Local and handler names have distinct binding identities across shadowing; qualified references to this file's module select its declarations.
 
@@ -160,7 +177,7 @@ Operation names are scoped to their family; unrelated families may reuse a spell
 
 Direct dispatch applies the selected operation's mode. Ordinary calls admitting the family and complete resumption residuals retain the conservative abandonment envelope of all declared operations, including affine siblings. A naked resource cannot cross such a call merely because its available implementation currently calls only a tail operation. Every resumption includes outward effects from all sibling clauses, with fresh ownership states for validation. Frame captures transfer once and never return to post-resume ownership; clause-local resources must be discharged separately. General usage/control joins remain outside this experiment.
 
-The runner requires exported nullary `main` returning `Int` or `Unit`, with only intrinsic effects left at the root. This is a fixture convention. Other functions, including unused functions, are checked before execution. General operators (beyond signed integer literals), branches, loops, recursion, open rows/generics, non-scalar operation parameters/results, non-scalar handler results, early returns, nonempty capture annotations, top-level `let`, `self`, traits, regions and tasks produce explicit implementation-limit diagnostics.
+The runner requires exported nullary, nongeneric `main` returning `Int`, `Nat`, `Bool` or `Unit`, with only intrinsic effects left at the root. Other functions, including unused and generic bodies, are checked before execution. All capabilities in the stage table above now execute. Branches must agree on ownership consumption and resumption use. Arithmetic defects unwind active `using` scopes, including through handlers. See the [root README](../README.md#source-to-execution-experiment) for the remaining language, library and scheduler limits.
 
 Normal-return clauses preserve the enclosing operation's lexical resumption, including through multiple nested handlers ([§25.1](../docs/language-spec/06-handlers.md#251-lexical-resumption)). Nested operation clauses instead use their own capability; explicit tail resume and capture by a nested function remain semantic errors. The checker shares the enclosing capability's used state and frame ownership, so a resume inside a normal-return clause counts toward exactly-once checking and transferred frame captures remain unavailable afterward. Inner affine handlers that could skip that resume are conservatively rejected, just as when the resume occurs in their body.
 
@@ -203,7 +220,7 @@ The 29 [multi-operation rejection fixtures](reject/semantics/multi_operations) c
 
 In particular, [sibling residual](reject/semantics/multi_operations/sibling_residual.eld) rejects the earlier resume because a sibling clause can perform an outward affine operation during deep re-entry. [Opaque family call](reject/semantics/multi_operations/opaque_affine_family.eld) rejects a source function call whose admitted family includes `affine`, even though its body currently invokes only `tail read`. These fail statically, before the interpreter runs.
 
-The complete suite currently has **171 passing tests on Python 3.14.8** and **133 synchronized grammar productions**; all previous pipeline tests remain regressions.
+The complete suite checks the corpus manifest, scalar operations, branches, generic calls, record/tuple ownership, defect cleanup, and all previous pipeline regressions. The **133 grammar productions** remain unchanged and synchronized.
 
 For example:
 
@@ -214,4 +231,4 @@ uv run python tools/run_eldude.py examples/reject/semantics/source_pipeline/fram
 # ...:8:13: note: Ownership transferred here
 ```
 
-The [missing-semicolon fixture](reject/syntax/source_pipeline/missing_semicolon.eld) reports `syntax`. The valid [branch fixture](07_source_pipeline/unsupported/branch.eld) reports `unsupported: Implementation limit`. Both exit nonzero without executing. Tests additionally cover unknown/duplicate names, malformed tokens, incorrect annotations, root evidence, named dispatch scope and source/host call contracts. Existing Python IR tests remain regressions for the broader inference and handler experiments.
+The [missing-semicolon fixture](reject/syntax/source_pipeline/missing_semicolon.eld) reports `syntax` and exits nonzero without executing. The [branch fixture](07_source_pipeline/branch.eld), previously an implementation-limit check, now prints `42`. [Task join](06_tasks/join.eld) now prints `42`. Tests additionally cover unknown/duplicate names, malformed tokens, incorrect annotations, root evidence, named dispatch scope and source/host call contracts. Existing Python IR tests remain regressions for the broader inference and handler experiments.

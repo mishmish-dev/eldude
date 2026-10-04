@@ -1,10 +1,10 @@
 """Small annotated-core inference experiment for Eldude.
 
 Infers result types, ambient effect rows, whole-value capture bounds and a
-straight-line ownership check. Inputs are Python-built expressions, not Eldude
+ownership checks with conservative branch joins. Inputs are expression IR, not Eldude
 source. Parameter types/usage bounds and primitive contracts are supplied.
 Only tail handler delimiters are modeled; handler clause bodies, resumptions,
-tasks, traits, higher-rank types, branches and general mutable grants are not.
+tasks, traits, higher-rank types, loops and general mutable grants are not.
 Cancellation is a static abandonment check, not an executed scheduler.
 """
 from collections import Counter
@@ -27,7 +27,7 @@ class Ty:
     region: str | None = None
 
 
-INT, UNIT = Ty('Int'), Ty('Unit')
+INT, UNIT, BOOL = Ty('Int'), Ty('Unit'), Ty('Bool')
 
 
 @dataclass(frozen=True)
@@ -94,6 +94,7 @@ class Binding:
     value: Value
     consumed: bool = False
     managed: bool = False
+    mode: str | None = None
 
 
 @dataclass
@@ -111,6 +112,7 @@ class Context:
     resumption: object = None
     suspended: tuple = ()
     blocked_family: str | None = None
+    group: object = None
 
 
 def state(region):
@@ -120,6 +122,17 @@ def state(region):
 def permissions(t):
     if isinstance(t, Fn):
         return t.dup, t.discard
+    if t.name.startswith('Record:'):
+        fields = [permissions(f.args[0]) for f in t.args]
+        return all(p[0] for p in fields), all(p[1] for p in fields)
+    if t.name == 'Linear':
+        return False, False
+    if t.name in ('View', 'Mut'):
+        return True, True
+    if t.name == 'Affine':
+        return False, permissions(t.args[0])[1]
+    if t.name == 'Task':
+        return False, True
     if t.name.startswith('$') or t.name == 'Owned':
         return False, False
     if t.name == 'DynArray':
@@ -131,8 +144,9 @@ def permissions(t):
 
 def capture_free(t):
     # Unknown callable environments/opaque types are deliberately conservative.
-    return isinstance(t, Ty) and (t.name in ('Int', 'Unit') or
-        (t.name == 'List' and capture_free(t.args[0])))
+    return isinstance(t, Ty) and (t.name in ('Int', 'Unit', 'Bool', 'Nat', 'Never') or
+        (t.name in ('List', 'Tuple', 'Option', 'Result') and all(capture_free(a) for a in t.args)) or
+        (t.name.startswith('Record:') and all(capture_free(a.args[0]) for a in t.args)))
 
 
 def required_captures(t):
@@ -181,12 +195,38 @@ def ambient(*rows):
 
 def free_names(expression, bound=frozenset()):
     match expression:
+        case ('variant', _, _, args):
+            return set().union(*(free_names(a, bound) for a in args))
+        case ('bindpat', pattern, initial, body) | ('for_each', pattern, initial, body):
+            from source_features import pattern_bindings
+            return free_names(initial, bound) | free_names(body, bound | pattern_bindings(pattern))
+        case ('match', subject, arms):
+            from source_features import pattern_bindings
+            return free_names(subject, bound) | set().union(*(free_names(body, bound | pattern_bindings(p)) for p, body in arms))
+        case ('exit_scope', _, _, body, _):
+            return free_names(body, bound)
+        case ('list_values', _, items):
+            return set().union(*(free_names(a, bound) for a in items))
+        case ('primitive_method' | 'method_call', _, receiver, args, _):
+            return free_names(receiver, bound) | set().union(*(free_names(a, bound) for a in args))
+        case ('access', _, name):
+            return {name} - bound
+        case ('definitions', functions, globals_, body):
+            local = bound | {s for s, _, _ in functions} | {s for s, _, _ in globals_}
+            return free_names(body, local) | set().union(*(free_names(b, local) for _, b, _ in functions),
+                                                         *(free_names(b, local) for _, _, b in globals_))
         case ('var', name):
             return {name} - bound
         case ('call', name, *arguments):
             return ({name} - bound).union(*(free_names(a, bound) for a in arguments))
         case ('let' | 'using', name, initializer, body):
             return free_names(initializer, bound) | free_names(body, bound | {name})
+        case ('unpack', pattern, initializer, body):
+            return free_names(initializer, bound) | free_names(body, bound | pattern_names(pattern))
+        case ('record', _, _, *items):
+            return set().union(*(free_names(a, bound) for a in items))
+        case ('specialize', callee, _):
+            return free_names(callee, bound)
         case ('lambda', parameters, body):
             return free_names(body, bound | {name for name, _ in parameters})
         case ('clause', parameters, body):
@@ -203,6 +243,10 @@ def free_names(expression, bound=frozenset()):
         case _:
             children = [a for a in expression[1:] if isinstance(a, tuple)]
             return set().union(*(free_names(a, bound) for a in children))
+
+
+def pattern_names(pattern):
+    return set().union(*(pattern_names(p) for p in pattern)) if isinstance(pattern, tuple) else {pattern}
 
 
 class Checker:
@@ -253,6 +297,8 @@ class Checker:
         if binding.consumed:
             raise InferenceError(f'{name} was already consumed', subject=name)
         context.references.add(binding)
+        if binding.mode and not permissions(binding.value.type)[0]:
+            raise InferenceError('Access grant cannot transfer its owner', subject=name)
         if not permissions(binding.value.type)[0]:
             binding.consumed = True
             self.transfers[name] = self.current_expression
@@ -328,17 +374,20 @@ class Checker:
         for index, (name, t) in enumerate(parameters):
             source = self.fresh('argument')
             sources[source] = f'arg:{index}'
-            binding = Binding(value(t, captures={source}))
+            mode = t.name.lower() if isinstance(t, Ty) and t.name in ('View', 'Mut') else None
+            binding = Binding(value(t.args[0] if mode else t, captures={source}), mode=mode)
             context.bindings[name] = binding
             parameter_bindings.append((name, binding))
             context.live.append((name, binding))
         result = self._infer(body, context)
         for name, binding in parameter_bindings:
-            if not binding.consumed and not permissions(binding.value.type)[1]:
+            if not binding.mode and not binding.consumed and not permissions(binding.value.type)[1]:
                 raise InferenceError(f'Unconsumed parameter {name}')
         captures, captured_types = set(), []
         for copy in context.references & originals.keys():
             original = originals[copy]
+            if original.mode:
+                raise InferenceError('Access grants cannot be captured by a function')
             if original.consumed:
                 raise InferenceError('Closure captures a consumed value')
             if not permissions(original.value.type)[0]:
@@ -366,6 +415,10 @@ class Checker:
         variables = {v: Var(v.name) for v in signature.effect_vars}
 
         def match(expected, actual, invariant=False):
+            if isinstance(actual, Ty) and actual.name in ('Never', 'Unknown'):
+                return
+            if isinstance(expected, Ty) and expected.name == 'Unknown':
+                return
             if isinstance(expected, Ty) and expected.name.startswith('$'):
                 name = expected.name[1:]
                 if name not in signature.type_vars:
@@ -459,10 +512,133 @@ class Checker:
         match expression:
             case ('int', number) if type(number) is int:
                 return value(INT)
+            case ('bool', boolean) if type(boolean) is bool:
+                return value(BOOL)
             case ('unit',):
                 return value(UNIT)
+            case ('tuple', *items) | ('record', _, _, *items):
+                values = []
+                start = len(context.temporaries)
+                for item in items:
+                    element = self._infer(item, context)
+                    values.append(element)
+                    context.temporaries.append(element)
+                del context.temporaries[start:]
+                if expression[0] == 'record':
+                    result = expression[1]
+                    from source_features import unwrapped
+                    fields = {f.name: f.args[0] for f in unwrapped(result).args}
+                    type_vars, regions = set(), set()
+                    def parameters(t):
+                        if isinstance(t, Fn):
+                            for part in (*t.parameters, t.result):
+                                parameters(part)
+                        else:
+                            if t.name.startswith('$'):
+                                type_vars.add(t.name[1:])
+                            if t.region and t.region not in context.regions and t.region not in context.active:
+                                regions.add(t.region)
+                            for part in t.args:
+                                parameters(part)
+                    parameters(result)
+                    constructor = Fn(tuple(fields[n] for n in expression[2]), result, Row(),
+                                     type_vars=tuple(sorted(type_vars)), regions=tuple(sorted(regions)))
+                    result = self._apply(value(constructor), values, context).type
+                else:
+                    result = Ty('Tuple', tuple(v.type for v in values))
+                return value(result, ambient(*(v.effects for v in values)),
+                             frozenset().union(*(v.captures for v in values)))
+            case ('field', name, base):
+                record = self._infer(base, context)
+                if not isinstance(record.type, Ty) or not record.type.name.startswith('Record:'):
+                    raise InferenceError('Field access requires a record', code='type')
+                fields = {f.name: f.args[0] for f in record.type.args}
+                if name not in fields:
+                    raise InferenceError('Unknown record field ' + name, code='type')
+                if not permissions(record.type)[0]:
+                    raise InferenceError('Implementation limit: field copies require a duplicable record', code='unsupported')
+                return value(fields[name], record.effects, record.captures)
+            case ('unpack', pattern, initializer, body):
+                initial = self._infer(initializer, context)
+                bound = {}
+                def bind(pattern, t):
+                    if isinstance(pattern, tuple):
+                        if not isinstance(t, Ty) or t.name != 'Tuple' or len(t.args) != len(pattern):
+                            raise InferenceError('Tuple pattern shape mismatch', code='type')
+                        for p, part in zip(pattern, t.args):
+                            bind(p, part)
+                    else:
+                        bound[pattern] = Binding(value(t, captures=initial.captures))
+                bind(pattern, initial.type)
+                previous = context.bindings
+                start = len(context.live)
+                context.bindings = previous | bound
+                context.live.extend(bound.items())
+                result = self._infer(body, context)
+                for name, binding in bound.items():
+                    if not binding.consumed and not permissions(binding.value.type)[1]:
+                        raise InferenceError(f'Unconsumed resource {name}', subject=name)
+                context.bindings = previous
+                del context.live[start:]
+                return replace(result, effects=ambient(initial.effects, result.effects))
+            case ('unary', operator, operand):
+                result = self._infer(operand, context)
+                if operator not in ('+', '-') or result.type != INT:
+                    raise InferenceError('Unary arithmetic requires Int', code='type')
+                return result
+            case ('binary', operator, left, right):
+                first = self._infer(left, context)
+                context.temporaries.append(first)
+                second = self._infer(right, context)
+                context.temporaries.pop()
+                nat = Ty('Nat')
+                allowed = (INT, nat, BOOL, UNIT) if operator in ('==', '!=') else (INT, nat)
+                if first.type != second.type or first.type not in allowed:
+                    raise InferenceError('Invalid operand types for ' + operator, code='type')
+                result = BOOL if operator in ('==', '!=', '<', '<=', '>', '>=') else first.type
+                return value(result, ambient(first.effects, second.effects))
+            case ('if', condition, then, otherwise):
+                test = self._infer(condition, context)
+                if test.type != BOOL:
+                    raise InferenceError('Condition must have type Bool', expression=condition, code='type')
+                bindings = set(context.bindings.values()) | {b for _, b in context.live}
+                incoming = {b: b.consumed for b in bindings}
+                resumption = context.resumption
+                used = resumption.used if resumption else False
+                first = self._infer(then, context)
+                outgoing = {b: b.consumed for b in bindings}
+                resumed = resumption.used if resumption else False
+                for binding, consumed in incoming.items():
+                    binding.consumed = consumed
+                if resumption:
+                    resumption.used = used
+                second = self._infer(otherwise, context)
+                from source_features import join_type, NEVER
+                result_type = join_type(first.type, second.type)
+                if first.type != NEVER and second.type != NEVER and any(b.consumed != consumed for b, consumed in outgoing.items()):
+                    raise InferenceError('Branches must agree on ownership consumption')
+                if first.type != NEVER and second.type != NEVER and resumption and resumption.used != resumed:
+                    raise InferenceError('Branches must agree on resumption use')
+                if second.type == NEVER and first.type != NEVER:
+                    for b, consumed in outgoing.items():
+                        b.consumed = consumed
+                    if resumption:
+                        resumption.used = resumed
+                return value(result_type, ambient(test.effects, first.effects, second.effects),
+                             first.captures | second.captures)
             case ('var', name):
                 return self._lookup(name, context)
+            case ('specialize', callee, arguments):
+                function = self._infer(callee, context)
+                signature = function.type
+                if not isinstance(signature, Fn) or not signature.type_vars or len(signature.type_vars) != len(arguments):
+                    raise InferenceError('Generic type argument arity mismatch', code='type')
+                substitutions = dict(zip(signature.type_vars, arguments))
+                def substitute(t):
+                    if isinstance(t, Ty):
+                        return substitutions.get(t.name[1:], t) if t.name.startswith('$') else replace(t, args=tuple(substitute(a) for a in t.args))
+                    return replace(t, parameters=tuple(substitute(p) for p in t.parameters), result=substitute(t.result))
+                return replace(function, type=replace(substitute(signature), type_vars=()))
             case ('lambda', parameters, body):
                 return self._function(parameters, body, context)
             case ('let' | 'using' as kind, name, initializer, body):
@@ -474,9 +650,12 @@ class Checker:
                 result = self._infer(body, context)
                 cleanup = Row()
                 if kind == 'using':
-                    if not isinstance(initial.type, Ty) or initial.type.name != 'Owned':
+                    if isinstance(initial.type, Ty) and initial.type.name == 'Owned':
+                        cleanup = self.cleanup_rows[initial.type.args[0].name]
+                    elif hasattr(self, 'cleanup_contract'):
+                        cleanup = self.cleanup_contract(expression, initial, context)
+                    else:
                         raise InferenceError('using requires a canonical cleanup resource')
-                    cleanup = self.cleanup_rows[initial.type.args[0].name]
                     if self._abandoning(cleanup, masked=True):
                         raise InferenceError('Canonical cleanup may abandon its resource')
                     if initial.captures & result.captures:
@@ -491,11 +670,27 @@ class Checker:
                     context.bindings[name] = previous
                 context.live.pop()
                 return replace(result, effects=ambient(initial.effects, result.effects, cleanup))
+            case ('while', condition, body):
+                before = {b: b.consumed for b in context.bindings.values()}
+                resumed = context.resumption.used if context.resumption else False
+                test = self._infer(condition, context)
+                if test.type != BOOL:
+                    raise InferenceError('While condition must have type Bool', code='type')
+                result = self._infer(body, context)
+                if result.type not in (UNIT, Ty('Never')):
+                    raise InferenceError('While body must return Unit', code='type')
+                if any(b.consumed != old for b, old in before.items()):
+                    raise InferenceError('Repeated loop cannot consume an outside owner')
+                if context.resumption and context.resumption.used != resumed:
+                    raise InferenceError('Repeated loop cannot consume a resumption')
+                return value(UNIT, ambient(test.effects, result.effects, Row(('diverge',))))
             case ('seq', *expressions) if expressions:
                 rows = []
                 for index, item in enumerate(expressions):
                     result = self._infer(item, context)
                     rows.append(result.effects)
+                    if result.type == Ty('Never'):
+                        break
                     if index != len(expressions) - 1 and not permissions(result.type)[1]:
                         raise InferenceError('Cannot discard an owned intermediate value', expression=item)
                 return replace(result, effects=ambient(*rows))

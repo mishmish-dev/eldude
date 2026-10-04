@@ -28,8 +28,7 @@ class SourceSyntaxTests(unittest.TestCase):
         from source_syntax import Diagnostic, parse_source
         for source, code, column in (
             ('module m; fn f()->Int { 1 2 }', 'syntax', 27),
-            ('module m; fn f()->Int { if true { 1 } else { 2 } }', 'unsupported', 25),
-            ('module m; fn f()->Int { 1 + 2 }', 'unsupported', 27),
+            ('module m; fn f()->Int { 1.0 }', 'unsupported', 25),
             ('module m; fn f()->Int { 1 + }', 'syntax', 29),
         ):
             with self.subTest(source=source), self.assertRaises(Diagnostic) as caught:
@@ -49,11 +48,12 @@ class SourceSyntaxTests(unittest.TestCase):
             self.assertEqual(caught.exception.code, 'syntax')
             self.assertEqual((caught.exception.span.line, caught.exception.span.column), (line, column))
 
-    def test_nested_numeric_operators_remain_outside_literal_subset(self):
-        from source_syntax import Diagnostic, parse_source
-        with self.assertRaises(Diagnostic) as caught:
-            parse_source('module m; pub fn main()->Int { -(-9223372036854775808) }')
-        self.assertEqual(caught.exception.code, 'unsupported')
+    def test_nested_numeric_operators_parse_without_folding_away_overflow(self):
+        from source_syntax import parse_source
+        ast = parse_source('module m; pub fn main()->Int { -(-9223372036854775808) }')
+        expression = ast.items[1][0].items[-1].items[1]
+        self.assertEqual(expression.kind, 'unary')
+        self.assertEqual(expression.items[1].items, (-9223372036854775808,))
 
 
 if __name__ == '__main__':

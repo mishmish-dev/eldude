@@ -212,7 +212,7 @@ pub fn main()->Int { let file:File=open(); release(file); 42 }
         for source, code, message, at in (
             ('module m; fn f()->Int { 1 } fn f()->Int { 2 } pub fn main()->Int { 3 }', 'name', 'Duplicate', 'f'),
             ('module m; pub fn main()->Missing { 1 }', 'name', 'Unknown type', 'Missing'),
-            ('module m; pub fn main()->Int { main() }', 'unsupported', 'recursion', 'main'),
+            ('module m; pub fn main()->Int { main() }', 'effect', 'Recursive.*diverge', 'pub fn main()->Int { main() }'),
         ):
             with self.subTest(source=source):
                 self.reject(source, code, message, at)
@@ -369,7 +369,7 @@ pub fn main()->Int {
             ('effect E{tail op(x:Int)->Int;}', 'handle {42} with handler E {op(x)=>!E::op(x);}',
              'semantic', 'unqualified same-family', '!E::op(x)'),
             ('effect E{tail op(x:File)->Int;}', '42',
-             'unsupported', 'operation parameters must currently be Int or Unit', 'File'),
+             'unsupported', 'operation parameters must currently be scalar data', 'File'),
             ('effect E{tail op(x:Missing)->Int;}', '42',
              'name', 'Unknown type Missing', 'Missing'),
         )
@@ -418,16 +418,9 @@ pub fn main()->{suspend} Int {
     def test_valid_broader_syntax_is_always_an_explicit_limit(self):
         from source_syntax import grammar
         sources = [
-            'module m; pub fn main()->Int { return 42; }',
-            'module m; fn f<!e>()->{|e}Unit { () } pub fn main()->Unit { () }',
-            'module m; effect E<T>{tail value()->T;} pub fn main()->Int {42}',
             'module m; effect E{tail a(x:fn()->Int)->Int;} pub fn main()->Int {42}',
-            'module m; let global=42; pub fn main()->Int {global}',
             'module m; fn externOnly()->Int; pub fn main()->Int {42}',
             'module m; pub fn main()->Int { let f=fn(x)=>x; f(42) }',
-            'module m; pub fn main()->Unit { while true {} }',
-            'module m; import core::result::{Result}; pub fn main()->Int {42}',
-            'module m; pub fn main()->Int { let pair=(1,2); 42 }',
         ]
         for source in sources:
             with self.subTest(source=source):
@@ -436,6 +429,20 @@ pub fn main()->{suspend} Int {
                     self.compile(source)
                 self.assertEqual(caught.exception.code, 'unsupported')
                 self.assertIn('Implementation limit', caught.exception.message)
+
+    def test_new_source_forms_cross_the_old_subset_boundary(self):
+        for source, expected in (
+            ('module m; pub fn main()->Int { return 42; }', 42),
+            ('module m; fn f<!e>()->{|e}Unit { () } pub fn main()->Unit { () }', None),
+            ('module m; effect E<T>{tail value()->T;} pub fn main()->Int {42}', 42),
+            ('module m; let global=42; pub fn main()->Int {global}', 42),
+            ('module m; import core::result::{Result}; pub fn main()->Int {42}', 42),
+        ):
+            with self.subTest(source=source):
+                self.assertEqual(self.execute(source).value, expected)
+        with self.assertRaises(Diagnostic) as caught:
+            self.compile('module m; pub fn main()->Unit { while true {} }')
+        self.assertNotEqual(caught.exception.code, 'unsupported')
 
     def test_int_literal_range_and_spellings(self):
         for literal in ('42', '4_2int', '42i64', '0x2a', '0b101010', '0o52', '+42'):
@@ -888,7 +895,8 @@ class SourceFixtureTests(unittest.TestCase):
             (REJECT / 'tail_resume.eld', 1, '', ':semantic:'),
             (REJECT / 'nested_return_affine_skip.eld', 1, '', ':semantic:'),
             (ROOT / 'examples/reject/semantics/operation_arguments/type.eld', 1, '', ':type:'),
-            (FIXTURES / 'unsupported/branch.eld', 1, '', ':unsupported:'),
+            (FIXTURES / 'branch.eld', 0, '42\n', ''),
+            (ROOT / 'examples/06_tasks/join.eld', 0, '42\n', ''),
         )
         for path, status, stdout, category in cases:
             with self.subTest(path=path):

@@ -1,15 +1,12 @@
-"""Resolve located Eldude source into the existing checked/executable expression IR.
-
-The only external module executed here is the explicit eldude::fixture profile.
-This is single-file, nonrecursive elaboration, not general module loading.
-"""
+"""Located source diagnostics and handler lowering shared by source elaboration."""
 from dataclasses import dataclass, replace
 from pathlib import Path
 
 from effect_rows import Row, Solver
-from handlers import HandlerChecker, Operation, compile_program, run
-from inference import Context, E, Fn, INT, UNIT, Ty, InferenceError, capture_free, value
+from handlers import Defect, HandlerChecker, Operation, compile_program, run
+from inference import Context, E, Fn, INT, UNIT, BOOL, Ty, InferenceError, capture_free, value
 from source_syntax import Diagnostic, Node, parse_source
+from source_features import FeatureChecker, substitute
 
 
 class Symbol(str):
@@ -73,11 +70,16 @@ def admitted_type(actual, declared):
     return actual
 
 
-class SourceChecker(HandlerChecker):
+class SourceChecker(FeatureChecker):
     """Annotation adapter; all type/row/ownership rules remain in the core checker."""
     def __init__(self, elaborator):
         super().__init__(operations=elaborator.operations,
                          imports={'close_async': Fn((ASYNC_FILE,), UNIT, Row(('suspend',)))})
+        self.variants = getattr(elaborator, 'variants', {})
+        self.data_parameters = getattr(elaborator, 'data_parameters', {})
+        self.methods = getattr(elaborator, 'methods', {})
+        self.cleanup_methods = getattr(elaborator, 'cleanup_methods', {})
+        self.structural_functions = getattr(elaborator, 'recursive_allowed', set())
         self.annotations = elaborator.annotations
         self.results = {}
 
@@ -92,7 +94,7 @@ class SourceChecker(HandlerChecker):
         result = super()._infer_expression(expression, context)
         self.results[id(expression)] = result
         for expected in self.annotations.get(id(expression), ()):
-            result = self.annotate(expression, result, expected)
+            result = self.annotate(expression, result, substitute(expected, regions=context.regions))
         self.results[id(expression)] = result
         return result
 
@@ -118,9 +120,11 @@ class SourceChecker(HandlerChecker):
                 error.code = 'type'
             raise
         if isinstance(expected, Fn):
-            if result.captures:
+            if result.captures - set(expected.regions):
                 raise InferenceError('Capture annotation omits retained obligations', code='type')
-            result = replace(result, type=admitted_type(actual, expected))
+            result = replace(result, type=replace(admitted_type(actual, expected), type_vars=expected.type_vars,
+                                                 regions=expected.regions, effect_vars=expected.effect_vars),
+                             captures=result.captures - set(expected.regions))
         return result
 
 
@@ -142,11 +146,13 @@ class Elaborator:
         self.ast = ast
         self.module = ast.items[0].items[0]
         self.serial = 0
-        self.values, self.types = {}, {'Int': INT, 'Int64': INT, 'Unit': UNIT}
+        self.values, self.types = {}, {'Int': INT, 'Int64': INT, 'Unit': UNIT, 'Bool': BOOL}
         self.effects, self.operations, self.definitions = {}, {}, {}
         self.origins, self.annotations, self.declarations = {}, {}, {}
         self.references = {}
         self.current_function = None
+        self.records = {}
+        self.resolving_records = set()
 
     def error(self, code, message, node, related=()):
         raise Diagnostic(code, message, node.span, related)
@@ -170,89 +176,6 @@ class Elaborator:
         prefix = self.module + '::'
         return name[len(prefix):] if name.startswith(prefix) else name
 
-    def collect(self):
-        declared = {}
-        def reserve(name):
-            spelling = name.items[0]
-            if spelling in declared or spelling in ('Int', 'Int64', 'Unit'):
-                related = [('Previous declaration', declared[spelling])] if spelling in declared else []
-                self.error('name', f'Duplicate declaration {spelling}', name, related)
-            declared[spelling] = name.span
-
-        for declaration in self.ast.items[1]:
-            if declaration.kind == 'import':
-                _, path, names = declaration.items
-                if path.items[0] != 'eldude::fixture':
-                    self.limit('only imports from eldude::fixture execute', path)
-                for original, alias in names:
-                    reserve(alias)
-                    name = original.items[0]
-                    if name in HOST_TYPES:
-                        self.types[alias.items[0]] = HOST_TYPES[name]
-                    elif name in HOST_FUNCTIONS:
-                        self.values[alias.items[0]] = Host(name)
-                    else:
-                        self.error('name', f'Unknown fixture export {name}', original)
-            else:
-                name = declaration.items[1]
-                reserve(name)
-                if declaration.kind == 'effect':
-                    self.effects[name.items[0]] = declaration
-                else:
-                    symbol = self.symbol(name)
-                    self.values[name.items[0]] = symbol
-                    self.definitions[symbol] = declaration
-
-        for family, declaration in self.effects.items():
-            operations = declaration.items[2]
-            names = set()
-            for operation in operations:
-                name = operation.items[1]
-                if name.items[0] in names:
-                    self.error('name', 'Duplicate operation declaration', name)
-                names.add(name.items[0])
-            self.operations[family] = {}
-            for operation in operations:
-                mode, name, parameters, result = operation.items
-                parameter_types, names = [], set()
-                for parameter in parameters:
-                    parameter_name, annotation = parameter.items
-                    spelling = parameter_name.items[0]
-                    if spelling != '_' and spelling in names:
-                        self.error('name', 'Duplicate operation parameter', parameter_name)
-                    names.add(spelling)
-                    declared = self.type(annotation)
-                    if declared not in (INT, UNIT):
-                        self.limit('operation parameters must currently be Int or Unit', annotation)
-                    parameter_types.append(declared)
-                result_type = self.type(result)
-                if result_type not in (INT, UNIT):
-                    self.limit('operation results must currently be Int or Unit', result)
-                self.operations[family][name.items[0]] = Operation(mode, result_type, tuple(parameter_types))
-
-    def type(self, node):
-        if node.kind == 'type':
-            name = self.local_name(node)
-            if name not in self.types:
-                if name in OTHER_PRIMITIVES:
-                    self.limit(f'type {name} does not execute in this slice', node)
-                self.error('name', f'Unknown type {name}', node)
-            return self.types[name]
-        parameters, contract = node.items
-        result, effects = self.contract(contract)
-        bound = frozenset() if capture_free(result) else frozenset({'env'} | {f'arg:{i}' for i in range(len(parameters))})
-        return Fn(tuple(self.type(p) for p in parameters), result, effects, bound)
-
-    def contract(self, node):
-        result, entries = node.items
-        effects = []
-        for entry in entries:
-            name = self.local_name(entry)
-            if name not in self.effects and name not in ('suspend', 'diverge'):
-                self.error('name', f'Unknown effect {name}', entry)
-            effects.append(name)
-        return self.type(result), Row(tuple(effects))
-
     def public_contract(self, item):
         if isinstance(item, Node):
             if item.kind == 'contract':
@@ -265,35 +188,6 @@ class Elaborator:
             for child in item:
                 self.public_contract(child)
 
-    def lookup(self, node, environment):
-        name = self.local_name(node)
-        if node.items[0].startswith(self.module + '::'):
-            environment = self.values
-        if name not in environment or name == '_':
-            self.error('name', f'Unknown value {name}', node)
-        symbol = environment[name]
-        if symbol in self.definitions and self.current_function is not None:
-            self.references[self.current_function].setdefault(symbol, node)
-        return symbol
-
-    def function(self, node, parameters, contract, body, environment, handlers):
-        local, typed, names = dict(environment), [], set()
-        for parameter in parameters:
-            name, annotation = parameter.items
-            if name.items[0] in names:
-                self.error('name', 'Duplicate parameter', name)
-            names.add(name.items[0])
-            if annotation is None:
-                self.limit('closure parameters require type annotations', name)
-            symbol = self.symbol(name)
-            local[name.items[0]] = symbol
-            typed.append((symbol, self.type(annotation)))
-        expression = self.ir(node, 'lambda', tuple(typed), self.expression(body, local, handlers))
-        if contract is not None:
-            result, effects = self.contract(contract)
-            self.annotations.setdefault(id(expression), []).append(Fn(tuple(t for _, t in typed), result, effects))
-        return expression
-
     def expression(self, node, environment, handlers):
         match node.kind, node.items:
             case 'int', (number,):
@@ -302,6 +196,34 @@ class Elaborator:
                 return self.ir(node, 'int', number)
             case 'unit', ():
                 return self.ir(node, 'unit')
+            case 'bool', (boolean,):
+                return self.ir(node, 'bool', boolean)
+            case 'tuple', (items,):
+                return self.ir(node, 'tuple', *(self.expression(item, environment, handlers) for item in items))
+            case 'record', (path, fields):
+                name = self.local_name(path)
+                if name not in self.records:
+                    self.error('name', 'Unknown record ' + name, path)
+                t = self.types[name]
+                names = [name.items[0] for name, _ in fields]
+                if len(set(names)) != len(names) or set(names) != {f.name for f in t.args}:
+                    self.error('type', 'Record fields must match the declaration exactly', node)
+                # Source order governs evaluation, even when fields are reordered.
+                expression = self.ir(node, 'record', t, tuple(names),
+                                     *(self.expression(item, environment, handlers) for _, item in fields))
+                return expression
+            case 'field', (base, name):
+                return self.ir(node, 'field', name.items[0], self.expression(base, environment, handlers))
+            case 'specialize', (callee, arguments):
+                return self.ir(node, 'specialize', self.expression(callee, environment, handlers),
+                               tuple(self.type(t) for t in arguments))
+            case 'unary', (operator, operand):
+                return self.ir(node, 'unary', operator, self.expression(operand, environment, handlers))
+            case 'binary', (operator, left, right):
+                return self.ir(node, 'binary', operator, self.expression(left, environment, handlers),
+                               self.expression(right, environment, handlers))
+            case 'if', branches:
+                return self.ir(node, 'if', *(self.expression(b, environment, handlers) for b in branches))
             case 'path', _:
                 symbol = self.lookup(node, environment)
                 if isinstance(symbol, Host):
@@ -317,6 +239,21 @@ class Elaborator:
                         initial = self.expression(initializer, local, handlers)
                         if annotation:
                             self.annotations.setdefault(id(initial), []).append(self.type(annotation))
+                        if name.kind == 'tuple_pattern':
+                            local = dict(local)
+                            names = set()
+                            def pattern(node):
+                                if node.kind == 'tuple_pattern':
+                                    return tuple(pattern(p) for p in node.items[0])
+                                spelling = node.items[0]
+                                if spelling != '_' and spelling in names:
+                                    self.error('name', 'Duplicate pattern binding', node)
+                                names.add(spelling)
+                                symbol = self.symbol(node)
+                                local[spelling] = symbol
+                                return symbol
+                            bound = pattern(name)
+                            return self.ir(statement, 'unpack', bound, initial, sequence(index + 1, local))
                         if name.items[0] == '_':
                             return self.ir(statement, 'seq', initial, sequence(index + 1, local))
                         symbol = self.symbol(name)
@@ -379,7 +316,7 @@ class Elaborator:
                                    acquire(index + 1, local | {name.items[0]: symbol}))
                 return acquire(0, environment)
             case 'handle', (family_node, name, body, clauses):
-                family = self.local_name(family_node)
+                family = self.effect_family(family_node) if hasattr(self, 'effect_family') else self.local_name(family_node)
                 if family not in self.effects:
                     self.error('name', f'Unknown effect family {family}', family_node)
                 symbol = self.symbol(name or Node('name', family_node.span, (family,)))
@@ -423,7 +360,8 @@ class Elaborator:
                             parameter_symbol = self.symbol(parameter)
                             local[spelling] = parameter_symbol
                             bound.append(parameter_symbol)
-                        operation_body = self.expression(clause_body, local, handlers)
+                        operation_body = (self.clause_expression(clause_body, local, handlers, signature)
+                                          if hasattr(self, 'clause_expression') else self.expression(clause_body, local, handlers))
                         if bound:
                             operation_body = self.ir(clause_body, 'clause', tuple(bound), operation_body)
                     checked_clauses.append((operation, operation_body))
@@ -438,66 +376,11 @@ class Elaborator:
                                self.ir(returning or node, 'returning', result_symbol, returned))
         self.limit(f'{node.kind} is not implemented', node)
 
-    def compile(self):
-        self.collect()
-        expressions = {}
-        for symbol, declaration in self.definitions.items():
-            self.current_function = symbol
-            self.references[symbol] = {}
-            public, _, parameters, contract, body = declaration.items
-            if public:
-                self.public_contract((parameters, contract))
-            expressions[symbol] = self.function(declaration, parameters, contract, body, self.values, {})
-        self.current_function = None
-        order, visiting, done = [], set(), set()
-        def visit(symbol):
-            if symbol in done:
-                return
-            visiting.add(symbol)
-            for dependency, node in self.references[symbol].items():
-                if dependency in visiting:
-                    self.limit('recursion between source functions is not implemented', node)
-                visit(dependency)
-            visiting.remove(symbol)
-            done.add(symbol)
-            order.append(symbol)
-        for symbol in expressions:
-            visit(symbol)
-        main = self.values.get('main')
-        if main not in self.definitions or not self.definitions[main].items[0]:
-            self.error('entry', 'Fixture runner requires an exported main function', self.ast)
-        declaration = self.definitions[main]
-        if declaration.items[2]:
-            self.error('entry', 'Fixture main must have no parameters', declaration.items[1])
-        if self.annotations[id(expressions[main])][0].result not in (INT, UNIT):
-            self.limit('fixture main must return Int or Unit', declaration.items[3])
-        expression = self.ir(declaration.items[1], 'call', main)
-        for symbol in reversed(order):
-            expression = self.ir(self.definitions[symbol], 'let', symbol, expressions[symbol], expression)
-        checker = SourceChecker(self)
-        try:
-            program = compile_program(expression, checker=checker, origins=self.origins)
-        except InferenceError as error:
-            span = self.origins.get(id(error.expression), self.ast.span)
-            related = []
-            if error.subject in self.declarations:
-                related.append(('Binding declared here', self.declarations[error.subject]))
-                transferred = checker.transfers.get(error.subject)
-                if id(transferred) in self.origins:
-                    related.append(('Ownership transferred here', self.origins[id(transferred)]))
-            raise Diagnostic(error.code, str(error), span, related) from error
-        if program.inferred.effects.tail or any(label not in ('suspend', 'diverge') for label in program.inferred.effects.labels):
-            body = expressions[main][2]
-            origin = checker.effect_origin(body, set(program.inferred.effects.labels))
-            span = self.origins.get(id(origin), declaration.items[3].span)
-            raise Diagnostic('effect', 'Fixture main requires closed handler evidence; an operation remains unhandled', span)
-        functions = {str(symbol): checker.results[id(body)].type for symbol, body in expressions.items()}
-        return SourceProgram(self.ast, expression, program, functions,
-                             {str(name): row for name, row in checker.handled_rows.items()})
 
 
 def compile_source(text, filename='<source>'):
-    return Elaborator(parse_source(text, filename)).compile()
+    from source_elaboration import SourceElaborator
+    return SourceElaborator(parse_source(text, filename)).compile()
 
 
 def compile_file(path):
@@ -506,4 +389,9 @@ def compile_file(path):
 
 
 def execute_file(path):
-    return run(compile_file(path).program)
+    program = compile_file(path)
+    try:
+        return run(program.program)
+    except Defect as error:
+        span = program.program.origins.get(id(error.expression), program.ast.span)
+        raise Diagnostic('defect', str(error), span) from error
