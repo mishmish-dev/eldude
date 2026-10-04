@@ -11,14 +11,15 @@ Eldude is a programming-language design in the pre-implementation stage. This re
 - [Expression inference experiment](tools/inference.py): effectful traversal, nested handlers, scoped state, cancellation checks, and imported capture contracts, with [executable cases](tools/test_inference.py).
 - [Handler experiment](tools/handlers.py): clause checking, ownership across resumption, explicit evidence lowering, and a small interpreter, with [accepted programs and counterexamples](tools/test_handlers.py).
 
-Check grammar publications, source syntax, and the prototypes with Python 3.10 or newer:
+The repository's Python tools share a uv project pinned to Python 3.14.8 and use only the standard library. Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then check grammar publications, source syntax, and the prototypes:
 
 ```sh
-PYTHONDONTWRITEBYTECODE=1 python3 tools/check_grammar.py
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_*.py'
+uv sync --locked
+uv run python tools/check_grammar.py
+uv run python -m unittest discover -s tools -p 'test_*.py'
 ```
 
-After editing the normative EBNF or the specification excerpts used by the grammar publication, regenerate artifacts with `python3 tools/check_grammar.py --write`. These checks do not establish type correctness of the `.eld` programs or execute them; there is no Eldude source compiler or production runtime yet.
+After editing the normative EBNF or the specification excerpts used by the grammar publication, regenerate artifacts with `uv run python tools/check_grammar.py --write`. These checks do not establish type correctness of the `.eld` programs or execute them; there is no Eldude source compiler or production runtime yet.
 
 ## Inference experiment
 
@@ -27,7 +28,7 @@ After editing the normative EBNF or the specification excerpts used by the gramm
 Run just the experiment:
 
 ```sh
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_inference.py' -v
+uv run python -m unittest discover -s tools -p 'test_inference.py' -v
 ```
 
 The cases exercise these outcomes:
@@ -51,7 +52,7 @@ The base inference fragment has straight-line expressions, monomorphic local reg
 `tools/handlers.py` extends the inference checker with operation clauses and normal-return clauses. `compile_program(expression, operations=...)` checks the annotated IR and produces a `Program` containing its inferred result and lowered `core`. `run(program)` executes that core and returns its value and an event trace. Dispatch nodes refer to explicit `Evidence` keys; ordinary calls supply an evidence argument. Closures capture lexically fixed evidence and receive ambient evidence at invocation.
 
 ```sh
-PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_handlers.py' -v
+uv run python -m unittest discover -s tools -p 'test_handlers.py' -v
 ```
 
 | Case | Checked and executed behavior | Rejected boundary |
