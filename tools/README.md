@@ -22,6 +22,7 @@ Read the component and its tests for the task at hand. All tools use the Python 
 | [source_declarations.py](source_declarations.py) | Recursive bindings and ordered global initialization | [Declarations](test_source_declarations.py) |
 | [source_features.py](source_features.py) | Data/control checking and execution, library primitives, source task integration | [Features](test_source_features.py), [integration regressions](test_source_feature_regressions.py), [semantic examples](test_source_semantic_examples.py), [source tasks](test_source_tasks.py) |
 | [effect_rows.py](effect_rows.py) | Scoped-row equality and closed-row opening on resolved labels (§16.5) | [Row counterexamples](test_effect_rows.py) |
+| [capture_rows.py](capture_rows.py) | Finite capture unions and scoped whole-argument substitution (§13) | [Capture rows](test_capture_rows.py) |
 | [inference.py](inference.py) | Annotated expression IR, type/effect/capture inference, ownership | [Inference](test_inference.py) |
 | [handlers.py](handlers.py) | Handler clause/resumption checks, evidence lowering, interpreter | [Handlers](test_handlers.py) |
 | [task_runtime.py](task_runtime.py) | Per-execution cooperative scheduling, cancellation, group draining | [Scheduler](test_task_runtime.py), [source integration](test_source_tasks.py) |
@@ -70,7 +71,7 @@ Parsing first checks full EBNF membership using the normative lexer's tokens, th
 
 ### Implementation limits
 
-- Capture-row polymorphism and signature capture clauses naming that function's own parameters remain unsupported; use region clauses where applicable. Callback-only region inference requires an unambiguous correspondence. Existential packages do not yet support generic traits, associated types, static prerequisites, or `mut` receivers. These cases report explicit implementation limits; they do not relax the specification's contracts.
+- Capture-row polymorphism remains unsupported. Callback-only region inference requires an unambiguous correspondence. Existential packages do not yet support generic traits, associated types, static prerequisites, or `mut` receivers. These cases report explicit implementation limits; they do not relax the specification's contracts.
 - Other unsupported forms include recursive record representations, guarded matches, untyped closure parameters, resource/callback operation payloads, destructuring clause parameters, general foreign execution, and parts of the declared library API.
 - Trait selection and structural termination checking cover a bounded subset. Multiple specialized method implementations for one nominal type report an implementation limit. General usage/control joins remain outside the experiment.
 - Resources are simulated. The recursive cooperative scheduler starts children FIFO, resumes suspended children in stack order, and cannot wait on a suspended ancestor. It does not provide production I/O, parallelism, arbitrary dependency graphs, or unbounded recursion/suspension depth.

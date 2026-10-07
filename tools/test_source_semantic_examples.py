@@ -24,6 +24,8 @@ class SourceSemanticExampleTests(unittest.TestCase):
     def test_rejection_examples_reach_their_semantic_check(self):
         cases = {
             'linear_discard': ('semantic', 'Unconsumed resource ticket'),
+            'parameter_capture_twice': ('semantic', 'already consumed'),
+            'parameter_capture_escape': ('semantic', 'region would escape'),
             'inherited_answer_change': ('semantic', 'Inherited handler'),
             'numeric_recursion_without_diverge': ('effect', 'structural descent or diverge'),
             'region_escape': ('semantic', 'region would escape'),

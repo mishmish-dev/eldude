@@ -139,7 +139,7 @@ class SourceChecker(FeatureChecker):
             else:
                 captures.add(source)
         fixed = {}
-        for c in sorted(captures):
+        for c in sorted(captures, key=str):
             if c in self.handler_ids:
                 fixed.setdefault(self.handler_ids[c][0], []).append(c)
         return replace(t, parameters=tuple(self.resolve_type(p, context) for p in t.parameters),

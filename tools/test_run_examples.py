@@ -30,12 +30,13 @@ class RunExamplesTests(unittest.TestCase):
                     self.assertEqual(execute_file(EXAMPLES / name).value, expected)
 
     def test_corpus_cli_and_strict_exit_status(self):
+        count = len(json.loads((EXAMPLES / 'manifest.json').read_text())['runnable'])
         for flags, status in ((['--examples'], 0), (['--examples', '--strict'], 0)):
             result = subprocess.run([sys.executable, str(ROOT / 'tools/run_eldude.py'), *flags],
                                     cwd=ROOT.parent, capture_output=True, text=True)
             with self.subTest(flags=flags):
                 self.assertEqual(result.returncode, status, result.stderr)
-                self.assertIn('52 passed, 0 unsupported, 0 failed', result.stdout)
+                self.assertIn(f'{count} passed, 0 unsupported, 0 failed', result.stdout)
                 self.assertIn('PASS 01_values/arithmetic.eld: 14', result.stdout)
                 self.assertIn('PASS 06_tasks/join.eld: 42', result.stdout)
                 self.assertEqual(result.stderr, '')

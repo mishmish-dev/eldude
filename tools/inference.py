@@ -12,6 +12,7 @@ from dataclasses import dataclass, field, replace
 import json
 
 from effect_rows import Row, Solver, Var
+from capture_rows import Argument, substitute_captures, encode_captures, decode_captures
 
 
 class InferenceError(ValueError):
@@ -52,10 +53,10 @@ class Fn:
             return {'parameters': [encode(p) for p in t.parameters], 'result': encode(t.result),
                     'effects': list(t.effects.labels),
                     'tail': t.effects.tail.name if t.effects.tail else None,
-                    'bound': sorted(t.bound), 'type_vars': list(t.type_vars),
+                    'bound': encode_captures(t.bound), 'type_vars': list(t.type_vars),
                     'regions': list(t.regions), 'effect_vars': [v.name for v in t.effect_vars],
                     'dup': t.dup, 'discard': t.discard,
-                    'captures': None if t.captures is None else sorted(t.captures)}
+                    'captures': None if t.captures is None else encode_captures(t.captures)}
         return json.dumps(encode(self), sort_keys=True)
 
     @staticmethod
@@ -70,9 +71,9 @@ class Fn:
             tail = scope[data['tail']] if data['tail'] is not None else None
             return Fn(tuple(decode(p, scope) for p in data['parameters']),
                       decode(data['result'], scope), Row(tuple(data['effects']), tail),
-                      frozenset(data['bound']), tuple(data['type_vars']),
+                      decode_captures(data['bound']), tuple(data['type_vars']),
                       tuple(data['regions']), quantified, data['dup'], data['discard'],
-                      None if data.get('captures') is None else frozenset(data['captures']))
+                      None if data.get('captures') is None else decode_captures(data['captures']))
         try:
             result = decode(json.loads(wire), {})
         except (KeyError, TypeError, json.JSONDecodeError) as error:
@@ -158,9 +159,12 @@ def capture_free(t):
 
 def required_captures(t):
     if isinstance(t, Fn):
-        result = set(required_captures(t.result)) | set(t.captures or ())
+        def enclosing(captures):
+            return {replace(c, depth=c.depth - 1) if isinstance(c, Argument) else c
+                    for c in captures if not isinstance(c, Argument) or c.depth > 0}
+        result = enclosing(required_captures(t.result)) | set(t.captures or ())
         for p in t.parameters:
-            result.update(required_captures(p))
+            result.update(enclosing(required_captures(p)))
         for label in t.effects.labels:
             if label.startswith('state<@'):
                 result.add(label[7:-1])
@@ -413,7 +417,17 @@ class Checker:
         if bound & captures:
             bound = (bound - captures) | {'env'}
         bound = {sources.get(source, source) for source in bound}
-        signature = Fn(tuple(t for _, t in parameters), result.type, result.effects,
+        def export(t, depth=0):
+            if isinstance(t, Fn):
+                def captures(expr):
+                    return frozenset(Argument(int(sources[c][4:]), depth,
+                                              *permissions(parameter_bindings[int(sources[c][4:])][1].value.type))
+                                     if c in sources else c for c in expr)
+                return replace(t, parameters=tuple(export(p, depth + 1) for p in t.parameters),
+                               result=export(t.result, depth + 1), bound=captures(t.bound),
+                               captures=None if t.captures is None else captures(t.captures))
+            return replace(t, args=tuple(export(a, depth) for a in t.args))
+        signature = Fn(tuple(t for _, t in parameters), export(result.type), result.effects,
                        frozenset(bound), dup=all(permissions(t)[0] for t in captured_types),
                        discard=all(permissions(t)[1] for t in captured_types))
         return value(signature, captures=captures)
@@ -509,15 +523,19 @@ class Checker:
         except ValueError as error:
             raise InferenceError(str(error)) from error
 
-        def substitute(t):
+        def substitute(t, depth=0):
             if isinstance(t, Fn):
-                return replace(t, parameters=tuple(substitute(p) for p in t.parameters),
-                               result=substitute(t.result), effects=solver.resolve(row(t.effects)),
-                               bound=frozenset(regions.get(source, source) for source in t.bound),
-                               captures=None if t.captures is None else frozenset(regions.get(c, c) for c in t.captures))
+                substitutions = {c: arguments[c.index].captures if c.depth == depth else {replace(c, depth=c.depth-1)}
+                                 for c in set(t.captures or ()) | set(t.bound)
+                                 if isinstance(c, Argument) and c.depth >= depth}
+                captures = None if t.captures is None else substitute_captures(t.captures, substitutions)
+                return replace(t, parameters=tuple(substitute(p, depth + 1) for p in t.parameters),
+                               result=substitute(t.result, depth + 1), effects=solver.resolve(row(t.effects)),
+                               bound=frozenset(regions.get(source, source) for source in substitute_captures(t.bound, substitutions)),
+                               captures=None if captures is None else frozenset(regions.get(c, c) for c in captures))
             if t.name.startswith('$') and t.name[1:] in types:
                 return types[t.name[1:]]
-            return Ty(t.name, tuple(substitute(a) for a in t.args), regions.get(t.region, t.region))
+            return Ty(t.name, tuple(substitute(a, depth) for a in t.args), regions.get(t.region, t.region))
 
         captures = set()
         for source in signature.bound:

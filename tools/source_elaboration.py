@@ -3,8 +3,9 @@ from dataclasses import replace
 from pathlib import Path
 
 from effect_rows import Row, Var, Solver
+from capture_rows import Argument
 from handlers import Operation, compile_program, operation_type
-from inference import E, Fn, Ty, INT, UNIT, BOOL, InferenceError, capture_free, state, permissions
+from inference import E, Fn, Ty, INT, UNIT, BOOL, InferenceError, capture_free, state, permissions, required_captures
 from source_features import NAT, UNKNOWN, substitute, unwrapped
 from source_modules import load_modules, STDLIB
 from source_pipeline import (Elaborator, SourceChecker, SourceProgram, Host, HOST_TYPES,
@@ -27,6 +28,7 @@ class SourceElaborator(Elaborator):
         self.impl_constraints = {}
         self.dynamic_methods, self.trait_methods = {}, {}
         self.capture_names = {}
+        self.capture_parameter_types = {}
         self.globals, self.global_modules, self.signatures = [], {}, {}
         self.generic_types, self.generic_regions, self.generic_effects = {}, (), {}
         self.exit_stack, self.region_stack = [], []
@@ -381,10 +383,16 @@ class SourceElaborator(Elaborator):
             return template
         if node.kind == 'fn_type':
             parameters, contract = node.items
+            previous = self.capture_names
+            self.capture_names = {name: replace(source, depth=source.depth + 1) if isinstance(source, Argument) else source
+                                  for name, source in previous.items()}
             result, effects = self.contract(contract)
+            self.capture_names = previous
+            captures = self.capture_contract(contract)
             bound = frozenset() if capture_free(result) else frozenset({'env'} | {f'arg:{i}' for i in range(len(parameters))})
             return Fn(tuple(self.type(p) for p in parameters), result, effects, bound,
-                      captures=self.capture_contract(contract))
+                      dup=all(c.dup for c in captures if isinstance(c, Argument)),
+                      discard=all(c.discard for c in captures if isinstance(c, Argument)), captures=captures)
         if node.kind == 'any_type':
             return self.existential_type(node)
         self.limit('type form ' + node.kind, node)
@@ -404,9 +412,11 @@ class SourceElaborator(Elaborator):
                 if name not in self.capture_names:
                     self.error('name', 'Unknown capture ' + name, entry)
                 source = self.capture_names[name]
-                if not isinstance(source, str):
+                if not isinstance(source, (str, Argument)):
                     self.limit('fixture primitives in capture contracts', entry)
                 captures.add(source)
+                if isinstance(source, Argument):
+                    captures.update(required_captures(self.capture_parameter_types[name]))
         return frozenset(captures)
 
     def existential_type(self, node):
@@ -561,20 +571,8 @@ class SourceElaborator(Elaborator):
         return self.expression(body, environment, handlers, expected)
 
     def function(self, node, parameters, contract, body, environment, handlers):
-        # ponytail: closed lexical rows only; abstract parameter summaries need
-        # scoped capture substitution before they can appear in result types.
-        parameter_names = {p.items[0].items[0] for p in parameters}
-        def check_captures(item):
-            if isinstance(item, Node):
-                if item.kind == 'contract' and len(item.items) > 2:
-                    for capture in item.items[2]:
-                        if capture.kind == 'path' and capture.items[0] in parameter_names:
-                            self.limit('parameter-dependent capture clauses; use region captures where applicable', capture)
-                check_captures(item.items)
-            elif isinstance(item, tuple):
-                for part in item:
-                    check_captures(part)
-        check_captures((parameters, contract))
+        previous_captures = self.capture_names
+        previous_types = self.capture_parameter_types
         local, typed, names = dict(environment), [], set()
         for parameter in parameters:
             name, annotation = parameter.items[:2]
@@ -593,7 +591,15 @@ class SourceElaborator(Elaborator):
             symbol = self.symbol(name)
             local[name.items[0]] = symbol
             typed.append((symbol, t))
+        self.capture_names = previous_captures | {
+            p.items[0].items[0]: Argument(i, 0, *permissions(unwrapped(t)))
+            for i, (p, (_, t)) in enumerate(zip(parameters, typed))}
+        self.capture_parameter_types = previous_types | {
+            p.items[0].items[0]: unwrapped(t) for p, (_, t) in zip(parameters, typed)}
         expected, effects = self.contract(contract) if contract else (None, None)
+        captures = self.capture_contract(contract) if contract else None
+        self.capture_names = previous_captures
+        self.capture_parameter_types = previous_types
         previous = self.exit_stack
         self.exit_stack = []
         lowered = (self.scoped_body(body, local, handlers, expected) if self.has_exit(body)
@@ -605,7 +611,7 @@ class SourceElaborator(Elaborator):
                            type_vars=tuple(self.generic_types) if node.kind == 'function' else (),
                            regions=self.generic_regions if node.kind == 'function' else (),
                            effect_vars=tuple(self.generic_effects.values()) if node.kind == 'function' else (),
-                           captures=self.capture_contract(contract))
+                           captures=captures)
             self.annotations.setdefault(id(expression), []).append(signature)
         return expression
 

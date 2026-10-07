@@ -1,5 +1,6 @@
 """Capture annotations and existential erasure preserve ownership and provenance."""
 import unittest
+from pathlib import Path
 
 from handlers import run
 from inference import Fn
@@ -8,6 +9,33 @@ from source_syntax import Diagnostic
 
 
 class SourceCaptureContractTests(unittest.TestCase):
+    def test_parameter_capture_programs(self):
+        root = Path(__file__).resolve().parents[1] / 'examples'
+        for folder in ('02_ownership', '05_state_and_collections'):
+            path = root / folder / 'parameter_capture.eld'
+            checked = compile_source(path.read_text(), str(path))
+            execution = run(checked.program)
+            self.assertEqual(execution.value, 42)
+            if folder == '02_ownership':
+                self.assertEqual(execution.events, (('acquire', 'File', 1), ('close', 1, 'explicit')))
+            self.assertEqual(Fn.loads(checked.functions['make'].dumps()), checked.functions['make'])
+        for name, message in (('twice', 'already consumed'), ('escape', 'region would escape')):
+            path = root / 'reject/semantics' / ('parameter_capture_' + name + '.eld')
+            with self.assertRaises(Diagnostic) as caught:
+                compile_source(path.read_text(), str(path))
+            self.assertEqual(caught.exception.code, 'semantic')
+            self.assertIn(message, caught.exception.message)
+            self.assertEqual(caught.exception.span.filename, str(path))
+
+    def test_parameter_names_do_not_change_canonical_contracts(self):
+        source = '''module m; import eldude::fixture::{File,close};
+fn make(file:File)->fn()->Unit captures {file} {fn(){close(file);}}
+pub fn main()->Int {42}'''
+        left = compile_source(source).functions['make']
+        right = compile_source(source.replace('file', 'resource')).functions['make']
+        self.assertEqual(left.dumps(), right.dumps())
+        self.assertEqual(Fn.loads(left.dumps()), left)
+
     def test_region_contracts_survive_higher_order_calls(self):
         source = '''module m;
 import state::ref::{Ref};
@@ -90,10 +118,6 @@ escaped()
     def test_capture_row_polymorphism_reports_an_explicit_limit(self):
         with self.assertRaisesRegex(Diagnostic, 'Implementation limit: capture-row polymorphism'):
             compile_source('module m; fn use<..C>(f:fn()->Int captures {..C})->Int {f()} pub fn main()->Int {42}')
-        with self.assertRaisesRegex(Diagnostic, 'Implementation limit: parameter-dependent capture clauses'):
-            compile_source('module m; import state::ref::{Ref}; '
-                           'fn make<@r>(cell:Ref<Int,@r>)->fn()->Int captures {cell} {fn(){42}} '
-                           'pub fn main()->Int {42}')
 
     def test_erased_methods_dispatch_through_a_shared_interface(self):
         source = '''module m;
