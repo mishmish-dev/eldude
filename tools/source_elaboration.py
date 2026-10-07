@@ -58,14 +58,17 @@ class SourceElaborator(Elaborator):
 
     def bind_generics(self, parameters):
         types, regions, effects, captures = {}, [], {}, {}
+        self.generic_binders = []
         for parameter in parameters:
             if parameter.kind == 'name':
                 name = parameter.items[0]
                 if name in types:
                     self.error('name', 'Duplicate type parameter', parameter)
                 types[name] = Ty('$' + name)
+                self.generic_binders.append(('type', name))
             elif parameter.kind == 'generic_parameter':
                 prefix, name = parameter.items
+                self.generic_binders.append(({'@': 'region', '!': 'effect', '..': 'capture', '#': 'nat'}[prefix], name.items[0]))
                 if prefix == '@':
                     regions.append(name.items[0])
                 elif prefix == '!':
@@ -629,7 +632,8 @@ class SourceElaborator(Elaborator):
                            regions=self.generic_regions if node.kind == 'function' else (),
                            effect_vars=tuple(self.generic_effects.values()) if node.kind == 'function' else (),
                            captures=captures,
-                           capture_vars=tuple(self.generic_captures.values()) if node.kind == 'function' else ())
+                           capture_vars=tuple(self.generic_captures.values()) if node.kind == 'function' else (),
+                           generic_binders=tuple(self.generic_binders) if node.kind == 'function' else ())
             self.annotations.setdefault(id(expression), []).append(signature)
         return expression
 
@@ -694,6 +698,26 @@ class SourceElaborator(Elaborator):
         return self.ir(node, 'variant', t, tag, values)
 
     def expression(self, node, environment, handlers, expected=None):
+        if node.kind == 'specialize':
+            callee, arguments = node.items
+            resolved = []
+            for argument in arguments:
+                if argument.kind == 'region_type':
+                    name = argument.items[0].items[0]
+                    if name not in self.region_stack and name not in self.generic_regions:
+                        self.error('name', 'Unknown region argument ' + name, argument)
+                    resolved.append(('region', name))
+                elif argument.kind in ('capture_set', 'capture_variable'):
+                    entries = argument.items[0] if argument.kind == 'capture_set' else (argument,)
+                    contract = Node('contract', argument.span, (None, (), entries))
+                    resolved.append(('capture', self.capture_contract(contract)))
+                elif argument.kind == 'effect_row':
+                    labels, tail = argument.items
+                    row = Row(tuple(self.effect_entry(e) for e in labels), self.generic_effects[tail.items[0]] if tail else None)
+                    resolved.append(('effect', row))
+                else:
+                    resolved.append(('type', self.type(argument)))
+            return self.ir(node, 'specialize', self.expression(callee, environment, handlers), tuple(resolved))
         previous = self.capture_names
         self.capture_names = environment | {name: pair[1] for name, pair in handlers.items()}
         try:

@@ -9,6 +9,23 @@ from source_syntax import Diagnostic
 
 
 class SourceCaptureContractTests(unittest.TestCase):
+    def test_region_arguments_and_inference_programs(self):
+        root = Path(__file__).resolve().parents[1] / 'examples'
+        for name in ('inferred_regions', 'explicit_regions'):
+            path = root / '05_state_and_collections' / (name + '.eld')
+            self.assertEqual(run(compile_source(path.read_text(), str(path)).program).value, 42)
+        for name, code, message in (
+                ('ambiguous_callback_regions', 'type', 'unambiguous'),
+                ('generic_argument_kind', 'type', 'kind'),
+                ('generic_argument_scope', 'name', 'Unknown'),
+                ('generic_argument_arity', 'type', 'arity')):
+            path = root / 'reject/semantics' / (name + '.eld')
+            with self.assertRaises(Diagnostic) as caught:
+                compile_source(path.read_text(), str(path))
+            self.assertEqual(caught.exception.code, code)
+            self.assertIn(message, caught.exception.message)
+            self.assertEqual(caught.exception.span.filename, str(path))
+
     def test_parameter_capture_programs(self):
         root = Path(__file__).resolve().parents[1] / 'examples'
         for folder in ('02_ownership', '05_state_and_collections'):

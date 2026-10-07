@@ -8,6 +8,7 @@ tasks, traits, higher-rank types, loops and general mutable grants are not.
 Cancellation is a static abandonment check, not an executed scheduler.
 """
 from collections import Counter
+from itertools import product
 from dataclasses import dataclass, field, replace
 import json
 
@@ -46,6 +47,7 @@ class Fn:
     # always provide a closed callable-environment capture set.
     captures: frozenset | None = None
     capture_vars: tuple = ()
+    generic_binders: tuple = ()
 
     def dumps(self):
         def encode(t):
@@ -58,7 +60,7 @@ class Fn:
                     'regions': list(t.regions), 'effect_vars': [v.name for v in t.effect_vars],
                     'dup': t.dup, 'discard': t.discard,
                     'captures': None if t.captures is None else encode_captures(t.captures),
-                    'capture_vars': encode_captures(t.capture_vars)}
+                    'capture_vars': encode_captures(t.capture_vars), 'generic_binders': t.generic_binders}
         return json.dumps(encode(self), sort_keys=True)
 
     @staticmethod
@@ -76,7 +78,8 @@ class Fn:
                       decode_captures(data['bound']), tuple(data['type_vars']),
                       tuple(data['regions']), quantified, data['dup'], data['discard'],
                       None if data.get('captures') is None else decode_captures(data['captures']),
-                      tuple(sorted(decode_captures(data.get('capture_vars', ())), key=str)))
+                      tuple(next(iter(decode_captures([a]))) for a in data.get('capture_vars', ())),
+                      tuple(tuple(b) for b in data.get('generic_binders', ())))
         try:
             result = decode(json.loads(wire), {})
         except (KeyError, TypeError, json.JSONDecodeError) as error:
@@ -506,24 +509,34 @@ class Checker:
 
         def captures(expression):
             return frozenset(regions.get(c, c) for c in substitute_captures(expression, capture_substitutions))
-        # A region may appear only in a callback's environment (no Ref in its
-        # parameter/result types). Infer it only when the correspondence is unique.
+        constraints, domains = [], {r: set() for r in signature.regions if r not in regions}
         for expected, actual, _ in row_checks:
-            wanted = {label[7:-1] for label in expected.effects.labels if label.startswith('state<@')}
-            available = {label[7:-1] for label in actual.effects.labels if label.startswith('state<@')}
-            unresolved_effects = wanted & set(signature.regions) - regions.keys()
-            if len(unresolved_effects) == 1 and len(available - set(regions.values())) == 1:
-                regions[next(iter(unresolved_effects))] = next(iter(available - set(regions.values())))
-            unresolved = set(expected.captures or ()) & set(signature.regions) - regions.keys()
-            if unresolved:
-                fixed = {regions.get(c, c) for c in expected.captures - unresolved}
-                remaining = set(actual.captures or ()) - fixed
-                if len(unresolved) != 1 or len(remaining) != 1:
-                    raise InferenceError('Cannot infer an unambiguous callback capture region', code='type')
-                regions[next(iter(unresolved))] = next(iter(remaining))
+            pairs = [(set(label[7:-1] for label in expected.effects.labels if label.startswith('state<@')),
+                      set(label[7:-1] for label in actual.effects.labels if label.startswith('state<@')))]
+            if not any(isinstance(c, Variable) for c in expected.captures or ()):
+                pairs.append((set(required_captures(expected)) & (set(signature.regions) | context.active),
+                              set(required_captures(actual)) & context.active))
+            for wanted, available in pairs:
+                unknown = wanted & domains.keys()
+                if unknown:
+                    constraints.append((wanted, available))
+                    for r in unknown:
+                        domains[r].update(available)
+        if domains:
+            names = tuple(domains)
+            solutions = []
+            for choices in product(*(domains[r] or context.active for r in names)):
+                candidate = regions | dict(zip(names, choices))
+                if all({candidate.get(r, r) for r in wanted} == available for wanted, available in constraints):
+                    solutions.append(candidate)
+                    if len(solutions) > 1:
+                        break
+            if len(solutions) != 1:
+                raise InferenceError('Cannot infer an unambiguous callback capture region; supply explicit generic arguments', code='type')
+            regions = solutions[0]
         for expected, actual in zip(signature.parameters, arguments):
             if isinstance(expected, Fn) and expected.captures is not None:
-                allowed = captures(expected.captures) | set(expected.regions)
+                allowed = captures(expected.captures) | captures(required_captures(expected)) | set(expected.regions)
                 retained = frozenset().union(*(self.capture_sources.get(c, {c}) for c in actual.captures))
                 if not retained <= allowed:
                     raise InferenceError('Callback capture annotation omits retained obligations')
@@ -538,8 +551,8 @@ class Checker:
             for expected, actual, invariant in row_checks:
                 solver.unify(row(expected.effects), actual.effects if invariant else solver.weaken(actual.effects))
                 if expected.captures is not None:
-                    allowed = captures(expected.captures)
-                    retained = set(actual.captures or ())
+                    allowed = captures(expected.captures) | captures(required_captures(expected))
+                    retained = set(actual.captures or ()) | set(required_captures(actual))
                     if not retained <= allowed or (invariant and retained != allowed):
                         raise InferenceError('Callback capture annotation omits retained obligations')
                 bound = captures(expected.bound)
@@ -715,14 +728,36 @@ class Checker:
             case ('specialize', callee, arguments):
                 function = self._infer(callee, context)
                 signature = function.type
-                if not isinstance(signature, Fn) or not signature.type_vars or len(signature.type_vars) != len(arguments):
+                binders = signature.generic_binders or tuple(('type', n) for n in signature.type_vars) if isinstance(signature, Fn) else ()
+                if not binders or len(binders) != len(arguments):
                     raise InferenceError('Generic type argument arity mismatch', code='type')
-                substitutions = dict(zip(signature.type_vars, arguments))
+                substitutions, regions, rows, captures = {}, {}, {}, {}
+                for (kind, name), argument in zip(binders, arguments):
+                    actual_kind, actual = argument if isinstance(argument, tuple) else ('type', argument)
+                    if actual_kind != kind:
+                        raise InferenceError('Generic argument kind mismatch: expected ' + kind, code='type')
+                    if kind == 'type':
+                        substitutions[name] = actual
+                    elif kind == 'region':
+                        if actual not in context.regions:
+                            raise InferenceError('Unknown region argument ' + actual, code='name')
+                        regions[name] = context.regions[actual]
+                    elif kind == 'capture':
+                        captures[Variable(name)] = frozenset(context.regions.get(c, c) for c in actual)
+                    elif kind == 'effect':
+                        rows[name] = actual
                 def substitute(t):
                     if isinstance(t, Ty):
-                        return substitutions.get(t.name[1:], t) if t.name.startswith('$') else replace(t, args=tuple(substitute(a) for a in t.args))
-                    return replace(t, parameters=tuple(substitute(p) for p in t.parameters), result=substitute(t.result))
-                return replace(function, type=replace(substitute(signature), type_vars=()))
+                        return substitutions.get(t.name[1:], t) if t.name.startswith('$') else replace(t, args=tuple(substitute(a) for a in t.args), region=regions.get(t.region, t.region))
+                    effects = Row(tuple(next((state(v) for k, v in regions.items() if label == state(k)), label) for label in t.effects.labels), t.effects.tail)
+                    if effects.tail and effects.tail.name in rows:
+                        replacement = rows[effects.tail.name]
+                        effects = Row(effects.labels + replacement.labels, replacement.tail)
+                    def capture_set(expression):
+                        return frozenset(regions.get(c, c) for c in substitute_captures(expression, captures))
+                    return replace(t, parameters=tuple(substitute(p) for p in t.parameters), result=substitute(t.result),
+                                   effects=effects, bound=capture_set(t.bound), captures=None if t.captures is None else capture_set(t.captures))
+                return replace(function, type=replace(substitute(signature), type_vars=(), regions=(), effect_vars=(), capture_vars=(), generic_binders=()))
             case ('lambda', parameters, body):
                 return self._function(parameters, body, context)
             case ('let' | 'using' as kind, name, initializer, body):

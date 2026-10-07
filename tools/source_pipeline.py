@@ -4,7 +4,7 @@ from pathlib import Path
 
 from effect_rows import Row, Solver
 from handlers import Defect, HandlerChecker, Operation, compile_program, run
-from inference import Context, E, Fn, INT, UNIT, BOOL, Ty, InferenceError, capture_free, permissions, value
+from inference import Context, E, Fn, INT, UNIT, BOOL, Ty, InferenceError, capture_free, permissions, value, required_captures
 from source_syntax import Diagnostic, Node, parse_source
 from source_features import FeatureChecker, substitute
 
@@ -171,11 +171,11 @@ class SourceChecker(FeatureChecker):
                 error.code = 'type'
             raise
         if isinstance(expected, Fn):
-            if self.closed_captures(result.captures) - set(expected.regions) - set(expected.captures or ()):
+            if self.closed_captures(result.captures) - set(expected.regions) - set(expected.captures or ()) - set(required_captures(expected)):
                 raise InferenceError('Capture annotation omits retained obligations', code='type')
             result = replace(result, type=replace(admitted_type(actual, expected), type_vars=expected.type_vars,
                                                  regions=expected.regions, effect_vars=expected.effect_vars,
-                                                 capture_vars=expected.capture_vars),
+                                                 capture_vars=expected.capture_vars, generic_binders=expected.generic_binders),
                              captures=result.captures - set(expected.regions))
         return result
 
