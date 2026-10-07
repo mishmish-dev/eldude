@@ -1,6 +1,6 @@
 # Eldude Standard Library
 
-Version: 0.0.4 working profile
+Status: working profile
 
 The collection commitments below are normative for the bundled library. They were previously embedded in language specification [§32](language-spec/08-collections.md#32-standard-sequence-abstractions). The [language specification](language-specification.md) remains authoritative for ownership, effects, captures, termination, and control flow.
 

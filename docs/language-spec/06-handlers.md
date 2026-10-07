@@ -48,7 +48,7 @@ The handler is lexical and not a first-class `Handler` value. A reusable interpr
 
 ### 23.1 Handlers are not first-class values
 
-Eldude 0.0.4 has no public `Handler<...>` value type. A handler is a lexical interpreter block written only as part of a `handle` application:
+Eldude has no public `Handler<...>` value type. A handler is a lexical interpreter block written only as part of a `handle` application:
 
 ```eldude
 handle {

@@ -1,12 +1,10 @@
 # Eldude Language Specification
 
-**Version:** 0.0.4
-
 **Status:** architectural consolidation; pre-implementation normative design
 
 `MUST` and `MUST NOT` state normative requirements. `SHOULD` permits a documented alternative. `MAY` grants implementation freedom.
 
-This specification consolidates the current Eldude design after the 0.6 architectural audit. It is not a 1.0 declaration. The design remains subject to further adversarial composition audits before stabilization. The [manifesto](index.md#the-eldude-manifesto) states its goals and principles.
+This specification consolidates the current Eldude design. It remains subject to further adversarial composition audits before stabilization. The [manifesto](index.md#the-eldude-manifesto) states its goals and principles.
 
 The twelve chapters below contain the normative language contracts. The scope reference is normative about exclusions and deferrals. Examples, precedents, and the invariants checklist explain or index those contracts; they do not create competing rules. The implementation evaluation reference retains its stated measurement recommendations.
 

@@ -6,8 +6,7 @@
   "format": "eldude-grammar",
   "format_version": 1,
   "language": {
-    "name": "Eldude",
-    "version": "0.0.4"
+    "name": "Eldude"
   },
   "lexical": {
     "contextual_words": [

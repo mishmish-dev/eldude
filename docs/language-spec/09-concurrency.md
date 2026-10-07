@@ -67,7 +67,7 @@ This makes interleaving points part of source-level/effect-level reasoning.
 
 ### 38.3 Parallelism
 
-The current language does not specify a general source-level shared-memory parallelism API or memory model. User-directed multicore execution of ordinary Eldude strands is outside the 0.0.4 language scope; programs requiring it must currently use host/native facilities.
+The current language does not specify a general source-level shared-memory parallelism API or memory model. User-directed multicore execution of ordinary Eldude strands is outside the language scope; programs requiring it must currently use host/native facilities.
 
 No ordinary `Send`, `Sync`, `Transfer`, or thread-affinity predicate exists.
 

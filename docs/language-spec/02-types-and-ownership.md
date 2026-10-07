@@ -107,7 +107,7 @@ Type -> Type
 EffectRow -> Constraint
 ```
 
-The compiler defines intrinsic constraints over non-type semantic categories when they expose an already-derived property rather than a user-defined protocol. In 0.0.4 this includes `NonAbandoning : EffectRow -> Constraint`, defined normatively in [§17.3](05-effects-and-failure.md#173-derived-continuation-control-envelope). It is not a trait and cannot be implemented by user code.
+The compiler defines intrinsic constraints over non-type semantic categories when they expose an already-derived property rather than a user-defined protocol. This includes `NonAbandoning : EffectRow -> Constraint`, defined normatively in [§17.3](05-effects-and-failure.md#173-derived-continuation-control-envelope). It is not a trait and cannot be implemented by user code.
 
 ### 6.3 Generic parameter categories
 
@@ -370,7 +370,7 @@ MutableOwner<T, @r>
 
 means that `T` denotes a non-duplicable owner of mutable identity in region `@r` whose in-place operations are governed by `state<@r>`. `T: not Dup` is necessary but not sufficient: a linear resource such as `File` does not acquire mutable-owner identity merely because it is non-duplicable.
 
-Mutable-owner status is not a user-implementable trait and does not participate in trait resolution. It is an intrinsic semantic fact of designated nominal state abstractions and is exported in canonical interfaces when clients need to form root `mut` grants. `DynArray<T,@r>` is the canonical standard example. Scoped projection ([§15](04-captures-and-access.md#15-scoped-access-projection)) may derive a `mut T` grant to an arbitrary subvalue from an already active parent-owner grant; the derived grant retains the parent owner identity/projection path and does not require `T` itself to satisfy `MutableOwner`. The 0.0.4 core does not define a general user-extensible mechanism for minting new root mutable-owner identities; abstractions that require new identity mechanisms are built from existing state primitives or audited unsafe/runtime facilities until such a mechanism is independently justified.
+Mutable-owner status is not a user-implementable trait and does not participate in trait resolution. It is an intrinsic semantic fact of designated nominal state abstractions and is exported in canonical interfaces when clients need to form root `mut` grants. `DynArray<T,@r>` is the canonical standard example. Scoped projection ([§15](04-captures-and-access.md#15-scoped-access-projection)) may derive a `mut T` grant to an arbitrary subvalue from an already active parent-owner grant; the derived grant retains the parent owner identity/projection path and does not require `T` itself to satisfy `MutableOwner`. The core does not define a general user-extensible mechanism for minting new root mutable-owner identities; abstractions that require new identity mechanisms are built from existing state primitives or audited unsafe/runtime facilities until such a mechanism is independently justified.
 
 Root-grant formation accounts for `state<@r>` under [§14.3](04-captures-and-access.md#143-mut). The grant carries that accounted state authority through forwarding and projection; the target type of a projected grant need not name the parent region.
 

@@ -213,7 +213,7 @@ The following vocabulary is normative. Values in the table are bare generated wo
 | Callback | `delivery-domain` | `current_domain`, `registration_domain`, or `protocol(path)` |
 | Callback | `barrier` | `ordinary`, `stack_preserving`, `not_applicable`; `stack_preserving` requires the complete audited [§56.1](10-host-and-ffi.md#561-same-domain-synchronous-callback) protocol |
 | Callback | `suspension` | `forbidden`, `permitted`; permission does not authorize crossing an ordinary barrier |
-| Callback | `algebraic-crossing` | `forbidden` in 0.0.4 |
+| Callback | `algebraic-crossing` | `forbidden` |
 | Callback | `cancellation` | `deferred`, `ordinary_points`, or `protocol(path)` |
 | Callback | `defect` | `rendezvous` or `protocol(path)` describing the applicable Eldude-boundary/private-ABI protocol |
 | Callback | `pending-defect-entry` | `suppressed` for synchronous entry; `not_applicable` for independently posted delivery |

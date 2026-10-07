@@ -182,7 +182,7 @@ While such a barrier is active:
 - a pending cooperative cancellation request remains pending rather than being delivered through the foreign frame;
 - a defect reaching `ForeignBarrier` follows the audited defect-rendezvous protocol of [§56.1](10-host-and-ffi.md#561-same-domain-synchronous-callback).
 
-An audited stack-preserving synchronous-callback protocol may replace `suspend = forbidden` with `suspend = permitted` for that specific foreign entry. It must still provide the cancellation/defect rendezvous and lifetime/rooting guarantees required by [§56.1](10-host-and-ffi.md#561-same-domain-synchronous-callback). In 0.0.4, such a protocol does not change `algebraic-crossing = forbidden`.
+An audited stack-preserving synchronous-callback protocol may replace `suspend = forbidden` with `suspend = permitted` for that specific foreign entry. It must still provide the cancellation/defect rendezvous and lifetime/rooting guarantees required by [§56.1](10-host-and-ffi.md#561-same-domain-synchronous-callback). Such a protocol does not change `algebraic-crossing = forbidden`.
 
 ## 59. Function introduction and application
 
@@ -558,7 +558,7 @@ For static abandonment safety, the compiler models the captured segment as an in
 
 `affine` permits zero resumption only when abandonment of the segment is a valid non-local exit. An `affine` operation returning `Never` cannot resume in safe code but uses the same rule rather than a separate mode.
 
-The same abandonment model is invoked indirectly at an ordinary call when the call's derived continuation-control envelope is potentially abandoning. Many-shot continuation duplication is not part of the 0.0.4 core.
+The same abandonment model is invoked indirectly at an ordinary call when the call's derived continuation-control envelope is potentially abandoning. Many-shot continuation duplication is not part of the core.
 
 ## 66. Error typing
 
@@ -717,7 +717,7 @@ Every callback-entry transition first checks the enclosing synchronous invocatio
 
 At the first defect-processing transition, the runtime records the defect and marks every active enclosing synchronous invocation pending before any callback-local discharge or native call. Callback-local structural unwinding then proceeds while possible; the barrier returns through the native frame using the audited rendezvous protocol, and outer Eldude defect unwinding resumes only when the corresponding Eldude boundary is regained. Removing an inner rendezvoused frame does not clear enclosing pending states. Native non-local unwinding across live Eldude frames is not part of ordinary safe-machine execution.
 
-An audited stack-preserving callback protocol may permit suspension by preserving the waiting native execution state and all required roots/lifetimes. Resumption must re-enter the same logical callback computation according to that protocol. Such an implementation remains subject to ordinary Eldude cancellation semantics at the permitted suspension point and still does not permit algebraic handler lookup across the foreign-control barrier in 0.0.4.
+An audited stack-preserving callback protocol may permit suspension by preserving the waiting native execution state and all required roots/lifetimes. Resumption must re-enter the same logical callback computation according to that protocol. Such an implementation remains subject to ordinary Eldude cancellation semantics at the permitted suspension point and still does not permit algebraic handler lookup across the foreign-control barrier.
 
 ## 70. Soundness obligations
 

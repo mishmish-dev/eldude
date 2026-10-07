@@ -2,7 +2,7 @@
 
 Eldude is a programming-language design with an experimental implementation. This repository contains its design contracts, a grammar recognizer, a bounded source-to-execution pipeline, staged example programs, and an initial standard-library API.
 
-Release **0.0.5** adds the first source-to-execution pipeline, implementing a subset of the unchanged Eldude **0.0.4** language contract.
+The source-to-execution pipeline implements a subset of the Eldude language contract.
 
 - [Documentation](docs/index.md): start here for the manifesto and documentation guide.
 - [Language specification](docs/language-specification.md): twelve chapters, reader and implementer paths, and stable section links.
@@ -14,7 +14,7 @@ Release **0.0.5** adds the first source-to-execution pipeline, implementing a su
 - [Handler experiment](tools/handlers.py): clause checking, ownership across resumption, explicit evidence lowering, and a small interpreter, with [accepted programs and counterexamples](tools/test_handlers.py).
 - [Source pipeline](tools/source_pipeline.py): located parsing, declaration resolution, contract checking, and execution of the [source fixtures](examples/README.md#executable-source-fixtures).
 
-The repository's Python tools share a uv project pinned to Python 3.14.8 and use only the standard library. Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then check grammar publications, source syntax, and the prototypes:
+The repository's Python tools share a uv project with Python pinned in [.python-version](.python-version) and use only the standard library. Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then check grammar publications, source syntax, and the prototypes:
 
 ```sh
 uv sync --locked
@@ -51,7 +51,7 @@ The corpus runner reports **49 passed, 0 unsupported, 0 failed**, checked agains
 
 This is still an experimental interpreter, not a complete language implementation. Existential trait objects (`any`), recursive record representations, guarded matches, untyped closure parameters, resource/callback effect-operation payloads, general foreign execution and parts of the declared standard-library API remain unsupported. Trait selection and structural termination checking cover a bounded subset; multiple specialized method implementations for the same nominal type report an explicit implementation limit. Simulated host resources and a stack-based cooperative scheduler do not provide production I/O, parallelism or unbounded recursion.
 
-The next extension after 0.0.5 supports an enclosing `once`/`affine` operation's `resume` inside a nested handler's normal-return clause, as required by [§25.1](docs/language-spec/06-handlers.md#251-lexical-resumption). Normal completion shares that lexical capability and its ownership state; a nested operation clause introduces its own capability, and a nested function cannot capture either. Resuming transfers the enclosing frame's non-`Dup` captures exactly once while keeping outside obligations live. An inner affine completion that could skip the enclosing resume remains rejected under the prototype's conservative usage rules.
+The source pipeline supports an enclosing `once`/`affine` operation's `resume` inside a nested handler's normal-return clause, as required by [§25.1](docs/language-spec/06-handlers.md#251-lexical-resumption). Normal completion shares that lexical capability and its ownership state; a nested operation clause introduces its own capability, and a nested function cannot capture either. Resuming transfers the enclosing frame's non-`Dup` captures exactly once while keeping outside obligations live. An inner affine completion that could skip the enclosing resume remains rejected under the prototype's conservative usage rules.
 
 ```sh
 uv run python tools/run_eldude.py examples/07_source_pipeline/nested_return.eld

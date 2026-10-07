@@ -193,11 +193,11 @@ affine
     zero or one resume
 ```
 
-The declaration describes control behavior independently of the handler implementation. Many-shot resumption is not part of the 0.0.4 core and is listed as deferred in [Appendix A](scope-and-deferrals.md#appendix-a--deliberately-absent-or-deferred-features).
+The declaration describes control behavior independently of the handler implementation. Many-shot resumption is not part of the core and is listed as deferred in [Appendix A](scope-and-deferrals.md#appendix-a--deliberately-absent-or-deferred-features).
 
 ### 17.3 Derived continuation-control envelope
 
-Effect rows determine a compiler-derived continuation-control envelope used at opaque calls and other composition boundaries. In the 0.0.4 core, the envelope records whether evaluation may abandon the surrounding continuation. The envelope is evaluated relative to the current structural-control context `Control`, including whether cooperative cancellation is masked at the evaluation point.
+Effect rows determine a compiler-derived continuation-control envelope used at opaque calls and other composition boundaries. In the core, the envelope records whether evaluation may abandon the surrounding continuation. The envelope is evaluated relative to the current structural-control context `Control`, including whether cooperative cancellation is masked at the evaluation point.
 
 For a closed effect row `Effects`, define `mayAbandon(Control, Effects)` as follows:
 
@@ -207,7 +207,7 @@ For a closed effect row `Effects`, define `mayAbandon(Control, Effects)` as foll
 
 In the ordinary unmasked structural control context `UnmaskedControl`, write `mayAbandon(Effects)` as shorthand for `mayAbandon(UnmaskedControl, Effects)`. An unconstrained open effect-row variable is conservatively treated as potentially abandoning in any context where its unknown families could contain `affine`; masking may remove only the known cancellation edge contributed by `suspend`.
 
-Eldude 0.0.4 exposes exactly one source constraint on the **ordinary unmasked** derived property:
+Eldude exposes exactly one source constraint on the **ordinary unmasked** derived property:
 
 ```eldude
 where e: NonAbandoning
@@ -491,7 +491,7 @@ enum LoadError {
 }
 ```
 
-Eldude 0.0.4 has no structural `error { ... }` type and no implicit nominal-error subtyping/widening. When a computation with error type `E1` must participate in an API using error type `E2`, the program performs an explicit mapping or constructs the chosen nominal variant.
+Eldude has no structural `error { ... }` type and no implicit nominal-error subtyping/widening. When a computation with error type `E1` must participate in an API using error type `E2`, the program performs an explicit mapping or constructs the chosen nominal variant.
 
 This keeps expected failure within the ordinary nominal data model rather than introducing a specialized structural sum mechanism.
 

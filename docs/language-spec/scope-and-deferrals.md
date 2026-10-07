@@ -126,6 +126,6 @@ Parallel computation remains subject to [§38.3](09-concurrency.md#383-paralleli
 
 ## A.8 Deferred or removed algebraic-control variants
 
-The 0.0.4 core has no separate `abort` resumption mode. Abortive operations use `affine ... -> Never`, so continuation abandonment follows the ordinary affine rule.
+The core has no separate `abort` resumption mode. Abortive operations use `affine ... -> Never`, so continuation abandonment follows the ordinary affine rule.
 
 Many-shot algebraic resumption is deferred. Reintroducing it would require a demonstrated need for continuation duplication plus a separately reviewed composition story for usage, mutable state, handlers, concurrency, and separate compilation. It is not accepted merely as the completion of a resumption-mode feature matrix.

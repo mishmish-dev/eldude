@@ -192,7 +192,7 @@ class Grammar:
         return {
             'format': 'eldude-grammar',
             'format_version': 1,
-            'language': {'name': 'Eldude', 'version': '0.0.4'},
+            'language': {'name': 'Eldude'},
             'entry_points': {'source': 'source_file', 'interface': 'interface_file'},
             'lexical': {
                 'encoding': 'UTF-8',
@@ -302,8 +302,6 @@ def section(source, number):
 def formal_markdown(text):
     return '''# Eldude Formal Grammar
 
-**Version:** 0.0.4
-
 **Status:** pre-implementation normative grammar
 
 This complete grammar covers ordinary Eldude source and generated canonical semantic interfaces. It is generated from [eldude.ebnf](eldude.ebnf), the parsing clauses in [Foundations and programs](language-spec/01-foundations.md), and the interface clauses in [Interfaces, compilation, and tooling](language-spec/12-interfaces-and-tooling.md). Numbered references retain their identifiers in the [language specification](language-specification.md). The [manifesto](index.md#the-eldude-manifesto) describes the design principles.
@@ -354,7 +352,7 @@ These rules select association among grammar derivations using syntax alone. The
 
 ## JSON representation
 
-`eldude-grammar.json` uses format `eldude-grammar`, format version `1`, and language version `0.0.4`. `entry_points` names the ordinary source and generated interface starts. `lexical.tokens` and `lexical.skip` are ordered arrays of `{ "name": ..., "pattern": ... }`; array order retains lexical priority. `reserved_words` and `contextual_words` expose the word categories. `literal_vocabulary` lists the reachable literals for each entry point. String/character token recognition additionally validates the Unicode scalar range and excluded surrogate interval recorded in `lexical`.
+`eldude-grammar.json` uses format `eldude-grammar`; `format_version` identifies the JSON schema version. `entry_points` names the ordinary source and generated interface starts. `lexical.tokens` and `lexical.skip` are ordered arrays of `{ "name": ..., "pattern": ... }`; array order retains lexical priority. `reserved_words` and `contextual_words` expose the word categories. `literal_vocabulary` lists the reachable literals for each entry point. String/character token recognition additionally validates the Unicode scalar range and excluded surrogate interval recorded in `lexical`.
 
 `productions` maps each nonterminal to an array of alternatives. Each alternative is an ordered array of symbols; `[]` means epsilon. A symbol has exactly one key: `rule` references a nonterminal, `token` references a lexical category, and `literal` matches exact spelling. Names beginning with `@` are generated repetition helpers, not Eldude source tokens. This representation expands EBNF options and repetitions into ordinary BNF. `parsing_conventions` preserves the normative derivation/association rules above; consumers must apply them when building syntax trees.
 
