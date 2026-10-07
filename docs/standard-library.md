@@ -1,8 +1,10 @@
 # Eldude Standard Library
 
-Status: working profile
+[Documentation and project map](index.md) · [Module/API map](../stdlib/README.md)
 
-The collection commitments below are normative for the bundled library. They were previously embedded in language specification [§32](language-spec/08-collections.md#32-standard-sequence-abstractions). The [language specification](language-specification.md) remains authoritative for ownership, effects, captures, termination, and control flow.
+**Status:** working library profile, partially implemented.
+
+The collection commitments below are normative for the bundled library, as referenced by [§32](language-spec/08-collections.md#32-standard-sequence-abstractions). The [language specification](language-specification.md) remains authoritative for ownership, effects, captures, termination, and control flow.
 
 ## Collection profile
 
@@ -20,11 +22,11 @@ Owning overlapping immutable slices may be added with explicit usage bounds, ord
 
 ## Implementation order
 
-Start with values and pure transformations, then consuming sequences, regional state, cleanup, and structured concurrency. Each step should make the corresponding programs in [examples](../examples/README.md) executable before expanding the API. Hash collections, text segmentation, streams, timers, native IO, and concurrent mapping can follow concrete program needs.
+The initial sequence was values and pure transformations, consuming sequences, regional state, cleanup, then structured concurrency. The corresponding [examples](../examples/README.md) now execute. Expand the API from concrete program needs; hash collections, text segmentation, streams, timers, native IO, and concurrent mapping remain later work.
 
 ## Initial API and builtin bindings
 
-The first source/API draft is in [stdlib](../stdlib/README.md). These API files are an initial implementation target, not an implemented or complete library. The bundled profile uses these canonical identities for existing language hooks:
+The [stdlib module map](../stdlib/README.md) distinguishes source implementations from declarations requiring interpreter primitives or further work. The declared API is only partly implemented. The bundled profile uses these canonical identities for existing language hooks:
 
 | Language hook | Library identity |
 | --- | --- |
@@ -82,4 +84,4 @@ For example, `freeze` exports `result-captures <= {captures(parameter(0))}`. Wit
 
 ## Deliberate initial limits
 
-The first API omits overload families and convenience wrappers until these programs run. `LinkedList::length` is consuming and needs `T: Discard`; this is a minimal starting operation, not a promise that unrestricted inspection will never be added. `TreeList`, `Array`, maps/sets, text segmentation, IO, timers, and broader iterator adapters retain their profile commitments but do not yet have source API drafts. No cost guarantee has been benchmarked, and no semantic contract is claimed to have passed a compiler that does not yet exist.
+The initial API omits overload families and convenience wrappers. `LinkedList::length` consumes its input and needs `T: Discard`; unrestricted inspection may be added later. `TreeList`, `Array`, maps/sets, text segmentation, IO, timers, and broader iterator adapters retain their profile commitments but do not yet have source API drafts. Cost guarantees remain unbenchmarked, and the experimental interpreter does not establish complete library conformance.

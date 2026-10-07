@@ -1,6 +1,6 @@
 # Eldude Formal Grammar
 
-**Status:** pre-implementation normative grammar
+**Status:** normative syntax with an implemented recognizer; source execution covers a subset.
 
 This complete grammar covers ordinary Eldude source and generated canonical semantic interfaces. It is generated from [eldude.ebnf](eldude.ebnf), the parsing clauses in [Foundations and programs](language-spec/01-foundations.md), and the interface clauses in [Interfaces, compilation, and tooling](language-spec/12-interfaces-and-tooling.md). Numbered references retain their identifiers in the [language specification](language-specification.md). The [manifesto](index.md#the-eldude-manifesto) describes the design principles.
 
@@ -421,9 +421,9 @@ User-authored source need not be reordered solely to match this interface order;
 From the repository root:
 
 ```sh
-python3 tools/check_grammar.py --write
-python3 tools/check_grammar.py
-python3 -m unittest discover -s tools -p 'test_grammar*.py'
+uv run python tools/check_grammar.py --write
+uv run python tools/check_grammar.py
+uv run python -m unittest discover -s tools -p 'test_grammar*.py'
 ```
 
 The first command regenerates this document and the JSON export; the specification chapters are inputs and are not rewritten. The second rejects undefined symbols, duplicate productions, malformed EBNF, reserved-word drift, or stale generated publications. Tests cover accepted/rejected syntax, source/interface separation, JSON consumption, and stale-publication detection. Edit the EBNF or originating specification clauses, then regenerate; do not edit generated presentations directly.

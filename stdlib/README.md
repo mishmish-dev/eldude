@@ -1,8 +1,10 @@
 # Initial Eldude standard-library API
 
-This is a small working API draft for the bundled library profile. The `.eld` files contain ordinary source declarations, with implementations for pure operations where practical. Opaque types and bodyless functions still need compiler/runtime backing or library implementations. They are not generated canonical interfaces and cannot substitute for the complete semantic metadata required by specification [§72](../docs/language-spec/12-interfaces-and-tooling.md#72-canonical-semantic-interfaces). The source runner resolves these modules and executes the subset needed by all 49 positive examples. Source functions such as `task::join2` execute through the checked interpreter; opaque collection, cell and task operations use explicit interpreter primitives. The entire declared API is not yet implemented.
+[Documentation and project map](../docs/index.md) · [Library contracts](../docs/standard-library.md) · [Executable examples](../examples/README.md)
 
-The [standard-library profile](../docs/standard-library.md) records representation, cost, ownership, and intrinsic contracts. The [example programs](../examples/README.md) supply incremental implementation targets. Source module declarations, not filesystem names, define import identities; no package manifest or new package-resolution mechanism is introduced here.
+The `.eld` files are ordinary source declarations and bodies. The interpreter executes the subset needed by the positive examples: source functions such as `task::join2` run checked bodies; opaque collection, cell, and task operations use explicit primitives. Other declarations still need implementations. These files are not generated canonical interfaces and do not supply all semantic metadata required by [§72](../docs/language-spec/12-interfaces-and-tooling.md#72-canonical-semantic-interfaces).
+
+The [library profile](../docs/standard-library.md) owns representation, cost, ownership, and intrinsic contracts. Declared module identities, rather than filesystem names, define imports; there is no package manifest or additional resolution mechanism.
 
 | Module | Initial surface | Implementation status |
 | --- | --- | --- |
@@ -20,4 +22,4 @@ Callbacks used by `Option`/`Result` transformations may be skipped, so their env
 
 Capture contracts use whole arguments and environments. Mutable calls conservatively accumulate captures in surviving owners. A frozen `DynArray` may leave its allocation region only when its element type is provably capture-free; the [library profile](../docs/standard-library.md#usage-and-provenance-contracts) defines the bounds, including their application through wrappers.
 
-No `unwrap`, implicit cleanup, detached task, borrowed collection view, or effectful module initializer is introduced. All staged value, ownership, result, effect, state/collection and task examples now execute. Remaining API coverage is separate from this example milestone.
+The initial API omits `unwrap`, implicit cleanup, detached tasks, borrowed collection views, and effectful module initializers. Executable example coverage does not imply complete API coverage.

@@ -1,10 +1,10 @@
 # Eldude Language Specification
 
-**Status:** architectural consolidation; pre-implementation normative design
+**Status:** normative design under review; the experimental implementation covers a subset.
 
 `MUST` and `MUST NOT` state normative requirements. `SHOULD` permits a documented alternative. `MAY` grants implementation freedom.
 
-This specification consolidates the current Eldude design. It remains subject to further adversarial composition audits before stabilization. The [manifesto](index.md#the-eldude-manifesto) states its goals and principles.
+The design remains subject to adversarial composition audits before stabilization. The [manifesto](index.md#the-eldude-manifesto) states its goals; the [documentation and project map](index.md) routes specific tasks to rules, code, and tests.
 
 The twelve chapters below contain the normative language contracts. The scope reference is normative about exclusions and deferrals. Examples, precedents, and the invariants checklist explain or index those contracts; they do not create competing rules. The implementation evaluation reference retains its stated measurement recommendations.
 
@@ -12,24 +12,24 @@ Syntax is defined by [eldude.ebnf](eldude.ebnf), the parsing contract in [chapte
 
 ## Reading order
 
-For language use, read chapters 1–10 in order, following the opening examples and chapter prerequisites. Chapters 11–12 provide the implementer reference; each language chapter links to the relevant shared judgments. The [example index](language-spec/examples.md) offers another way in.
+For a focused task, use the [topic map](index.md#language-topics) or choose a chapter below. For a full language introduction, read chapters 1–10 in order, following their examples and prerequisites. Chapters 11–12 provide checking judgments and implementation contracts. The [example index](language-spec/examples.md) offers another way in.
 
 Numbered clauses retain their original [§1](language-spec/01-foundations.md#1-semantic-dimensions)–[§78](language-spec/12-interfaces-and-tooling.md#78-testing) identifiers even where chapter boundaries changed. Cross-chapter references link directly to their targets. Existing bookmarks into this file remain available in the collapsed section directory below.
 
 | Chapter | Contents | Sections |
 |---|---|---|
-| [1. Foundations and programs](language-spec/01-foundations.md) | Start here for the semantic vocabulary, source model, evaluation order, functions, and module boundaries. | [§§1](language-spec/01-foundations.md#1-semantic-dimensions)–[5](language-spec/01-foundations.md#5-modules-and-top-level-structure) |
-| [2. Types and ownership](language-spec/02-types-and-ownership.md) | This chapter defines primitive and nominal data, polymorphism, and the permissions that determine how values may be used. | [§§6](language-spec/02-types-and-ownership.md#6-primitive-types-and-kinds)–[9](language-spec/02-types-and-ownership.md#9-usage-and-intrinsic-permissions) |
-| [3. Traits and dynamic abstraction](language-spec/03-traits.md) | This chapter explains static trait selection and runtime trait packages, including the contracts that survive abstraction. | [§§10](language-spec/03-traits.md#10-traits)–[11](language-spec/03-traits.md#11-dynamic-trait-abstraction) |
-| [4. Closures, captures, and scoped access](language-spec/04-captures-and-access.md) | This chapter explains what a callable retains and how a function temporarily inspects or mutates a value without creating reference values. | [§§12](language-spec/04-captures-and-access.md#12-function-value-capture-semantics)–[15](language-spec/04-captures-and-access.md#15-scoped-access-projection) |
-| [5. Effects, termination, and failure](language-spec/05-effects-and-failure.md) | This chapter describes visible behavior, conservative non-divergence checking, and expected failure as ordinary data. | [§§16](language-spec/05-effects-and-failure.md#16-effect-rows)–[22](language-spec/05-effects-and-failure.md#22-diagnostics-and-logging) |
-| [6. Handlers and resumption](language-spec/06-handlers.md) | This chapter explains lexical effect interpretation, resumption, forwarding, and the ownership obligations carried through each operation. | [§§23](language-spec/06-handlers.md#23-lexical-handler-frames)–[26](language-spec/06-handlers.md#26-handler-completion-forwarding-and-residual-rows) |
-| [7. Regions, mutable state, and cleanup](language-spec/07-state-and-cleanup.md) | This chapter combines region-local mutable identity with explicit resource ownership and cleanup. | [§§27](language-spec/07-state-and-cleanup.md#27-regions)–[31](language-spec/07-state-and-cleanup.md#31-using) |
-| [8. Collections and iteration](language-spec/08-collections.md) | This chapter applies ownership, scoped access, and termination rules to collection APIs and iteration. | [§§32](language-spec/08-collections.md#32-standard-sequence-abstractions)–[37](language-spec/08-collections.md#37-laziness-policy) |
-| [9. Structured concurrency](language-spec/09-concurrency.md) | This chapter defines cooperative scheduling, taskgroup ownership, cancellation, and the interaction between children and handlers. | [§§38](language-spec/09-concurrency.md#38-execution-domains-and-strands)–[47](language-spec/09-concurrency.md#47-no-detached-tasks-or-general-supervisor-primitive-in-the-core) |
-| [10. Host, unsafe code, and FFI](language-spec/10-host-and-ffi.md) | This chapter describes application runtime integration and the audited contracts required to cross into native code. | [§§48](language-spec/10-host-and-ffi.md#48-host-model)–[57](language-spec/10-host-and-ffi.md#57-foreign-unwinding-and-failure) |
-| [11. Formal static and dynamic semantics](language-spec/11-formal-semantics.md) | This implementer reference gives checking judgments, the dynamic machine, and soundness obligations for the language contracts. | [§§58](language-spec/11-formal-semantics.md#58-static-contexts-and-judgments)–[70](language-spec/11-formal-semantics.md#70-soundness-obligations) |
-| [12. Interfaces, compilation, and tooling](language-spec/12-interfaces-and-tooling.md) | This implementer reference defines the public information needed for separate compilation, native bindings, incremental checking, and diagnostics. | [§§71](language-spec/12-interfaces-and-tooling.md#71-separate-compilation)–[78](language-spec/12-interfaces-and-tooling.md#78-testing) |
+| [1. Foundations and programs](language-spec/01-foundations.md) | Semantic vocabulary, parsing, evaluation, functions, modules. | [§§1](language-spec/01-foundations.md#1-semantic-dimensions)–[5](language-spec/01-foundations.md#5-modules-and-top-level-structure) |
+| [2. Types and ownership](language-spec/02-types-and-ownership.md) | Primitive/nominal types, polymorphism, usage permissions. | [§§6](language-spec/02-types-and-ownership.md#6-primitive-types-and-kinds)–[9](language-spec/02-types-and-ownership.md#9-usage-and-intrinsic-permissions) |
+| [3. Traits and dynamic abstraction](language-spec/03-traits.md) | Trait selection, dynamic packages, abstraction contracts. | [§§10](language-spec/03-traits.md#10-traits)–[11](language-spec/03-traits.md#11-dynamic-trait-abstraction) |
+| [4. Closures, captures, and scoped access](language-spec/04-captures-and-access.md) | Callable retention, whole-value captures, temporary inspection/mutation. | [§§12](language-spec/04-captures-and-access.md#12-function-value-capture-semantics)–[15](language-spec/04-captures-and-access.md#15-scoped-access-projection) |
+| [5. Effects, termination, and failure](language-spec/05-effects-and-failure.md) | Effect rows, termination, defects, typed failure. | [§§16](language-spec/05-effects-and-failure.md#16-effect-rows)–[22](language-spec/05-effects-and-failure.md#22-diagnostics-and-logging) |
+| [6. Handlers and resumption](language-spec/06-handlers.md) | Lexical interpretation, resumption, forwarding, ownership. | [§§23](language-spec/06-handlers.md#23-lexical-handler-frames)–[26](language-spec/06-handlers.md#26-handler-completion-forwarding-and-residual-rows) |
+| [7. Regions, mutable state, and cleanup](language-spec/07-state-and-cleanup.md) | Regional state, resource ownership, explicit cleanup. | [§§27](language-spec/07-state-and-cleanup.md#27-regions)–[31](language-spec/07-state-and-cleanup.md#31-using) |
+| [8. Collections and iteration](language-spec/08-collections.md) | Collection ownership, access, iteration, termination. | [§§32](language-spec/08-collections.md#32-standard-sequence-abstractions)–[37](language-spec/08-collections.md#37-laziness-policy) |
+| [9. Structured concurrency](language-spec/09-concurrency.md) | Cooperative scheduling, taskgroups, cancellation, handler inheritance. | [§§38](language-spec/09-concurrency.md#38-execution-domains-and-strands)–[47](language-spec/09-concurrency.md#47-no-detached-tasks-or-general-supervisor-primitive-in-the-core) |
+| [10. Host, unsafe code, and FFI](language-spec/10-host-and-ffi.md) | Host integration, unsafe boundaries, native contracts. | [§§48](language-spec/10-host-and-ffi.md#48-host-model)–[57](language-spec/10-host-and-ffi.md#57-foreign-unwinding-and-failure) |
+| [11. Formal static and dynamic semantics](language-spec/11-formal-semantics.md) | Checking judgments, dynamic machine, soundness obligations. | [§§58](language-spec/11-formal-semantics.md#58-static-contexts-and-judgments)–[70](language-spec/11-formal-semantics.md#70-soundness-obligations) |
+| [12. Interfaces, compilation, and tooling](language-spec/12-interfaces-and-tooling.md) | Public interfaces, compilation, native bindings, diagnostics. | [§§71](language-spec/12-interfaces-and-tooling.md#71-separate-compilation)–[78](language-spec/12-interfaces-and-tooling.md#78-testing) |
 
 A contract without `diverge` rules out admitted nontermination under declared contracts; it still permits defects and structural cancellation ([§19.1](language-spec/05-effects-and-failure.md#191-default-contract)). For a callable with `mut` parameters, the row describes effects under supplied state authority; forming a root grant still charges region state ([§14.3](language-spec/04-captures-and-access.md#143-mut)).
 
@@ -47,7 +47,7 @@ A contract without `diverge` rules out admitted nontermination under declared co
 <details>
 <summary>Open the directory for bookmarks into the former full specification</summary>
 
-Each entry preserves the old anchor and links to its current home.
+Compatibility directory only: each entry preserves an old anchor and links to its current home. For new references and targeted reading, use the chapter links above.
 
 - <a id="part-i--foundations-and-program-model"></a> [Part I — Foundations and Program Model](language-spec/01-foundations.md#chapter-1--foundations-and-programs)
 - <a id="1-semantic-dimensions"></a> [1. Semantic dimensions](language-spec/01-foundations.md#1-semantic-dimensions)

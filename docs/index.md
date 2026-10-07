@@ -1,13 +1,66 @@
-# Eldude documentation
+# Eldude documentation and project map
+
+<a id="eldude-documentation"></a>
+
+Choose a task below, then read the linked chapter or component. The language specification defines the design; the experimental interpreter implements a subset. A documented rule or library declaration does not by itself imply executable support.
+
+[Reading guide](#reading-guide) · [Language topics](#language-topics) · [Project files](#project-files) · [Editing and checking](#editing-and-checking) · [Manifesto](#the-eldude-manifesto)
 
 ## Reading guide
 
-- [The Eldude Manifesto](#the-eldude-manifesto): motivation, principles, goals, and scope.
-- [Language specification](language-specification.md): twelve chapters, reading paths, and numbered language contracts. Begin with [Foundations and programs](language-spec/01-foundations.md).
-- [Formal grammar](formal-grammar.md): source and interface syntax, generated from [eldude.ebnf](eldude.ebnf), with a [JSON export](eldude-grammar.json).
-- [Standard-library profile](standard-library.md): collection representations, costs, and ownership contracts, with the initial [API declarations](../stdlib/README.md).
-- [Example programs](../examples/README.md): staged programs and expected outcomes.
-- [Implementation and development](../README.md): current prototype support, setup, and checks.
+| I need to… | Start here |
+| --- | --- |
+| Run a program or verify a change | [Quick start and checks](../README.md#quick-start) |
+| Understand the design goals | [Manifesto](#the-eldude-manifesto); [precedents](language-spec/precedents.md) for background |
+| Look up a language rule | [Topic map below](#language-topics); [specification index](language-specification.md) for conventions and a full reading order |
+| Find implemented behavior or a compiler component | [Implementation guide and code/test map](../tools/README.md) |
+| Find a small program or expected diagnostic | [Executable examples](../examples/README.md); [illustrative spec snippets](language-spec/examples.md) |
+| Check library APIs, ownership, or cost contracts | [Module/API map](../stdlib/README.md); [library profile](standard-library.md) |
+| Work on syntax or grammar consumers | [Normative EBNF](eldude.ebnf); generated [grammar reference](formal-grammar.md) and [JSON export](eldude-grammar.json) |
+| Check design scope or review a proposal | [Exclusions and deferrals](language-spec/scope-and-deferrals.md), [invariants checklist](language-spec/invariants.md), [implementation evaluation criteria](language-spec/implementation-criteria.md) |
+
+## Language topics
+
+Use the chapter's local contents and section links for a precise lookup. Chapters 1–10 explain language use; chapters 11–12 are implementer references. Chapter numbers group topics; stable § numbers identify individual contracts.
+
+| Topic / search terms | Chapter | Sections |
+| --- | --- | --- |
+| Parsing, evaluation order, functions, modules | [1. Foundations](language-spec/01-foundations.md) | §§1–5 |
+| Types, generics, records, enums, patterns, `Dup`, `Discard` | [2. Types and ownership](language-spec/02-types-and-ownership.md) | §§6–9 |
+| Traits, coherence, associated types, `any` | [3. Traits](language-spec/03-traits.md) | §§10–11 |
+| Closures, provenance, retention, `view`, `mut` | [4. Captures and access](language-spec/04-captures-and-access.md) | §§12–15 |
+| Effect rows, `diverge`, termination, defects, `Result`, `?`, `try` | [5. Effects and failure](language-spec/05-effects-and-failure.md) | §§16–22 |
+| `handle`, `resume`, `tail`, `once`, `affine`, forwarding | [6. Handlers](language-spec/06-handlers.md) | §§23–26 |
+| Regions, `Ref`, mutable owners, linear resources, `using` | [7. State and cleanup](language-spec/07-state-and-cleanup.md) | §§27–31 |
+| Sequences, indexing, consuming operations, `for`, finite iteration | [8. Collections](language-spec/08-collections.md) | §§32–37 |
+| `taskgroup`, `spawn`, `await`, cancellation, inherited handlers | [9. Concurrency](language-spec/09-concurrency.md) | §§38–47 |
+| Host contracts, `unsafe`, pointers, native storage, callbacks | [10. Host and FFI](language-spec/10-host-and-ffi.md) | §§48–57 |
+| Typing judgments, usage joins, dynamic machine, soundness | [11. Formal semantics](language-spec/11-formal-semantics.md) | §§58–70 |
+| Canonical interfaces, ABI, compilation, diagnostics, formatting | [12. Interfaces and tooling](language-spec/12-interfaces-and-tooling.md) | §§71–78 |
+
+## Project files
+
+| Location | Purpose / next stop |
+| --- | --- |
+| [README.md](../README.md) | Setup, commands, and implementation entry points |
+| [AGENTS.md](../AGENTS.md) | Short starting instructions for coding agents |
+| [docs/](.) | This map, language contracts, library profile, and grammar publications |
+| [tools/](../tools/README.md#file-map) | Python recognizer, parser, checking/lowering, interpreter, scheduler, and adjacent `test_*.py` files; the file map pairs components with tests |
+| [examples/](../examples/README.md) | Numbered positive programs and `reject/syntax` / `reject/semantics` counterexamples; [manifest.json](../examples/manifest.json) owns expected positive results and runnable/pending status |
+| [stdlib/](../stdlib/README.md) | `.eld` declarations and source bodies, grouped by module; the README maps APIs and implementation status |
+| [pyproject.toml](../pyproject.toml), [.python-version](../.python-version), [uv.lock](../uv.lock) | Project metadata, Python version, and locked environment |
+| [.gitignore](../.gitignore) | Local environment and Python cache exclusions |
+| [implementation-plan.md](implementation-plan.md) | Completed example-coverage milestone; historical context, not a current backlog |
+
+## Editing and checking
+
+- **Language rules:** edit the owning numbered chapter. The [invariants](language-spec/invariants.md) and example index link to those rules; they do not add competing contracts. Keep existing § identifiers and anchors, and link new references directly to the chapter. The specification index's large [legacy directory](language-specification.md#earlier-section-links) exists only for old bookmarks.
+- **Syntax:** edit [eldude.ebnf](eldude.ebnf) and the relevant clauses in [chapter 1](language-spec/01-foundations.md#2-surface-and-parsing-model) or [chapter 12](language-spec/12-interfaces-and-tooling.md#72-canonical-semantic-interfaces). [check_grammar.py](../tools/check_grammar.py) generates `formal-grammar.md` and `eldude-grammar.json`; regenerate with `uv run python tools/check_grammar.py --write` instead of editing outputs.
+- **Implementation:** check the [supported subset and limits](../tools/README.md#source-to-execution-experiment), then use the [code/test map](../tools/README.md#file-map). Grammar acceptance, static checking, and execution are separate checks.
+- **Library and examples:** keep the [library profile](standard-library.md), declarations, and example expectations consistent. Preserve expected results independently of the implementation. Spec snippets may be schematic or deliberately rejected; executable expectations belong in the example corpus.
+- **Verification:** use the [root README commands](../README.md#checks). When moving prose, update incoming links and keep useful anchors. Update this map when an entry point or file responsibility changes.
+
+For a narrow lookup, search the owning file: `rg -n '^#{2,3} ' docs/language-spec/06-handlers.md` lists its sections; `rg -n 'resume' tools/handlers.py tools/test_handlers.py` finds the matching implementation and checks.
 
 ## The Eldude Manifesto
 

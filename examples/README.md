@@ -1,6 +1,12 @@
-# Eldude implementation targets
+# Eldude examples
 
-All **49 positive examples** execute through the source checker and interpreter, with their original source and expected results. Each file is a separate program. The harness calls its exported `main`; this is a corpus convention, not a language entry-point rule. Task examples run in a cooperative scheduler owned by each execution.
+<a id="eldude-implementation-targets"></a>
+
+[Documentation and project map](../docs/index.md) · [Implementation support and limits](../tools/README.md#source-to-execution-experiment)
+
+[Positive programs](#positive-programs) · [Source fixtures](#executable-source-fixtures) · [Test host](#fixture-host-profile) · [Rejections](#rejection-targets) · [Handler counterexamples](#enforced-source-rejections)
+
+All **49 positive examples** execute through the source checker and interpreter, with their original source and expected results. Each file is a separate program; the runner uses the documented [entry-point convention](../tools/README.md#entry-point-api-and-diagnostics).
 
 ```sh
 uv run python tools/run_eldude.py --examples --strict
@@ -11,15 +17,19 @@ uv run python tools/run_eldude.py --examples --strict
 
 | Stage | Runnable | Capabilities exercised |
 | --- | ---: | --- |
-| Values | 9 / 9 | Arithmetic, closures, generics, records, tuples, enums and startup |
-| Ownership | 5 / 5 | Linear nominal types, inspection, recursion and traits |
-| Results | 3 / 3 | Library imports, matching, `?` and `try` |
-| Effects | 6 / 6 | Generic instances, handlers, forwarding and `Result` payloads |
-| State and collections | 6 / 6 | Regions, collection primitives, iteration and cleanup traits |
-| Tasks | 4 / 4 | Cooperative scheduling, task groups, spawn/await and library join |
-| Source pipeline | 16 / 16 | Handler evidence, ownership, resumption and cleanup regressions |
+| [1. Values](01_values) | 9 / 9 | Arithmetic, closures, generics, records, tuples, enums and startup |
+| [2. Ownership](02_ownership) | 5 / 5 | Linear nominal types, inspection, recursion and traits |
+| [3. Results](03_results) | 3 / 3 | Library imports, matching, `?` and `try` |
+| [4. Effects](04_effects) | 6 / 6 | Generic instances, handlers, forwarding and `Result` payloads |
+| [5. State and collections](05_state_and_collections) | 6 / 6 | Regions, collection primitives, iteration and cleanup traits |
+| [6. Tasks](06_tasks) | 4 / 4 | Cooperative scheduling, task groups, spawn/await and library join |
+| [7. Source pipeline](07_source_pipeline) | 16 / 16 | Handler evidence, ownership, resumption and cleanup regressions |
 
 Resolve explicit library imports using the module declarations in [stdlib](../stdlib/README.md). Primitive types and intrinsic constraints have their predefined meanings. There is no implied wildcard library prelude. The bundled profile binds list literals, `?`/`try`, optional access, `for`, cleanup, and task handles to their corresponding library identities.
+
+## Positive programs
+
+Stages 1–6 introduce the language features below. Stage 7 contains the focused [source pipeline fixtures](#executable-source-fixtures).
 
 | Stage | Program | Expected value | Capability |
 | --- | --- | --- | --- |
@@ -57,40 +67,9 @@ Resolve explicit library imports using the module declarations in [stdlib](../st
 | 6 | [child-local handler](06_tasks/child_local_handler.eld) | `42` | Answer-changing handler inside a child |
 | 6 | [library join](06_tasks/library_join.eld) | `42` | Higher-order task composition |
 
-## Rejection targets
-
-`reject/syntax` must fail the grammar recognizer. `reject/semantics` must parse; the source pipeline enforces the new `source_pipeline` counterexamples below. The older targets in this table also reject; the runner remains a bounded implementation, so rejection does not establish complete language conformance.
-
-| Program | Required failure |
-| --- | --- |
-| [missing loop separator](reject/syntax/missing_loop_separator.eld) | Missing `;` after a nonfinal loop |
-| [effect application](reject/syntax/effect_application.eld) | Expression type application needs `::<...>` |
-| [multiple row tails](reject/syntax/multiple_row_tails.eld) | Only one tail may follow `|` |
-| [decreases annotation](reject/syntax/decreases_annotation.eld) | Symbolic termination annotations are deferred |
-| [linear discard](reject/semantics/linear_discard.eld) | Unconsumed linear binding |
-| [uncovered impl](reject/semantics/uncovered_impl.eld) | Impl parameter absent from its head |
-| [inherited answer change](reject/semantics/inherited_answer_change.eld) | Baseline handler cannot preserve arbitrary child results |
-| [region escape](reject/semantics/region_escape.eld) | Returned closure retains a local cell |
-| [whole argument capture](reject/semantics/whole_argument_capture.eld) | Returning one opaque tuple member conservatively retains the whole argument |
-| [await whole argument capture](reject/semantics/await_whole_argument_capture.eld) | Awaiting a task returned through a helper preserves the helper's conservative capture bound |
-| [freeze captured elements](reject/semantics/freeze_captured_elements.eld) | Capture-bearing elements preserve the frozen owner's region dependency |
-| [mutable capture escape](reject/semantics/mut_capture_escape.eld) | A wrapper returning `Unit` leaves an inner capture in an outer mutable owner |
-| [explicit tail resume](reject/semantics/tail_explicit_resume.eld) | A `tail` clause must return the operation result |
-| [row variable entry](reject/semantics/row_variable_entry.eld) | A row variable cannot occupy a fixed effect-entry position |
-| [numeric recursion without diverge](reject/semantics/numeric_recursion_without_diverge.eld) | Numeric descent does not establish structural recursion |
-| [while without diverge](reject/semantics/while_without_diverge.eld) | Every `while` requires `diverge` in the initial core |
-
-Run the checks from the repository root:
-
-```sh
-uv sync --locked
-uv run python tools/check_grammar.py
-uv run python -m unittest discover -s tools -p 'test_*.py'
-```
-
 ## Executable source fixtures
 
-Run the complete source milestone from the repository root:
+Run a fixture and the source tests from the repository root:
 
 ```sh
 uv run python tools/run_eldude.py examples/07_source_pipeline/combined.eld
@@ -98,11 +77,11 @@ uv run python tools/run_eldude.py examples/07_source_pipeline/combined.eld
 uv run python -m unittest discover -s tools -p 'test_source*.py' -v
 ```
 
-All these files execute real Eldude syntax through a located AST, declaration resolution, the existing checked expression IR, explicit handler evidence and the existing interpreter. `tools/test_source_pipeline.py` asserts literal expected values and event ordering; it does not infer expectations from the implementation.
+These fixtures cover handler evidence, ownership, resumption, and cleanup through the [source pipeline](../tools/README.md#file-map). [test_source_pipeline.py](../tools/test_source_pipeline.py) asserts independent expected values and event ordering.
 
 | Program | Result | Checked execution |
 | --- | --- | --- |
-| [literal](01_values/literal.eld) | `42` | Existing scalar fixture |
+| [branch](07_source_pipeline/branch.eld) | `42` | Conditional execution |
 | [functions](07_source_pipeline/functions.eld) | `42` | Forward function reference, typed callback, closure capture |
 | [tail cleanup](07_source_pipeline/tail_cleanup.eld) | `40` | Clause-local close precedes implicit resume and caller acquisition |
 | [tail output](07_source_pipeline/tail_output.eld) | `()` | Operation returns `Int` even though handler output is `Unit` |
@@ -131,23 +110,21 @@ acquire 4 → cleanup 4 → acquire 5 → cleanup 5
 cleanup 2
 ```
 
-`uv run python tools/run_eldude.py examples/07_source_pipeline/nested_return.eld` also prints `42`. Each `Step` clause installs a `Read` handler whose normal-return clause resumes `Step`. The trace orders cleanup of temporary `2` before the first `Step` resume, cleanup of temporary `3` before the second, then one explicit close of frame `1` and post-resume cleanup of locals `4` and `5`.
+In `nested_return`, each `Step` clause installs a `Read` handler whose normal-return clause resumes `Step`. The trace orders cleanup of temporary `2` before the first `Step` resume, cleanup of temporary `3` before the second, then one explicit close of frame `1` and post-resume cleanup of locals `4` and `5`.
 
-`uv run python tools/run_eldude.py examples/07_source_pipeline/operation_arguments.eld` prints `42`. It passes `7` and `42` through `request`, the inner forwarding `Echo`, and the outer `Echo` clause. Cleanup of each tail-clause temporary precedes the corresponding outer/inner/`Step` resumptions. The retained frame then closes once, followed by cleanup of the two post-resume locals.
+`operation_arguments` passes `7` and `42` through `request`, the inner forwarding `Echo`, and the outer `Echo` clause. Cleanup of each tail-clause temporary precedes the corresponding outer/inner/`Step` resumptions. The retained frame then closes once, followed by cleanup of the two post-resume locals.
 
-`uv run python tools/run_eldude.py examples/07_source_pipeline/multi_operations.eld` prints `42`. Its order is inner `step` dispatch/resume, inner then outer `read` dispatch, acquisition/cleanup of temporary `2`, outer then inner tail resume, and cleanup of protected body `1`. The handler has separate `tail read(Int) -> Int`, `once step() -> Unit`, and `affine stop(Int) -> Unit` contracts.
+In `multi_operations`, the order is inner `step` dispatch/resume, inner then outer `read` dispatch, acquisition/cleanup of temporary `2`, outer then inner tail resume, and cleanup of protected body `1`. The handler has separate `tail read(Int) -> Int`, `once step() -> Unit`, and `affine stop(Int) -> Unit` contracts.
 
-`multi_operations_deep.eld` also prints `42`. Named dispatch enters the shared outer `step`; its nested empty handler's normal return resumes that operation. Inner `step` resumes, then inner `read` forwards to the same outer frame. Tail cleanup precedes resumption, normal return closes frame `1` exactly once, and independent post-resume cleanup finishes afterward. The scalar `read(frame)` parameter shadows the retained frame resource without acquiring its ownership. An outward `Mark` effect from `read` forces the checker to validate the earlier `step` resume against the complete residual using fresh states.
+In `multi_operations_deep`, named dispatch enters the shared outer `step`; its nested empty handler's normal return resumes that operation. Inner `step` resumes, then inner `read` forwards to the same outer frame. Tail cleanup precedes resumption, normal return closes frame `1` exactly once, and independent post-resume cleanup finishes afterward. The scalar `read(frame)` parameter shadows the retained frame resource without acquiring its ownership. An outward `Mark` effect from `read` forces the checker to validate the earlier `step` resume against the complete residual using fresh states.
 
-`multi_operations_affine.eld` prints `7`. After inner `step` resumes, inner `stop(7)` forwards to outer `stop`; both captured segments are abandoned, body resource `2` is cleaned, and outside resource `1` is explicitly closed. No read dispatch or read-clause temporary acquisition occurs.
+In `multi_operations_affine`, after inner `step` resumes, inner `stop(7)` forwards to outer `stop`; both captured segments are abandoned, body resource `2` is cleaned, and outside resource `1` is explicitly closed. No read dispatch or read-clause temporary acquisition occurs.
 
-For families with several operations, dispatch events are `('dispatch', family, instance, operation)`. Singleton families retain the previous three-field dispatch events. Other event shapes are unchanged.
-
-The broader [forwarding](04_effects/forwarding.eld) now executes unchanged using checked arithmetic. [Tail result](04_effects/tail_result.eld) still needs `Result`/matching/`?`, and [tail cleanup](05_state_and_collections/tail_cleanup.eld) needs regions/traits/references/early return. The smaller fixtures above do not redefine those programs.
+See the [handler interpreter reference](../tools/README.md#handler-and-resumption-experiment) for dispatch event shapes.
 
 ## Fixture host profile
 
-The runner provides exactly one built-in module profile, `eldude::fixture`. It is a test host contract, not a standard-library implementation or arbitrary imported-code loader. Import only the names required by the file, with optional aliases:
+The `eldude::fixture` module provides simulated resources and suspension events for tests. Ordinary source modules are resolved separately. Import the names used by the file, with optional aliases:
 
 ```eldude
 import eldude::fixture::{File, acquire as open, close};
@@ -169,17 +146,32 @@ Acquisition is pure in this simulated profile. `using` owns any acquired resourc
 
 Fixture primitives must be called directly by their imported names/aliases. Use a source closure, such as `fn() => acquire()`, when passing one as a callback. There is no implicit prelude, and user declarations with these spellings execute their own checked bodies. Fixture type names also require imports. Ordinary source module loading and the cleanup implementations used by the examples execute; real resource management remains deferred.
 
-Source functions have annotated parameters and signatures; closures require parameter annotations but may infer their result/effect contract. Function types and closed effect rows are supported; omitted rows mean pure. Annotations cannot hide effects, replace a lambda's own contract, or erase whole-value capture bounds. Only empty source `captures {}` clauses are currently supported. Local and handler names have distinct binding identities across shadowing; qualified references to this file's module select its declarations.
+Source annotations, operation arguments, forwarding, lexical resumption, and implementation limits are documented in the [implementation guide](../tools/README.md#source-to-execution-experiment).
 
-Effect declarations may specify positional `Int`/`Unit` parameters, for example `effect Echo { tail echo(value: Int, marker: Unit) -> Int; }`. Call arguments evaluate once, left to right, before dispatch. A clause such as `echo(value, _) => value;` binds fresh local parameters using the declaration's types; `_` discards a scalar argument. Parameter arity, types, duplicate names and scope are checked. Both named calls and `forward operation;`/`forward ..;` preserve evaluated arguments and instance evidence. Clause parameters remain available after resume when their scalar types allow duplication; they do not replace retained frame obligations. Resource/callback operation parameters and destructuring clause patterns are implementation limits.
+## Rejection targets
 
-Operation names are scoped to their family; unrelated families may reuse a spelling with different signatures. Every operation is independently checked, including clauses not reached at runtime. A handler must cover all declarations with operation clauses or explicit `forward name;` entries. A single `forward ..;` covers only omitted operations and may coexist with explicit entries in any order. Empty families need no operation clauses. Unknown or duplicate operations, duplicate explicit entries and duplicate fallback forwards are rejected. A clause cannot dispatch unqualified to another operation of its own family; name an outer instance explicitly. Effect slots still belong to family instances, so forwarding preserves the outer slot without re-evaluating arguments.
+`reject/syntax` must fail the grammar recognizer. `reject/semantics` must parse and specifies the intended static failure. Three existential capture cases marked **pending** currently stop at `unsupported: any_type`, before the intended semantic check; [test_source_semantic_examples.py](../tools/test_source_semantic_examples.py) records this distinction. [Handler counterexamples](#enforced-source-rejections) are enforced separately below.
 
-Direct dispatch applies the selected operation's mode. Ordinary calls admitting the family and complete resumption residuals retain the conservative abandonment envelope of all declared operations, including affine siblings. A naked resource cannot cross such a call merely because its available implementation currently calls only a tail operation. Every resumption includes outward effects from all sibling clauses, with fresh ownership states for validation. Frame captures transfer once and never return to post-resume ownership; clause-local resources must be discharged separately. General usage/control joins remain outside this experiment.
+| Program | Required failure |
+| --- | --- |
+| [missing loop separator](reject/syntax/missing_loop_separator.eld) | Missing `;` after a nonfinal loop |
+| [effect application](reject/syntax/effect_application.eld) | Expression type application needs `::<...>` |
+| [multiple row tails](reject/syntax/multiple_row_tails.eld) | Only one tail may follow `\|` |
+| [decreases annotation](reject/syntax/decreases_annotation.eld) | Symbolic termination annotations are deferred |
+| [linear discard](reject/semantics/linear_discard.eld) | Unconsumed linear binding |
+| [uncovered impl](reject/semantics/uncovered_impl.eld) | Impl parameter absent from its head |
+| [inherited answer change](reject/semantics/inherited_answer_change.eld) | Baseline handler cannot preserve arbitrary child results |
+| [region escape](reject/semantics/region_escape.eld) | Returned closure retains a local cell |
+| [whole argument capture](reject/semantics/whole_argument_capture.eld) | **Pending semantic check:** Returning one opaque tuple member conservatively retains the whole argument |
+| [await whole argument capture](reject/semantics/await_whole_argument_capture.eld) | **Pending semantic check:** Awaiting a task returned through a helper preserves the helper's conservative capture bound |
+| [freeze captured elements](reject/semantics/freeze_captured_elements.eld) | Capture-bearing elements preserve the frozen owner's region dependency |
+| [mutable capture escape](reject/semantics/mut_capture_escape.eld) | **Pending semantic check:** A wrapper returning `Unit` leaves an inner capture in an outer mutable owner |
+| [explicit tail resume](reject/semantics/tail_explicit_resume.eld) | A `tail` clause must return the operation result |
+| [row variable entry](reject/semantics/row_variable_entry.eld) | A row variable cannot occupy a fixed effect-entry position |
+| [numeric recursion without diverge](reject/semantics/numeric_recursion_without_diverge.eld) | Numeric descent does not establish structural recursion |
+| [while without diverge](reject/semantics/while_without_diverge.eld) | Every `while` requires `diverge` in the initial core |
 
-The runner requires exported nullary, nongeneric `main` returning `Int`, `Nat`, `Bool` or `Unit`, with only intrinsic effects left at the root. Other functions, including unused and generic bodies, are checked before execution. All capabilities in the stage table above now execute. Branches must agree on ownership consumption and resumption use. Arithmetic defects unwind active `using` scopes, including through handlers. See the [root README](../README.md#source-to-execution-experiment) for the remaining language, library and scheduler limits.
-
-Normal-return clauses preserve the enclosing operation's lexical resumption, including through multiple nested handlers ([§25.1](../docs/language-spec/06-handlers.md#251-lexical-resumption)). Nested operation clauses instead use their own capability; explicit tail resume and capture by a nested function remain semantic errors. The checker shares the enclosing capability's used state and frame ownership, so a resume inside a normal-return clause counts toward exactly-once checking and transferred frame captures remain unavailable afterward. Inner affine handlers that could skip that resume are conservatively rejected, just as when the resume occurs in their body.
+Run the [repository checks](../README.md#checks) to verify syntax failures, enforced semantic failures, and the documented implementation limits. The positive corpus command does not run rejection fixtures.
 
 ## Enforced source rejections
 
@@ -220,8 +212,6 @@ The 29 [multi-operation rejection fixtures](reject/semantics/multi_operations) c
 
 In particular, [sibling residual](reject/semantics/multi_operations/sibling_residual.eld) rejects the earlier resume because a sibling clause can perform an outward affine operation during deep re-entry. [Opaque family call](reject/semantics/multi_operations/opaque_affine_family.eld) rejects a source function call whose admitted family includes `affine`, even though its body currently invokes only `tail read`. These fail statically, before the interpreter runs.
 
-The complete suite checks the corpus manifest, scalar operations, branches, generic calls, record/tuple ownership, defect cleanup, and all previous pipeline regressions. The **133 grammar productions** remain unchanged and synchronized.
-
 For example:
 
 ```sh
@@ -231,4 +221,4 @@ uv run python tools/run_eldude.py examples/reject/semantics/source_pipeline/fram
 # ...:8:13: note: Ownership transferred here
 ```
 
-The [missing-semicolon fixture](reject/syntax/source_pipeline/missing_semicolon.eld) reports `syntax` and exits nonzero without executing. The [branch fixture](07_source_pipeline/branch.eld), previously an implementation-limit check, now prints `42`. [Task join](06_tasks/join.eld) now prints `42`. Tests additionally cover unknown/duplicate names, malformed tokens, incorrect annotations, root evidence, named dispatch scope and source/host call contracts. Existing Python IR tests remain regressions for the broader inference and handler experiments.
+The [missing-semicolon fixture](reject/syntax/source_pipeline/missing_semicolon.eld) reports `syntax` and exits nonzero without executing. Additional tests cover unknown/duplicate names, malformed tokens, incorrect annotations, root evidence, named dispatch scope, and source/host contracts. The [code/test map](../tools/README.md#file-map) locates these checks and the underlying IR regressions.
