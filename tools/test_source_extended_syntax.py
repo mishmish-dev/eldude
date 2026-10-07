@@ -19,7 +19,7 @@ def nodes(value):
 class ExtendedSourceSyntaxTests(unittest.TestCase):
     def test_all_examples_and_bundled_sources_have_located_ast(self):
         examples = [p for p in (ROOT / 'examples').rglob('*.eld') if 'reject' not in p.parts]
-        self.assertEqual(len(examples), 49)
+        self.assertEqual(len(examples), 52)
         for path in examples + list((ROOT / 'stdlib').rglob('*.eld')):
             with self.subTest(path=path.relative_to(ROOT)):
                 source = path.read_text(encoding='utf-8')

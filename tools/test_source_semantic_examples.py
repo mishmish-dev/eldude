@@ -32,6 +32,9 @@ class SourceSemanticExampleTests(unittest.TestCase):
             'uncovered_impl': ('semantic', 'Uncovered implementation parameter'),
             'tail_explicit_resume': ('semantic', 'resume is forbidden'),
             'row_variable_entry': ('name', 'Unknown effect family e'),
+            'whole_argument_capture': ('semantic', 'region would escape'),
+            'await_whole_argument_capture': ('semantic', 'region would escape'),
+            'mut_capture_escape': ('semantic', 'mutable owner'),
         }
         for name, (code, message) in cases.items():
             path = REJECT / (name + '.eld')
@@ -41,16 +44,6 @@ class SourceSemanticExampleTests(unittest.TestCase):
                 self.assertEqual(caught.exception.code, code, str(caught.exception))
                 self.assertIn(message, caught.exception.message)
                 self.assertEqual(caught.exception.span.filename, str(path))
-
-    def test_existential_capture_examples_report_the_remaining_type_limit(self):
-        # The located parser preserves `any` bounds. Executable existential
-        # packages and dynamic trait dictionaries are outside this profile.
-        for name in ('whole_argument_capture', 'mut_capture_escape', 'await_whole_argument_capture'):
-            path = REJECT / (name + '.eld')
-            with self.subTest(example=name), self.assertRaises(Diagnostic) as caught:
-                compile_source(executable_source(path), str(path))
-            self.assertEqual(caught.exception.code, 'unsupported')
-            self.assertIn('any_type', caught.exception.message)
 
     def test_trait_members_match_declared_associated_types(self):
         source = '''module m;
@@ -87,13 +80,6 @@ pub fn main() -> Int { 42 }
                     compile_source(source)
                 self.assertEqual(caught.exception.code, 'effect')
                 self.assertIn('structural descent or diverge', caught.exception.message)
-
-    def test_nonempty_capture_contract_remains_an_explicit_limit(self):
-        source = 'module m; fn f<@r>() -> Unit captures {@r} {()} pub fn main()->Int {42}'
-        with self.assertRaises(Diagnostic) as caught:
-            compile_source(source)
-        self.assertEqual(caught.exception.code, 'unsupported')
-        self.assertIn('nonempty capture contracts', caught.exception.message)
 
 
 if __name__ == '__main__':

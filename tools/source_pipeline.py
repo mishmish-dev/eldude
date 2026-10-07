@@ -4,7 +4,7 @@ from pathlib import Path
 
 from effect_rows import Row, Solver
 from handlers import Defect, HandlerChecker, Operation, compile_program, run
-from inference import Context, E, Fn, INT, UNIT, BOOL, Ty, InferenceError, capture_free, value
+from inference import Context, E, Fn, INT, UNIT, BOOL, Ty, InferenceError, capture_free, permissions, value
 from source_syntax import Diagnostic, Node, parse_source
 from source_features import FeatureChecker, substitute
 
@@ -66,7 +66,8 @@ def admitted_type(actual, declared):
     """Keep inferred whole-value bounds while honoring every written call row."""
     if isinstance(actual, Fn) and isinstance(declared, Fn):
         return replace(actual, result=admitted_type(actual.result, declared.result),
-                       effects=declared.effects)
+                       effects=declared.effects, captures=declared.captures,
+                       dup=declared.dup, discard=declared.discard)
     return actual
 
 
@@ -78,6 +79,10 @@ class SourceChecker(FeatureChecker):
         self.variants = getattr(elaborator, 'variants', {})
         self.data_parameters = getattr(elaborator, 'data_parameters', {})
         self.methods = getattr(elaborator, 'methods', {})
+        self.dynamic_methods = getattr(elaborator, 'dynamic_methods', {})
+        self.trait_methods = getattr(elaborator, 'trait_methods', {})
+        self.impl_contracts = getattr(elaborator, 'impl_contracts', {})
+        self.impl_constraints = getattr(elaborator, 'impl_constraints', {})
         self.cleanup_methods = getattr(elaborator, 'cleanup_methods', {})
         self.structural_functions = getattr(elaborator, 'recursive_allowed', set())
         self.annotations = elaborator.annotations
@@ -91,12 +96,56 @@ class SourceChecker(FeatureChecker):
         return expression
 
     def _infer_expression(self, expression, context):
-        result = super()._infer_expression(expression, context)
+        annotations = self.annotations.get(id(expression), ())
+        if expression[0] == 'lambda':
+            signature = annotations[0] if annotations and isinstance(annotations[0], Fn) else None
+            regions = signature.regions if signature else ()
+            context = replace(context, regions=context.regions | {r: r for r in regions},
+                              active=context.active | set(regions))
+            parameters = tuple((name, self.resolve_type(t, context)) for name, t in expression[1])
+            result = self._function(parameters, expression[2], context)
+            result = replace(result, type=replace(result.type, regions=regions,
+                             captures=self.closed_captures(result.captures) - set(regions)))
+        else:
+            result = super()._infer_expression(expression, context)
         self.results[id(expression)] = result
-        for expected in self.annotations.get(id(expression), ()):
-            result = self.annotate(expression, result, substitute(expected, regions=context.regions))
+        for expected in annotations:
+            result = self.annotate(expression, result, self.resolve_type(expected, context))
         self.results[id(expression)] = result
         return result
+
+    def closed_captures(self, captures):
+        """Expand closed annotations without narrowing whole-argument bounds."""
+        return frozenset().union(*(self.capture_sources.get(c, {c}) for c in captures))
+
+    def resolve_type(self, t, context):
+        t = substitute(t, regions=context.regions)
+        if not isinstance(t, Fn):
+            return replace(t, args=tuple(self.resolve_type(a, context) for a in t.args))
+        captures, dup, discard = set(), t.dup, t.discard
+        for source in t.captures or ():
+            if isinstance(source, Symbol):
+                if source in context.bindings:
+                    binding = context.bindings[source]
+                    if binding.mode:
+                        raise InferenceError('Access grants cannot appear in capture contracts')
+                    captures.update(self.closed_captures(binding.value.captures))
+                    d, s = permissions(binding.value.type)
+                    dup, discard = dup and d, discard and s
+                elif source in context.names:
+                    captures.add(context.names[source])
+                else:
+                    raise InferenceError('Unknown capture ' + str(source), code='name')
+            else:
+                captures.add(source)
+        fixed = {}
+        for c in sorted(captures):
+            if c in self.handler_ids:
+                fixed.setdefault(self.handler_ids[c][0], []).append(c)
+        return replace(t, parameters=tuple(self.resolve_type(p, context) for p in t.parameters),
+                       result=self.resolve_type(t.result, context), dup=dup, discard=discard,
+                       effects=Row(tuple(c for label in t.effects.labels for c in fixed.get(label, (label,))), t.effects.tail),
+                       captures=frozenset(captures) if t.captures is not None else None)
 
     def annotate(self, expression, result, expected):
         actual = result.type
@@ -120,7 +169,7 @@ class SourceChecker(FeatureChecker):
                 error.code = 'type'
             raise
         if isinstance(expected, Fn):
-            if result.captures - set(expected.regions):
+            if self.closed_captures(result.captures) - set(expected.regions) - set(expected.captures or ()):
                 raise InferenceError('Capture annotation omits retained obligations', code='type')
             result = replace(result, type=replace(admitted_type(actual, expected), type_vars=expected.type_vars,
                                                  regions=expected.regions, effect_vars=expected.effect_vars),

@@ -23,7 +23,10 @@ class SourceElaborator(Elaborator):
         self.variants, self.data_parameters, self.methods, self.cleanup_methods = {}, {}, {}, {}
         self.function_modules, self.function_generics, self.function_self = {}, {}, {}
         self.function_traits, self.effect_arguments = {}, {}
-        self.impl_heads = {}
+        self.impl_heads, self.impl_contracts = {}, {}
+        self.impl_constraints = {}
+        self.dynamic_methods, self.trait_methods = {}, {}
+        self.capture_names = {}
         self.globals, self.global_modules, self.signatures = [], {}, {}
         self.generic_types, self.generic_regions, self.generic_effects = {}, (), {}
         self.exit_stack, self.region_stack = [], []
@@ -212,6 +215,9 @@ class SourceElaborator(Elaborator):
                     self.error('semantic', 'Duplicate trait implementation', implementation)
                 if trait:
                     self.impl_heads[head] = target
+                    self.impl_contracts[head] = Fn((target,), UNIT, Row(),
+                                                  type_vars=tuple(self.generic_types), regions=self.generic_regions)
+                    self.impl_constraints[head] = constraints
                 equations = {m.items[0].items[0]: self.type(m.items[1]) for m in members if m.kind == 'associated_type'}
                 for method in members:
                     if method.kind != 'function':
@@ -226,6 +232,9 @@ class SourceElaborator(Elaborator):
                                             if m.kind == 'function' and m.items[1].items[0] == method.items[1].items[0]), None)
                         if requirement:
                             self.function_traits[symbol] = (requirement, self.traits[trait_name], trait)
+                            self.trait_methods[(trait_name, unwrapped(target).name, method.items[1].items[0])] = symbol
+                            if len(method.items[1].items) > 2:
+                                self.impl_constraints[head] += method.items[1].items[2]
                     method_key = (unwrapped(target).name, method.items[1].items[0])
                     if method_key in self.methods:
                         previous_symbol = self.methods[method_key][0]
@@ -248,6 +257,8 @@ class SourceElaborator(Elaborator):
 
         def payload_permissions(t):
             if isinstance(t, Fn):
+                return permissions(t)
+            if t.name.startswith('Any:'):
                 return permissions(t)
             if t.name.startswith('$'):
                 return True, True
@@ -372,8 +383,84 @@ class SourceElaborator(Elaborator):
             parameters, contract = node.items
             result, effects = self.contract(contract)
             bound = frozenset() if capture_free(result) else frozenset({'env'} | {f'arg:{i}' for i in range(len(parameters))})
-            return Fn(tuple(self.type(p) for p in parameters), result, effects, bound)
+            return Fn(tuple(self.type(p) for p in parameters), result, effects, bound,
+                      captures=self.capture_contract(contract))
+        if node.kind == 'any_type':
+            return self.existential_type(node)
         self.limit('type form ' + node.kind, node)
+
+    def capture_contract(self, node):
+        captures = set()
+        for entry in node.items[2] if len(node.items) > 2 else ():
+            if entry.kind == 'capture_variable':
+                self.limit('capture-row polymorphism', entry)
+            if entry.kind == 'region_type':
+                name = entry.items[0].items[0]
+                if name not in self.generic_regions and name not in self.region_stack:
+                    self.error('name', 'Unknown capture region ' + name, entry)
+                captures.add(name)
+            else:
+                name = entry.items[0]
+                if name not in self.capture_names:
+                    self.error('name', 'Unknown capture ' + name, entry)
+                source = self.capture_names[name]
+                if not isinstance(source, str):
+                    self.limit('fixture primitives in capture contracts', entry)
+                captures.add(source)
+        return frozenset(captures)
+
+    def existential_type(self, node):
+        bounds = node.items[0]
+        trait_name = self.canonical(bounds[0].items[0])
+        if trait_name not in self.traits:
+            self.error('name', 'Unknown trait ' + trait_name, bounds[0])
+        usage = [b.items[0] for b in bounds[1:]]
+        if any(b.kind != 'type' or b.items[0] not in ('Dup', 'Discard') for b in bounds[1:]):
+            self.limit('existential packages require one trait plus Dup/Discard', node)
+        t = Ty('Any:' + trait_name, tuple(Ty(u) for u in sorted(set(usage))))
+        trait = self.traits[trait_name]
+        if bounds[0].kind != 'type' or self.generics(trait.items[1]):
+            self.limit('generic existential trait interfaces', node)
+        if any(m.kind != 'function' for m in trait.items[2]):
+            self.limit('existential associated types', node)
+        if len(trait.items[1].items) > 2:
+            self.limit('existential trait constraints', node)
+        if t.name in self.dynamic_methods:
+            return t
+        methods = {}
+        self.dynamic_methods[t.name] = methods
+        def mentions_self(part):
+            if isinstance(part, Node):
+                return mentions_self(part.items)
+            if isinstance(part, tuple):
+                return any(mentions_self(p) for p in part)
+            return isinstance(part, str) and (part == 'Self' or part.startswith('Self::'))
+        previous = (self.module, self.current_function, self.generic_types,
+                    self.generic_regions, self.generic_effects, self.capture_names)
+        self.module = self.owners[id(trait)]
+        self.current_function = None
+        self.bind_generics(())
+        self.capture_names = {}
+        for member in trait.items[2]:
+            _, name, parameters, contract, _ = member.items
+            if (self.generics(name) or not parameters or parameters[0].items[0].items[0] != 'self'
+                    or sum(p.items[0].items[0] == 'self' for p in parameters) != 1
+                    or parameters[0].items[1] is not None or mentions_self((parameters[1:], contract, name))):
+                self.error('type', 'Trait is not DynCompatible', member)
+            if len(name.items) > 2:
+                self.limit('existential method constraints', member)
+            receiver = Ty(parameters[0].items[2].title(), (t,)) if len(parameters[0].items) == 3 else t
+            if isinstance(receiver, Ty) and receiver.name == 'Mut':
+                self.limit('existential mut receivers', member)
+            rest = tuple(Ty(p.items[2].title(), (self.type(p.items[1]),)) if len(p.items) == 3
+                         else self.type(p.items[1]) for p in parameters[1:])
+            result, effects = self.contract(contract)
+            bound = frozenset() if capture_free(result) else frozenset(f'arg:{i}' for i in range(len(parameters)))
+            methods[name.items[0]] = Fn((receiver, *rest), result, effects, bound,
+                                       captures=self.capture_contract(contract))
+        (self.module, self.current_function, self.generic_types,
+         self.generic_regions, self.generic_effects, self.capture_names) = previous
+        return t
 
     def instantiate_effect(self, identity, arguments):
         declaration = self.effects[identity]
@@ -418,8 +505,6 @@ class SourceElaborator(Elaborator):
         return self.instantiate_effect(identity, args)
 
     def contract(self, node):
-        if len(node.items) > 2 and node.items[2]:
-            self.limit('nonempty capture contracts', node)
         result, entries = node.items[:2]
         labels, tail = [], None
         for entry in entries:
@@ -476,6 +561,20 @@ class SourceElaborator(Elaborator):
         return self.expression(body, environment, handlers, expected)
 
     def function(self, node, parameters, contract, body, environment, handlers):
+        # ponytail: closed lexical rows only; abstract parameter summaries need
+        # scoped capture substitution before they can appear in result types.
+        parameter_names = {p.items[0].items[0] for p in parameters}
+        def check_captures(item):
+            if isinstance(item, Node):
+                if item.kind == 'contract' and len(item.items) > 2:
+                    for capture in item.items[2]:
+                        if capture.kind == 'path' and capture.items[0] in parameter_names:
+                            self.limit('parameter-dependent capture clauses; use region captures where applicable', capture)
+                check_captures(item.items)
+            elif isinstance(item, tuple):
+                for part in item:
+                    check_captures(part)
+        check_captures((parameters, contract))
         local, typed, names = dict(environment), [], set()
         for parameter in parameters:
             name, annotation = parameter.items[:2]
@@ -505,7 +604,8 @@ class SourceElaborator(Elaborator):
             signature = Fn(tuple(t for _, t in typed), expected, effects,
                            type_vars=tuple(self.generic_types) if node.kind == 'function' else (),
                            regions=self.generic_regions if node.kind == 'function' else (),
-                           effect_vars=tuple(self.generic_effects.values()) if node.kind == 'function' else ())
+                           effect_vars=tuple(self.generic_effects.values()) if node.kind == 'function' else (),
+                           captures=self.capture_contract(contract))
             self.annotations.setdefault(id(expression), []).append(signature)
         return expression
 
@@ -570,12 +670,23 @@ class SourceElaborator(Elaborator):
         return self.ir(node, 'variant', t, tag, values)
 
     def expression(self, node, environment, handlers, expected=None):
+        previous = self.capture_names
+        self.capture_names = environment | {name: pair[1] for name, pair in handlers.items()}
+        try:
+            if isinstance(expected, Ty) and expected.name.startswith('Any:'):
+                return self.ir(node, 'pack', expected, self._expression(node, environment, handlers))
+            return self._expression(node, environment, handlers, expected)
+        finally:
+            self.capture_names = previous
+
+    def _expression(self, node, environment, handlers, expected=None):
         kind, items = node.kind, node.items
         if kind == 'nat':
             return self.ir(node, 'nat', items[0])
         if kind == 'block':
             statements, result = items
             def sequence(index, local):
+                self.capture_names = local | {name: pair[1] for name, pair in handlers.items()}
                 if index == len(statements):
                     return self.expression(result, local, handlers, expected)
                 statement = statements[index]

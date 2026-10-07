@@ -35,7 +35,7 @@ class RunExamplesTests(unittest.TestCase):
                                     cwd=ROOT.parent, capture_output=True, text=True)
             with self.subTest(flags=flags):
                 self.assertEqual(result.returncode, status, result.stderr)
-                self.assertIn('49 passed, 0 unsupported, 0 failed', result.stdout)
+                self.assertIn('52 passed, 0 unsupported, 0 failed', result.stdout)
                 self.assertIn('PASS 01_values/arithmetic.eld: 14', result.stdout)
                 self.assertIn('PASS 06_tasks/join.eld: 42', result.stdout)
                 self.assertEqual(result.stderr, '')

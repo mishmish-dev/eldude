@@ -41,6 +41,9 @@ class Fn:
     effect_vars: tuple = ()
     dup: bool = True
     discard: bool = True
+    # None keeps trusted legacy IR contracts unconstrained; source contracts
+    # always provide a closed callable-environment capture set.
+    captures: frozenset | None = None
 
     def dumps(self):
         def encode(t):
@@ -51,7 +54,8 @@ class Fn:
                     'tail': t.effects.tail.name if t.effects.tail else None,
                     'bound': sorted(t.bound), 'type_vars': list(t.type_vars),
                     'regions': list(t.regions), 'effect_vars': [v.name for v in t.effect_vars],
-                    'dup': t.dup, 'discard': t.discard}
+                    'dup': t.dup, 'discard': t.discard,
+                    'captures': None if t.captures is None else sorted(t.captures)}
         return json.dumps(encode(self), sort_keys=True)
 
     @staticmethod
@@ -67,7 +71,8 @@ class Fn:
             return Fn(tuple(decode(p, scope) for p in data['parameters']),
                       decode(data['result'], scope), Row(tuple(data['effects']), tail),
                       frozenset(data['bound']), tuple(data['type_vars']),
-                      tuple(data['regions']), quantified, data['dup'], data['discard'])
+                      tuple(data['regions']), quantified, data['dup'], data['discard'],
+                      None if data.get('captures') is None else frozenset(data['captures']))
         try:
             result = decode(json.loads(wire), {})
         except (KeyError, TypeError, json.JSONDecodeError) as error:
@@ -122,6 +127,8 @@ def state(region):
 def permissions(t):
     if isinstance(t, Fn):
         return t.dup, t.discard
+    if t.name.startswith('Any:'):
+        return Ty('Dup') in t.args, Ty('Discard') in t.args
     if t.name.startswith('Record:'):
         fields = [permissions(f.args[0]) for f in t.args]
         return all(p[0] for p in fields), all(p[1] for p in fields)
@@ -151,7 +158,7 @@ def capture_free(t):
 
 def required_captures(t):
     if isinstance(t, Fn):
-        result = set(required_captures(t.result))
+        result = set(required_captures(t.result)) | set(t.captures or ())
         for p in t.parameters:
             result.update(required_captures(p))
         for label in t.effects.labels:
@@ -264,6 +271,7 @@ class Checker:
         self.dispatches, self.cleanups, self.handled_rows = [], [], {}
         self.scope_depth = {}
         self.counter = 0
+        self.capture_sources = {}
         self.current_expression = None
         self.transfers = {}
 
@@ -374,6 +382,9 @@ class Checker:
         for index, (name, t) in enumerate(parameters):
             source = self.fresh('argument')
             sources[source] = f'arg:{index}'
+            if (isinstance(t, Fn) and t.captures is not None or
+                    isinstance(t, Ty) and t.name == 'Ref' and capture_free(t.args[0])):
+                self.capture_sources[source] = required_captures(t)
             mode = t.name.lower() if isinstance(t, Ty) and t.name in ('View', 'Mut') else None
             binding = Binding(value(t.args[0] if mode else t, captures={source}), mode=mode)
             context.bindings[name] = binding
@@ -456,6 +467,22 @@ class Checker:
 
         for p, a in zip(signature.parameters, arguments):
             match(p, a.type)
+        # A region may appear only in a callback's environment (no Ref in its
+        # parameter/result types). Infer it only when the correspondence is unique.
+        for expected, actual, _ in row_checks:
+            unresolved = set(expected.captures or ()) & set(signature.regions) - regions.keys()
+            if unresolved:
+                fixed = {regions.get(c, c) for c in expected.captures - unresolved}
+                remaining = set(actual.captures or ()) - fixed
+                if len(unresolved) != 1 or len(remaining) != 1:
+                    raise InferenceError('Cannot infer an unambiguous callback capture region', code='type')
+                regions[next(iter(unresolved))] = next(iter(remaining))
+        for expected, actual in zip(signature.parameters, arguments):
+            if isinstance(expected, Fn) and expected.captures is not None:
+                allowed = {regions.get(c, c) for c in expected.captures} | set(expected.regions)
+                retained = frozenset().union(*(self.capture_sources.get(c, {c}) for c in actual.captures))
+                if not retained <= allowed:
+                    raise InferenceError('Callback capture annotation omits retained obligations')
         solver = Solver()
 
         def row(r):
@@ -466,6 +493,11 @@ class Checker:
         try:
             for expected, actual, invariant in row_checks:
                 solver.unify(row(expected.effects), actual.effects if invariant else solver.weaken(actual.effects))
+                if expected.captures is not None:
+                    allowed = {regions.get(c, c) for c in expected.captures}
+                    retained = set(actual.captures or ())
+                    if not retained <= allowed or (invariant and retained != allowed):
+                        raise InferenceError('Callback capture annotation omits retained obligations')
                 bound = {regions.get(source, source) for source in expected.bound}
                 compatible = actual.bound == bound if invariant else actual.bound <= bound
                 if not capture_free(actual.result) and not compatible:
@@ -481,7 +513,8 @@ class Checker:
             if isinstance(t, Fn):
                 return replace(t, parameters=tuple(substitute(p) for p in t.parameters),
                                result=substitute(t.result), effects=solver.resolve(row(t.effects)),
-                               bound=frozenset(regions.get(source, source) for source in t.bound))
+                               bound=frozenset(regions.get(source, source) for source in t.bound),
+                               captures=None if t.captures is None else frozenset(regions.get(c, c) for c in t.captures))
             if t.name.startswith('$') and t.name[1:] in types:
                 return types[t.name[1:]]
             return Ty(t.name, tuple(substitute(a) for a in t.args), regions.get(t.region, t.region))

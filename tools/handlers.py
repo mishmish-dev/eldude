@@ -439,6 +439,10 @@ def compile_program(expression, *, operations=None, checker=None, origins=None):
     checker = checker or HandlerChecker(operations=operations)
     inferred = checker.infer(expression)
     serial = 0
+    hidden = {target[0] for target in getattr(checker, 'method_calls', {}).values()}
+    hidden.update(getattr(checker, 'cleanup_targets', {}).values())
+    hidden.update(name for methods in getattr(checker, 'packages', {}).values()
+                  if methods for name in methods.values())
 
     def evidence_used(term):
         if isinstance(term, Evidence):
@@ -490,8 +494,6 @@ def compile_program(expression, *, operations=None, checker=None, origins=None):
                 core = lower(body, names)
                 fixed = tuple(sorted(evidence_used(core) & set(names.values()),
                                      key=lambda e: (e.family, e.instance)))
-                hidden = {target[0] for target in getattr(checker, 'method_calls', {}).values()}
-                hidden.update(getattr(checker, 'cleanup_targets', {}).values())
                 captures = tuple(sorted(free_names(body, {name for name, _ in parameters}) | hidden))
                 return E('closure', tuple(name for name, _ in parameters), captures, fixed, core)
             case ('perform', family, *named):
@@ -513,8 +515,7 @@ def compile_program(expression, *, operations=None, checker=None, origins=None):
                 selected = Evidence(family, serial)
                 captures = tuple(sorted(free_names(E('returning', result_name, result_body)) |
                                         set().union(*(free_names(clause) for _, clause in clauses)) |
-                                        {target[0] for target in getattr(checker, 'method_calls', {}).values()} |
-                                        set(getattr(checker, 'cleanup_targets', {}).values())))
+                                        hidden))
                 clause_cores = []
                 for operation_name, clause in clauses:
                     forwarding = clause == E('forward')
@@ -590,12 +591,14 @@ class Execution:
 
 
 def _dup(retained):
-    from source_features import Variant, Record, Cell, Buffer
+    from source_features import Variant, Record, Cell, Buffer, Package
     from task_runtime import TaskHandle
     if isinstance(retained, (Buffer, TaskHandle)):
         return False
     if isinstance(retained, Cell):
         return True
+    if isinstance(retained, Package):
+        return permissions(retained.type)[0]
     if isinstance(retained, Record):
         # Constructor types can retain generic placeholders; the actual fields
         # determine structural usage, while nominal restrictions remain binding.

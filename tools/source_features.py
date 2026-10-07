@@ -16,7 +16,8 @@ def substitute(t, types=None, regions=None):
                        result=substitute(t.result, types, regions),
                        effects=Row(tuple(next((state(v) for k, v in regions.items() if label == state(k)), label)
                                          for label in t.effects.labels), t.effects.tail),
-                       bound=frozenset(regions.get(c, c) for c in t.bound))
+                       bound=frozenset(regions.get(c, c) for c in t.bound),
+                       captures=None if t.captures is None else frozenset(regions.get(c, c) for c in t.captures))
     if t.name.startswith('$'):
         return types.get(t.name[1:], t)
     return replace(t, args=tuple(substitute(a, types, regions) for a in t.args), region=regions.get(t.region, t.region))
@@ -76,6 +77,13 @@ class Buffer:
     values: list
 
 
+@dataclass
+class Package:
+    type: object
+    value: object
+    methods: dict
+
+
 class EarlyExit(BaseException):
     def __init__(self, key, result):
         self.key, self.result = key, result
@@ -100,6 +108,9 @@ class FeatureChecker(HandlerChecker):
         self.data_parameters = {}
         self.methods = {}
         self.method_calls = {}
+        self.dynamic_methods, self.trait_methods, self.impl_contracts = {}, {}, {}
+        self.impl_constraints = {}
+        self.packages, self.dynamic_calls = {}, {}
         self.exit_contracts = {}
         self.exit_values = {}
         self.exit_active = {}
@@ -237,6 +248,29 @@ class FeatureChecker(HandlerChecker):
 
     def _infer_expression(self, expression, context):
         match expression:
+            case ('pack', t, initial):
+                retained = self._infer(initial, context)
+                if retained.type == t:
+                    self.packages[id(expression)] = None
+                    return retained
+                wanted, actual = permissions(t), permissions(retained.type)
+                if any(w and not a for w, a in zip(wanted, actual)):
+                    raise InferenceError('Existential usage promises require Dup/Discard of the hidden value', code='type')
+                if isinstance(retained.type, Ty) and retained.type.name == t.name:
+                    self.packages[id(expression)] = {}
+                    return value(t, retained.effects, retained.captures)
+                trait = t.name[4:]
+                concrete = unwrapped(retained.type)
+                head = (trait, concrete.name if isinstance(concrete, Ty) else None)
+                contract = self.impl_contracts.get(head)
+                if contract is None:
+                    raise InferenceError('Existential package requires a matching trait implementation', code='type')
+                if self.impl_constraints.get(head):
+                    raise InferenceError('Implementation limit: existential implementation constraints', code='unsupported')
+                self._apply(value(contract), [retained], context)
+                methods = {method: self.trait_methods[(*head, method)] for method in self.dynamic_methods[t.name]}
+                self.packages[id(expression)] = methods
+                return value(t, retained.effects, retained.captures)
             case ('definitions', _, _, _):
                 from source_declarations import infer_declarations
                 return infer_declarations(self, expression, context)
@@ -249,7 +283,16 @@ class FeatureChecker(HandlerChecker):
                     # arguments evaluate; method resolution uses its type.
                     retained = self._infer(receiver, context)
                     t = retained.type
-                target = self.methods.get((unwrapped(t).name, method))
+                dynamic = isinstance(t, Ty) and t.name.startswith('Any:')
+                if dynamic:
+                    signature = self.dynamic_methods[t.name].get(method)
+                    if signature is None:
+                        raise InferenceError('Unknown existential method ' + method, code='type')
+                    receiver_type = signature.parameters[0]
+                    receiver_type = replace(receiver_type, args=(t,)) if receiver_type.name == 'View' else t
+                    target = (method, replace(signature, parameters=(receiver_type, *signature.parameters[1:])))
+                else:
+                    target = self.methods.get((unwrapped(t).name, method))
                 if target is None:
                     return self.primitive_method(expression, method, receiver, arguments, mode, context, retained)
                 name, signature = target
@@ -276,7 +319,12 @@ class FeatureChecker(HandlerChecker):
                     context.temporaries.append(item)
                 del context.temporaries[start:]
                 result = self._apply(value(signature), values, context)
-                self.method_calls[id(expression)] = (name, parameter.name.lower() if borrowed else '')
+                if not dynamic:
+                    self.method_calls[id(expression)] = (name, parameter.name.lower() if borrowed else '')
+                else:
+                    targets = tuple(symbol for (trait, _, member), symbol in self.trait_methods.items()
+                                    if trait == t.name[4:] and member == method)
+                    self.dynamic_calls[id(expression)] = (parameter.name.lower() if borrowed else '', targets)
                 return replace(result, effects=ambient(result.effects, *(v.effects for v in values)))
             case ('field', name, ('var', symbol)) if symbol in context.bindings:
                 binding = context.bindings[symbol]
@@ -626,10 +674,19 @@ def match_value(pattern, retained, output):
 
 def lower_feature(expr, names, lower, checker):
     match expr:
+        case ('pack', t, initial):
+            methods = checker.packages[id(expr)]
+            if methods is None:
+                return lower(initial, names)
+            return E('pack', t, tuple(methods.items()), lower(initial, names))
         case ('definitions', _, _, _):
             from source_declarations import lower_declarations
             return lower_declarations(expr, names, lower)
         case ('method_call', method, receiver, arguments, mode):
+            if id(expr) in checker.dynamic_calls:
+                access, _ = checker.dynamic_calls[id(expr)]
+                first = E('access', access, receiver[1]) if access else lower(receiver, names)
+                return E('dynamic_call', method, first, tuple(lower(a, names) for a in arguments))
             target = checker.method_calls.get(id(expr))
             if target:
                 name, access = target
@@ -681,6 +738,14 @@ def evaluate_feature(machine, term, environment, evidence, resume):
             raise RuntimeError(f'Consumed runtime binding {name}')
         return read_slot(name, slot, term)
     match term:
+        case ('pack', t, methods, initial):
+            return _bind(evaluate(initial), lambda retained: replace(retained, type=t) if isinstance(retained, Package)
+                         else Package(t, retained, {method: _read(name, environment) for method, name in methods}))
+        case ('dynamic_call', method, receiver, arguments):
+            def invoke_package(package):
+                return machine.evaluate_arguments(arguments, environment, evidence, resume,
+                    lambda args: machine.invoke(package.methods[method], evidence, [package.value, *args]))
+            return _bind(evaluate(receiver), invoke_package)
         case ('definitions', _, _, _):
             from source_declarations import evaluate_declarations
             return evaluate_declarations(machine, term, environment, evidence, resume)

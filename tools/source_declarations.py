@@ -45,21 +45,24 @@ def read_slot(name, slot, expression=None):
     return slot.value
 
 
-def _calls(expression, methods):
+def _calls(expression, methods, dynamic):
     if not isinstance(expression, tuple) or not expression:
         return set()
     called = {expression[1]} if expression[0] == 'call' else set()
     if expression[0] == 'method_call' and id(expression) in methods:
         called.add(methods[id(expression)][0])
+    if id(expression) in dynamic:
+        called.update(dynamic[id(expression)][1])
     for child in expression:
         if isinstance(child, tuple):
-            called.update(_calls(child, methods))
+            called.update(_calls(child, methods, dynamic))
     return called
 
 
 def _check_recursion(checker, functions):
     methods = getattr(checker, 'method_calls', {})
-    graph = {name: _calls(body, methods) for name, body, _ in functions}
+    dynamic = getattr(checker, 'dynamic_calls', {})
+    graph = {name: _calls(body, methods, dynamic) for name, body, _ in functions}
     structural = getattr(checker, 'structural_functions', set())
     for name, body, signature in functions:
         visited, pending = set(), list(graph[name])

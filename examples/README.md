@@ -6,11 +6,11 @@
 
 [Positive programs](#positive-programs) · [Source fixtures](#executable-source-fixtures) · [Test host](#fixture-host-profile) · [Rejections](#rejection-targets) · [Handler counterexamples](#enforced-source-rejections)
 
-All **49 positive examples** execute through the source checker and interpreter, with their original source and expected results. Each file is a separate program; the runner uses the documented [entry-point convention](../tools/README.md#entry-point-api-and-diagnostics).
+All **52 positive examples** execute through the source checker and interpreter. Each file is a separate program; the runner uses the documented [entry-point convention](../tools/README.md#entry-point-api-and-diagnostics).
 
 ```sh
 uv run python tools/run_eldude.py --examples --strict
-# 49 passed, 0 unsupported, 0 failed
+# 52 passed, 0 unsupported, 0 failed
 ```
 
 [manifest.json](manifest.json) records independently specified expected values for every positive file. Corpus execution fails for wrong values, unexpected diagnostics, missing manifest entries, or regressions. `--strict` also rejects pending implementation limits; there are currently none in this corpus. Rejection fixtures are checked separately by the test suite.
@@ -18,10 +18,10 @@ uv run python tools/run_eldude.py --examples --strict
 | Stage | Runnable | Capabilities exercised |
 | --- | ---: | --- |
 | [1. Values](01_values) | 9 / 9 | Arithmetic, closures, generics, records, tuples, enums and startup |
-| [2. Ownership](02_ownership) | 5 / 5 | Linear nominal types, inspection, recursion and traits |
+| [2. Ownership](02_ownership) | 7 / 7 | Linear nominal types, capture contracts, inspection, recursion and trait erasure |
 | [3. Results](03_results) | 3 / 3 | Library imports, matching, `?` and `try` |
 | [4. Effects](04_effects) | 6 / 6 | Generic instances, handlers, forwarding and `Result` payloads |
-| [5. State and collections](05_state_and_collections) | 6 / 6 | Regions, collection primitives, iteration and cleanup traits |
+| [5. State and collections](05_state_and_collections) | 7 / 7 | Regions, captured callbacks, collection primitives, iteration and cleanup traits |
 | [6. Tasks](06_tasks) | 4 / 4 | Cooperative scheduling, task groups, spawn/await and library join |
 | [7. Source pipeline](07_source_pipeline) | 16 / 16 | Handler evidence, ownership, resumption and cleanup regressions |
 
@@ -46,6 +46,8 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 | 2 | [numeric recursion](02_ownership/numeric_recursion.eld) | `6nat` | Unproved termination requires `diverge`, including at the caller |
 | 2 | [view](02_ownership/view.eld) | `42` | Scoped inspection followed by consumption |
 | 2 | [linear closure](02_ownership/linear_closure.eld) | `42` | Transfer into a closure |
+| 2 | [explicit captures](02_ownership/explicit_captures.eld) | `42` | A named capture contract preserves linear ownership |
+| 2 | [existentials](02_ownership/existentials.eld) | `42` | Distinct concrete values share a checked dynamic trait interface |
 | 2 | [traits](02_ownership/traits.eld) | `42` | Covered impl and associated type |
 | 3 | [option](03_results/option.eld) | `42` | Library method and lazy fallback |
 | 3 | [propagation](03_results/propagation.eld) | `42` | Error identity and `?` |
@@ -57,6 +59,7 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 | 4 | [forwarding](04_effects/forwarding.eld) | `42` | Forwarded operation keeps its outer effect requirement |
 | 4 | [tail result](04_effects/tail_result.eld) | `42` | Clause-local `?` supplies an error result to the caller |
 | 5 | [local state](05_state_and_collections/local_state.eld) | `42` | Regional cell and state elimination |
+| 5 | [captured callback](05_state_and_collections/captured_callback.eld) | `42` | Explicit region/value captures survive higher-order forwarding |
 | 5 | [list failure](05_state_and_collections/list_failure.eld) | `3nat` | Failed removal returns original collection |
 | 5 | [finite loop](05_state_and_collections/finite_loop.eld) | `42` | Ownership-threaded finite iteration |
 | 5 | [freeze](05_state_and_collections/freeze.eld) | `2nat` | Capture-free elements escape after freezing through a generic wrapper |
@@ -150,7 +153,7 @@ Source annotations, operation arguments, forwarding, lexical resumption, and imp
 
 ## Rejection targets
 
-`reject/syntax` must fail the grammar recognizer. `reject/semantics` must parse and specifies the intended static failure. Three existential capture cases marked **pending** currently stop at `unsupported: any_type`, before the intended semantic check; [test_source_semantic_examples.py](../tools/test_source_semantic_examples.py) records this distinction. [Handler counterexamples](#enforced-source-rejections) are enforced separately below.
+`reject/syntax` must fail the grammar recognizer. `reject/semantics` must parse and reach its intended static failure; [test_source_semantic_examples.py](../tools/test_source_semantic_examples.py) checks these diagnostics, including all three existential capture cases. [Handler counterexamples](#enforced-source-rejections) are enforced separately below.
 
 | Program | Required failure |
 | --- | --- |
@@ -162,10 +165,10 @@ Source annotations, operation arguments, forwarding, lexical resumption, and imp
 | [uncovered impl](reject/semantics/uncovered_impl.eld) | Impl parameter absent from its head |
 | [inherited answer change](reject/semantics/inherited_answer_change.eld) | Baseline handler cannot preserve arbitrary child results |
 | [region escape](reject/semantics/region_escape.eld) | Returned closure retains a local cell |
-| [whole argument capture](reject/semantics/whole_argument_capture.eld) | **Pending semantic check:** Returning one opaque tuple member conservatively retains the whole argument |
-| [await whole argument capture](reject/semantics/await_whole_argument_capture.eld) | **Pending semantic check:** Awaiting a task returned through a helper preserves the helper's conservative capture bound |
+| [whole argument capture](reject/semantics/whole_argument_capture.eld) | Returning one opaque tuple member conservatively retains the whole argument |
+| [await whole argument capture](reject/semantics/await_whole_argument_capture.eld) | Awaiting a task returned through a helper preserves the helper's conservative capture bound |
 | [freeze captured elements](reject/semantics/freeze_captured_elements.eld) | Capture-bearing elements preserve the frozen owner's region dependency |
-| [mutable capture escape](reject/semantics/mut_capture_escape.eld) | **Pending semantic check:** A wrapper returning `Unit` leaves an inner capture in an outer mutable owner |
+| [mutable capture escape](reject/semantics/mut_capture_escape.eld) | A wrapper returning `Unit` leaves an inner capture in an outer mutable owner |
 | [explicit tail resume](reject/semantics/tail_explicit_resume.eld) | A `tail` clause must return the operation result |
 | [row variable entry](reject/semantics/row_variable_entry.eld) | A row variable cannot occupy a fixed effect-entry position |
 | [numeric recursion without diverge](reject/semantics/numeric_recursion_without_diverge.eld) | Numeric descent does not establish structural recursion |
