@@ -13,6 +13,7 @@ Read the component and its tests for the task at hand. All tools use the Python 
 | File | Responsibility | Tests |
 | --- | --- | --- |
 | [run_eldude.py](run_eldude.py) | CLI, result display, corpus manifest validation | [Corpus runner](test_run_examples.py) |
+| [check_docs.py](check_docs.py) | Local Markdown links/anchors, chapter/code map coverage, example table results | [Documentation checks](test_check_docs.py) |
 | [check_grammar.py](check_grammar.py) | EBNF lexer/recognizer and Markdown/JSON generation | [Syntax](test_grammar.py), [publications](test_grammar_artifacts.py), [program/API corpus](test_grammar_programs.py) |
 | [source_syntax.py](source_syntax.py) | Located AST, syntax errors, executable-subset parsing | [Core syntax](test_source_syntax.py), [extended syntax](test_source_extended_syntax.py) |
 | [source_modules.py](source_modules.py) | Declared module identities, imports, dependency order | [Modules](test_source_modules.py) |

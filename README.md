@@ -19,13 +19,14 @@ uv run python tools/run_eldude.py examples/07_source_pipeline/combined.eld
 ## Checks
 
 ```sh
+uv run python tools/check_docs.py
 uv run python tools/check_grammar.py
 uv run python -m unittest discover -s tools -p 'test_*.py'
 uv run python tools/run_eldude.py --examples --strict
 git diff --check
 ```
 
-The grammar check verifies syntax and generated publications. The tests check static diagnostics and execution; the strict corpus run compares every positive example with [manifest.json](examples/manifest.json). See the [example guide](examples/README.md) for expected values and rejection fixtures.
+The documentation check verifies local links and fragment anchors, chapter/code map coverage, and example tables against [manifest.json](examples/manifest.json). The grammar check verifies syntax and generated publications. The tests check static diagnostics and execution; the strict corpus run executes every positive example. See the [example guide](examples/README.md) for expected values and rejection fixtures.
 
 After editing [eldude.ebnf](docs/eldude.ebnf) or the originating parsing/interface clauses, regenerate the Markdown and JSON grammar publications with `uv run python tools/check_grammar.py --write`. The [editing guide](docs/index.md#editing-and-checking) identifies the source files.
 
