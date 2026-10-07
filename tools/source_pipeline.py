@@ -100,12 +100,14 @@ class SourceChecker(FeatureChecker):
         if expression[0] == 'lambda':
             signature = annotations[0] if annotations and isinstance(annotations[0], Fn) else None
             regions = signature.regions if signature else ()
+            capture_vars = signature.capture_vars if signature else ()
             context = replace(context, regions=context.regions | {r: r for r in regions},
                               active=context.active | set(regions))
             parameters = tuple((name, self.resolve_type(t, context)) for name, t in expression[1])
             result = self._function(parameters, expression[2], context)
-            result = replace(result, type=replace(result.type, regions=regions,
-                             captures=self.closed_captures(result.captures) - set(regions)))
+            retained = self.closed_captures(result.captures) - set(regions) - set(capture_vars)
+            result = replace(result, type=replace(result.type, regions=regions, capture_vars=capture_vars,
+                             captures=retained), captures=result.captures - set(capture_vars))
         else:
             result = super()._infer_expression(expression, context)
         self.results[id(expression)] = result
@@ -172,7 +174,8 @@ class SourceChecker(FeatureChecker):
             if self.closed_captures(result.captures) - set(expected.regions) - set(expected.captures or ()):
                 raise InferenceError('Capture annotation omits retained obligations', code='type')
             result = replace(result, type=replace(admitted_type(actual, expected), type_vars=expected.type_vars,
-                                                 regions=expected.regions, effect_vars=expected.effect_vars),
+                                                 regions=expected.regions, effect_vars=expected.effect_vars,
+                                                 capture_vars=expected.capture_vars),
                              captures=result.captures - set(expected.regions))
         return result
 

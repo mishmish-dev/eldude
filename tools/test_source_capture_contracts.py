@@ -115,9 +115,21 @@ escaped()
             with self.subTest(capture=capture), self.assertRaisesRegex(Diagnostic, 'Unknown.*capture|Unknown.*region'):
                 compile_source('module m; pub fn main()->Int {let f=fn()->Int captures {' + capture + '}{42};f()}')
 
-    def test_capture_row_polymorphism_reports_an_explicit_limit(self):
-        with self.assertRaisesRegex(Diagnostic, 'Implementation limit: capture-row polymorphism'):
-            compile_source('module m; fn use<..C>(f:fn()->Int captures {..C})->Int {f()} pub fn main()->Int {42}')
+    def test_capture_row_programs_preserve_usage(self):
+        root = Path(__file__).resolve().parents[1] / 'examples'
+        for name in ('02_ownership/capture_rows.eld', '05_state_and_collections/affine_capture_row.eld'):
+            path = root / name
+            execution = run(compile_source(path.read_text(), str(path)).program)
+            self.assertEqual(execution.value, 42)
+            if name.startswith('02_'):
+                self.assertEqual(execution.events, (('acquire', 'File', 1), ('close', 1, 'explicit')))
+        for name in ('capture_row_duplicate', 'capture_row_discard'):
+            path = root / 'reject/semantics' / (name + '.eld')
+            with self.assertRaises(Diagnostic) as caught:
+                compile_source(path.read_text(), str(path))
+            self.assertEqual(caught.exception.code, 'semantic')
+            self.assertIn('Callback must', caught.exception.message)
+            self.assertEqual(caught.exception.span.filename, str(path))
 
     def test_erased_methods_dispatch_through_a_shared_interface(self):
         source = '''module m;

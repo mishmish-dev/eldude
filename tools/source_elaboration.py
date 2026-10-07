@@ -3,7 +3,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from effect_rows import Row, Var, Solver
-from capture_rows import Argument
+from capture_rows import Argument, Variable
 from handlers import Operation, compile_program, operation_type
 from inference import E, Fn, Ty, INT, UNIT, BOOL, InferenceError, capture_free, state, permissions, required_captures
 from source_features import NAT, UNKNOWN, substitute, unwrapped
@@ -31,6 +31,7 @@ class SourceElaborator(Elaborator):
         self.capture_parameter_types = {}
         self.globals, self.global_modules, self.signatures = [], {}, {}
         self.generic_types, self.generic_regions, self.generic_effects = {}, (), {}
+        self.generic_captures, self.capture_usage = {}, {}
         self.exit_stack, self.region_stack = [], []
         self.recursive_allowed = set()
         self.types['Nat'] = NAT
@@ -56,7 +57,7 @@ class SourceElaborator(Elaborator):
         return name.items[1] if name.kind == 'generic_name' else ()
 
     def bind_generics(self, parameters):
-        types, regions, effects = {}, [], {}
+        types, regions, effects, captures = {}, [], {}, {}
         for parameter in parameters:
             if parameter.kind == 'name':
                 name = parameter.items[0]
@@ -69,7 +70,10 @@ class SourceElaborator(Elaborator):
                     regions.append(name.items[0])
                 elif prefix == '!':
                     effects[name.items[0]] = Var(name.items[0], rigid=True)
+                elif prefix == '..':
+                    captures[name.items[0]] = Variable(name.items[0])
         self.generic_types, self.generic_regions, self.generic_effects = types, tuple(regions), effects
+        self.generic_captures = captures
 
     def is_library(self, module):
         path = Path(self.graph.modules[module].span.filename)
@@ -391,8 +395,10 @@ class SourceElaborator(Elaborator):
             captures = self.capture_contract(contract)
             bound = frozenset() if capture_free(result) else frozenset({'env'} | {f'arg:{i}' for i in range(len(parameters))})
             return Fn(tuple(self.type(p) for p in parameters), result, effects, bound,
-                      dup=all(c.dup for c in captures if isinstance(c, Argument)),
-                      discard=all(c.discard for c in captures if isinstance(c, Argument)), captures=captures)
+                      dup=all(c.dup if isinstance(c, Argument) else 'Dup' in self.capture_usage.get(c.name, ())
+                              for c in captures if isinstance(c, (Argument, Variable))),
+                      discard=all(c.discard if isinstance(c, Argument) else 'Discard' in self.capture_usage.get(c.name, ())
+                                  for c in captures if isinstance(c, (Argument, Variable))), captures=captures)
         if node.kind == 'any_type':
             return self.existential_type(node)
         self.limit('type form ' + node.kind, node)
@@ -401,7 +407,11 @@ class SourceElaborator(Elaborator):
         captures = set()
         for entry in node.items[2] if len(node.items) > 2 else ():
             if entry.kind == 'capture_variable':
-                self.limit('capture-row polymorphism', entry)
+                name = entry.items[0].items[0]
+                if name not in self.generic_captures:
+                    self.error('name', 'Unknown capture row ' + name, entry)
+                captures.add(self.generic_captures[name])
+                continue
             if entry.kind == 'region_type':
                 name = entry.items[0].items[0]
                 if name not in self.generic_regions and name not in self.region_stack:
@@ -573,6 +583,13 @@ class SourceElaborator(Elaborator):
     def function(self, node, parameters, contract, body, environment, handlers):
         previous_captures = self.capture_names
         previous_types = self.capture_parameter_types
+        if node.kind == 'function':
+            self.capture_usage = {}
+            name = node.items[1]
+            for constraint in name.items[2] if len(name.items) > 2 else ():
+                if constraint.kind == 'bound' and constraint.items[0].kind == 'capture_variable':
+                    subject, bounds = constraint.items
+                    self.capture_usage[subject.items[0].items[0]] = {b.items[0] for b in bounds}
         local, typed, names = dict(environment), [], set()
         for parameter in parameters:
             name, annotation = parameter.items[:2]
@@ -611,7 +628,8 @@ class SourceElaborator(Elaborator):
                            type_vars=tuple(self.generic_types) if node.kind == 'function' else (),
                            regions=self.generic_regions if node.kind == 'function' else (),
                            effect_vars=tuple(self.generic_effects.values()) if node.kind == 'function' else (),
-                           captures=captures)
+                           captures=captures,
+                           capture_vars=tuple(self.generic_captures.values()) if node.kind == 'function' else ())
             self.annotations.setdefault(id(expression), []).append(signature)
         return expression
 

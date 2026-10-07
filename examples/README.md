@@ -48,6 +48,7 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 | 2 | [linear closure](02_ownership/linear_closure.eld) | `42` | Transfer into a closure |
 | 2 | [explicit captures](02_ownership/explicit_captures.eld) | `42` | A named capture contract preserves linear ownership |
 | 2 | [parameter captures](02_ownership/parameter_capture.eld) | `42` | A factory transfers its file into a returned callable; one explicit close |
+| 2 | [capture rows](02_ownership/capture_rows.eld) | `42` | Generic callback forwarding preserves linear usage; bounded repetition |
 | 2 | [existentials](02_ownership/existentials.eld) | `42` | Distinct concrete values share a checked dynamic trait interface |
 | 2 | [traits](02_ownership/traits.eld) | `42` | Covered impl and associated type |
 | 3 | [option](03_results/option.eld) | `42` | Library method and lazy fallback |
@@ -62,6 +63,7 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 | 5 | [local state](05_state_and_collections/local_state.eld) | `42` | Regional cell and state elimination |
 | 5 | [captured callback](05_state_and_collections/captured_callback.eld) | `42` | Explicit region/value captures survive higher-order forwarding |
 | 5 | [parameter captures](05_state_and_collections/parameter_capture.eld) | `42` | Nested factories and shadowed cells preserve distinct argument sources |
+| 5 | [affine capture row](05_state_and_collections/affine_capture_row.eld) | `42` | Generic relay retains a nonduplicable array callback |
 | 5 | [list failure](05_state_and_collections/list_failure.eld) | `3nat` | Failed removal returns original collection |
 | 5 | [finite loop](05_state_and_collections/finite_loop.eld) | `42` | Ownership-threaded finite iteration |
 | 5 | [freeze](05_state_and_collections/freeze.eld) | `2nat` | Capture-free elements escape after freezing through a generic wrapper |

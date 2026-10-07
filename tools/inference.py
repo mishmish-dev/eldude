@@ -12,7 +12,7 @@ from dataclasses import dataclass, field, replace
 import json
 
 from effect_rows import Row, Solver, Var
-from capture_rows import Argument, substitute_captures, encode_captures, decode_captures
+from capture_rows import Argument, Variable, CaptureSolver, substitute_captures, encode_captures, decode_captures
 
 
 class InferenceError(ValueError):
@@ -45,6 +45,7 @@ class Fn:
     # None keeps trusted legacy IR contracts unconstrained; source contracts
     # always provide a closed callable-environment capture set.
     captures: frozenset | None = None
+    capture_vars: tuple = ()
 
     def dumps(self):
         def encode(t):
@@ -56,7 +57,8 @@ class Fn:
                     'bound': encode_captures(t.bound), 'type_vars': list(t.type_vars),
                     'regions': list(t.regions), 'effect_vars': [v.name for v in t.effect_vars],
                     'dup': t.dup, 'discard': t.discard,
-                    'captures': None if t.captures is None else encode_captures(t.captures)}
+                    'captures': None if t.captures is None else encode_captures(t.captures),
+                    'capture_vars': encode_captures(t.capture_vars)}
         return json.dumps(encode(self), sort_keys=True)
 
     @staticmethod
@@ -73,7 +75,8 @@ class Fn:
                       decode(data['result'], scope), Row(tuple(data['effects']), tail),
                       decode_captures(data['bound']), tuple(data['type_vars']),
                       tuple(data['regions']), quantified, data['dup'], data['discard'],
-                      None if data.get('captures') is None else decode_captures(data['captures']))
+                      None if data.get('captures') is None else decode_captures(data['captures']),
+                      tuple(sorted(decode_captures(data.get('capture_vars', ())), key=str)))
         try:
             result = decode(json.loads(wire), {})
         except (KeyError, TypeError, json.JSONDecodeError) as error:
@@ -170,7 +173,7 @@ def required_captures(t):
                 result.add(label[7:-1])
             elif '@handler:' in label:
                 result.add(label)
-        return frozenset(result.difference(t.regions))
+        return frozenset(result.difference(t.regions).difference(t.capture_vars))
     result = {t.region} if t.region else set()
     for a in t.args:
         result.update(required_captures(a))
@@ -306,12 +309,12 @@ class Checker:
                 return value(self.functions[name])
             raise InferenceError(f'Unknown value {name}')
         binding = context.bindings[name]
-        if binding.consumed:
+        if binding.consumed and not permissions(binding.value.type)[0]:
             raise InferenceError(f'{name} was already consumed', subject=name)
         context.references.add(binding)
         if binding.mode and not permissions(binding.value.type)[0]:
             raise InferenceError('Access grant cannot transfer its owner', subject=name)
-        if not permissions(binding.value.type)[0]:
+        if permissions(binding.value.type) != (True, True):
             binding.consumed = True
             self.transfers[name] = self.current_expression
         return binding.value
@@ -438,6 +441,12 @@ class Checker:
             raise InferenceError('Callable arity mismatch', code='type')
         types, regions, row_checks = {}, {}, []
         variables = {v: Var(v.name) for v in signature.effect_vars}
+        capture_variables = {v: Variable(v.name, rigid=False) for v in signature.capture_vars}
+        capture_solver = CaptureSolver()
+        capture_permissions = {}
+
+        def capture_expression(expression):
+            return substitute_captures(expression, {k: {v} for k, v in capture_variables.items()})
 
         def match(expected, actual, invariant=False):
             if isinstance(actual, Ty) and actual.name in ('Never', 'Unknown'):
@@ -481,9 +490,30 @@ class Checker:
 
         for p, a in zip(signature.parameters, arguments):
             match(p, a.type)
+        for expected, actual, invariant in row_checks:
+            if expected.captures is not None and expected.captures & capture_variables.keys():
+                capture_solver.equal(actual.captures or (), capture_expression(expected.captures))
+                for variable in expected.captures & capture_variables.keys():
+                    previous = capture_permissions.get(variable, (True, True))
+                    capture_permissions[variable] = (previous[0] and actual.dup, previous[1] and actual.discard)
+        try:
+            capture_substitutions, residual = capture_solver.solve()
+        except ValueError as error:
+            raise InferenceError('Callback capture annotation omits retained obligations') from error
+        if residual:
+            raise InferenceError('Ambiguous capture row inference')
+        capture_substitutions = {k: capture_substitutions.get(v, {v}) for k, v in capture_variables.items()}
+
+        def captures(expression):
+            return frozenset(regions.get(c, c) for c in substitute_captures(expression, capture_substitutions))
         # A region may appear only in a callback's environment (no Ref in its
         # parameter/result types). Infer it only when the correspondence is unique.
         for expected, actual, _ in row_checks:
+            wanted = {label[7:-1] for label in expected.effects.labels if label.startswith('state<@')}
+            available = {label[7:-1] for label in actual.effects.labels if label.startswith('state<@')}
+            unresolved_effects = wanted & set(signature.regions) - regions.keys()
+            if len(unresolved_effects) == 1 and len(available - set(regions.values())) == 1:
+                regions[next(iter(unresolved_effects))] = next(iter(available - set(regions.values())))
             unresolved = set(expected.captures or ()) & set(signature.regions) - regions.keys()
             if unresolved:
                 fixed = {regions.get(c, c) for c in expected.captures - unresolved}
@@ -493,7 +523,7 @@ class Checker:
                 regions[next(iter(unresolved))] = next(iter(remaining))
         for expected, actual in zip(signature.parameters, arguments):
             if isinstance(expected, Fn) and expected.captures is not None:
-                allowed = {regions.get(c, c) for c in expected.captures} | set(expected.regions)
+                allowed = captures(expected.captures) | set(expected.regions)
                 retained = frozenset().union(*(self.capture_sources.get(c, {c}) for c in actual.captures))
                 if not retained <= allowed:
                     raise InferenceError('Callback capture annotation omits retained obligations')
@@ -508,11 +538,11 @@ class Checker:
             for expected, actual, invariant in row_checks:
                 solver.unify(row(expected.effects), actual.effects if invariant else solver.weaken(actual.effects))
                 if expected.captures is not None:
-                    allowed = {regions.get(c, c) for c in expected.captures}
+                    allowed = captures(expected.captures)
                     retained = set(actual.captures or ())
                     if not retained <= allowed or (invariant and retained != allowed):
                         raise InferenceError('Callback capture annotation omits retained obligations')
-                bound = {regions.get(source, source) for source in expected.bound}
+                bound = captures(expected.bound)
                 compatible = actual.bound == bound if invariant else actual.bound <= bound
                 if not capture_free(actual.result) and not compatible:
                     raise InferenceError('Callback capture contract would lose retained provenance')
@@ -528,25 +558,28 @@ class Checker:
                 substitutions = {c: arguments[c.index].captures if c.depth == depth else {replace(c, depth=c.depth-1)}
                                  for c in set(t.captures or ()) | set(t.bound)
                                  if isinstance(c, Argument) and c.depth >= depth}
-                captures = None if t.captures is None else substitute_captures(t.captures, substitutions)
+                retained = None if t.captures is None else substitute_captures(t.captures, substitutions)
+                usage = [capture_permissions[c] for c in t.captures or () if c in capture_permissions]
                 return replace(t, parameters=tuple(substitute(p, depth + 1) for p in t.parameters),
                                result=substitute(t.result, depth + 1), effects=solver.resolve(row(t.effects)),
-                               bound=frozenset(regions.get(source, source) for source in substitute_captures(t.bound, substitutions)),
-                               captures=None if captures is None else frozenset(regions.get(c, c) for c in captures))
+                               bound=captures(substitute_captures(t.bound, substitutions)),
+                               dup=all(u[0] for u in usage) and all(c.dup for c in t.captures or () if isinstance(c, Argument)) if usage else t.dup,
+                               discard=all(u[1] for u in usage) and all(c.discard for c in t.captures or () if isinstance(c, Argument)) if usage else t.discard,
+                               captures=None if retained is None else captures(retained))
             if t.name.startswith('$') and t.name[1:] in types:
                 return types[t.name[1:]]
             return Ty(t.name, tuple(substitute(a, depth) for a in t.args), regions.get(t.region, t.region))
 
-        captures = set()
+        retained = set()
         for source in signature.bound:
-            if source.startswith('arg:'):
-                captures.update(arguments[int(source[4:])].captures)
+            if isinstance(source, str) and source.startswith('arg:'):
+                retained.update(arguments[int(source[4:])].captures)
             elif source == 'env':
-                captures.update(function.captures)
+                retained.update(function.captures)
             else:
-                captures.add(regions.get(source, source))
+                retained.update(captures({source}))
         self._control(effects, context)
-        return value(substitute(signature.result), effects, captures)
+        return value(substitute(signature.result), effects, retained)
 
     def _infer(self, expression, context):
         previous, self.current_expression = self.current_expression, expression
