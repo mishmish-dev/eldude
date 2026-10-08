@@ -160,6 +160,7 @@ class Context:
     group: object = None
     evidence: tuple = ()
     grants: tuple = ()
+    effect_variables: dict = field(default_factory=dict)
 
 
 def state(region):
@@ -171,6 +172,8 @@ def permissions(t):
         return t.dup, t.discard
     if t.name.startswith('Any:'):
         return Ty('Dup') in t.args, Ty('Discard') in t.args
+    if t.name.startswith('Capture:'):
+        return False, False
     if t.name.startswith('Record:'):
         fields = [permissions(f.args[0]) for f in t.args]
         return all(p[0] for p in fields), all(p[1] for p in fields)
@@ -335,7 +338,8 @@ class Checker:
         return self._infer(expression, Context())
 
     def define(self, name, parameters, body, *, type_vars=(), regions=(), effect_vars=()):
-        context = Context(regions={r: r for r in regions}, active=frozenset(regions), trace=False)
+        context = Context(regions={r: r for r in regions}, active=frozenset(regions), trace=False,
+                          effect_variables={v.name: v for v in effect_vars})
         result = self._function(parameters, body, context)
         signature = replace(result.type, type_vars=tuple(type_vars), regions=tuple(regions),
                             effect_vars=tuple(effect_vars))
@@ -419,13 +423,26 @@ class Checker:
         return self._resolve(Row((label,)), context)
 
     def _control(self, row, context):
-        if not self._abandoning(row):
+        if not self._abandoning(row) or self.non_abandoning(row, context.evidence):
             return
         for name, binding in context.live:
             if not binding.consumed and not binding.managed and not permissions(binding.value.type)[1]:
                 raise InferenceError(f'Effects may abandon live resource {name}')
         if any(not permissions(v.type)[1] for v in context.temporaries):
             raise InferenceError('Effects may abandon an owned argument temporary')
+
+    def non_abandoning(self, row, evidence=()):
+        if self._abandoning(Row(row.labels)):
+            return False
+        from trait_constraints import TraitSolver
+        solver = getattr(self, 'trait_solver', None) or TraitSolver()
+        labels = tuple(Ty(self.handler_ids[l][0] if l in self.handler_ids else l) for l in row.labels)
+        term = Ty('Effects', labels + ((Ty('$!' + row.tail.name),) if row.tail else ()))
+        try:
+            solver.check(Ty('Trait:NonAbandoning', (term,)), evidence)
+            return True
+        except ValueError:
+            return False
 
     def _function(self, parameters, body, outer):
         free = free_names(body, {name for name, _ in parameters})
@@ -434,7 +451,8 @@ class Checker:
         originals = {binding: outer.bindings[name] for name, binding in copies.items()}
         context = Context(bindings=copies, live=list(copies.items()),
                           regions=dict(outer.regions), names=dict(outer.names),
-                          active=outer.active, trace=False, blocked_family=outer.blocked_family, evidence=outer.evidence)
+                          active=outer.active, trace=False, blocked_family=outer.blocked_family, evidence=outer.evidence,
+                          effect_variables=outer.effect_variables)
         parameter_bindings, sources = [], {}
         if len({name for name, _ in parameters}) != len(parameters):
             raise InferenceError('Duplicate parameter name')
@@ -527,7 +545,8 @@ class Checker:
                 return
             if isinstance(expected, Ty) and expected.name.startswith('$'):
                 name = expected.name[1:]
-                if name not in signature.type_vars:
+                generic_names = set(signature.type_vars) | {'!' + v.name for v in signature.effect_vars} | {'..' + v.name for v in signature.capture_vars}
+                if name not in generic_names:
                     if expected != actual:
                         raise InferenceError('Rigid type parameter mismatch')
                 elif name in types and types[name] != actual:
@@ -563,6 +582,10 @@ class Checker:
 
         for p, a in zip(signature.parameters, arguments):
             match(p, a.type)
+        from trait_constraints import capture_row
+        for variable, fresh in capture_variables.items():
+            if '..' + variable.name in types:
+                capture_solver.equal({fresh}, capture_row(types['..' + variable.name]))
         for expected, actual, invariant in row_checks:
             if expected.captures is not None and expected.captures & capture_variables.keys():
                 capture_solver.equal(actual.captures or (), capture_expression(expected.captures))
@@ -604,7 +627,6 @@ class Checker:
             if len(solutions) != 1:
                 raise InferenceError('Cannot infer an unambiguous callback capture region; supply explicit generic arguments', code='type')
             regions = solutions[0]
-        self.check_constraints(signature.constraints, types, regions, context)
         for expected, actual in zip(signature.parameters, arguments):
             if isinstance(expected, Fn) and expected.captures is not None:
                 allowed = captures(expected.captures) | captures(required_captures(expected)) | set(expected.regions)
@@ -619,6 +641,10 @@ class Checker:
             return Row(labels, variables.get(r.tail, r.tail))
 
         try:
+            from trait_constraints import effect_row
+            for variable, fresh in variables.items():
+                if '!' + variable.name in types:
+                    solver.unify(Row((), fresh), effect_row(types['!' + variable.name], context.effect_variables))
             for expected, actual, invariant in row_checks:
                 solver.unify(row(expected.effects), actual.effects if invariant else solver.weaken(actual.effects))
                 if expected.captures is not None:
@@ -636,6 +662,17 @@ class Checker:
             effects = self._resolve(solver.resolve(effects), context)
         except ValueError as error:
             raise InferenceError(str(error)) from error
+
+        constraint_types = dict(types)
+        for variable, usage in capture_permissions.items():
+            constraint_types['..' + variable.name] = Ty('$..' + variable.name,
+                tuple(Ty(name) for name, allowed in zip(('Dup', 'Discard'), usage) if allowed))
+        for variable, fresh in variables.items():
+            resolved = solver.resolve(Row((), fresh))
+            constraint_types['!' + variable.name] = Ty('Effects',
+                tuple(Ty('state', region=l[7:-1]) if l.startswith('state<@') else Ty(self.handler_ids.get(l, (l,))[0]) for l in resolved.labels)
+                + ((Ty('$!' + resolved.tail.name),) if resolved.tail else ()))
+        self.check_constraints(signature.constraints, constraint_types, regions, context)
 
         def substitute(t, depth=0):
             if isinstance(t, Fn):
@@ -818,7 +855,18 @@ class Checker:
                             raise InferenceError('Unknown region argument ' + actual, code='name')
                         regions[name] = context.regions[actual]
                     elif kind == 'capture':
-                        captures[Variable(name)] = frozenset(context.regions.get(c, c) for c in actual)
+                        retained = frozenset(context.regions.get(c, c) for c in actual)
+                        captures[Variable(name)] = retained
+                        parts = []
+                        for c in retained:
+                            if c in context.bindings:
+                                usage = permissions(context.bindings[c].value.type)
+                                parts.append(Ty('$capture:' + str(c), tuple(Ty(n) for n, allowed in zip(('Dup', 'Discard'), usage) if allowed)))
+                            elif isinstance(c, Variable):
+                                parts.append(Ty('$..' + c.name))
+                            else:
+                                parts.append(Ty('Region', region=c))
+                        substitutions['..' + name] = Ty('Captures', tuple(parts))
                     elif kind == 'effect':
                         rows[name] = actual
                     elif kind == 'constructor':
@@ -827,7 +875,12 @@ class Checker:
                         substitutions['#' + name] = actual
                 def substitute(t):
                     if isinstance(t, Ty):
-                        return substitutions.get(t.name[1:], t) if t.name.startswith('$') else replace(t, args=tuple(substitute(a) for a in t.args), region=regions.get(t.region, t.region))
+                        if t.name.startswith('$') and t.name[1:] in substitutions:
+                            replacement = substitutions[t.name[1:]]
+                            if ('constructor', t.name[1:]) in binders:
+                                return replace(replacement, args=tuple(substitute(a) for a in t.args))
+                            return replacement
+                        return replace(t, args=tuple(substitute(a) for a in t.args), region=regions.get(t.region, t.region))
                     effects = Row(tuple(next((state(v) for k, v in regions.items() if label == state(k)), label) for label in t.effects.labels), t.effects.tail)
                     if effects.tail and effects.tail.name in rows:
                         replacement = rows[effects.tail.name]

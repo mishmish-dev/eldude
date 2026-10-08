@@ -91,6 +91,15 @@ class SourceChecker(FeatureChecker):
         self.annotations = elaborator.annotations
         self.results = {}
         self.trait_solver = getattr(elaborator, 'trait_solver', None)
+        self.origins = elaborator.origins
+
+    def _infer(self, expression, context):
+        try:
+            return super()._infer(expression, context)
+        except InferenceError as error:
+            if id(error.expression) not in self.origins and id(expression) in self.origins:
+                error.expression = expression
+            raise
 
     def effect_origin(self, expression, labels):
         for child in children(expression):
@@ -107,7 +116,8 @@ class SourceChecker(FeatureChecker):
             capture_vars = signature.capture_vars if signature else ()
             context = replace(context, regions=context.regions | {r: r for r in regions},
                               active=context.active | set(regions),
-                              evidence=context.evidence + (signature.constraints if signature else ()))
+                              evidence=context.evidence + (signature.constraints if signature else ()),
+                              effect_variables=context.effect_variables | {v.name: v for v in signature.effect_vars} if signature else context.effect_variables)
             parameters = tuple((name, self.resolve_type(t, context)) for name, t in expression[1])
             result = self._function(parameters, expression[2], context)
             retained = self.closed_captures(result.captures) - set(regions) - set(capture_vars)
@@ -133,7 +143,7 @@ class SourceChecker(FeatureChecker):
 
     def resolve_type(self, t, context):
         original = t
-        t = substitute(t, regions=context.regions)
+        t = substitute(t, regions=context.regions, effect_variables=context.effect_variables)
         if not isinstance(t, Fn):
             t = replace(t, args=tuple(self.resolve_type(a, context) for a in t.args))
             mapping_types, mapping_regions = {}, context.regions
@@ -150,7 +160,7 @@ class SourceChecker(FeatureChecker):
                     original = template
                     break
             if original in self.dynamic_methods and t not in self.dynamic_methods:
-                self.dynamic_methods[t] = {name: substitute(signature, mapping_types, mapping_regions)
+                self.dynamic_methods[t] = {name: substitute(signature, mapping_types, mapping_regions, context.effect_variables)
                                            for name, signature in self.dynamic_methods[original].items()}
                 self.interfaces[t] = tuple((name, tuple(substitute(a, mapping_types, mapping_regions) for a in arguments),
                                            tuple((n, substitute(v, mapping_types, mapping_regions)) for n, v in bindings))
@@ -192,7 +202,8 @@ class SourceChecker(FeatureChecker):
     def annotate(self, expression, result, expected):
         if isinstance(expected, Fn):
             expected = self.resolve_type(expected, Context(regions={r: r for r in expected.regions},
-                                                         active=frozenset(expected.regions), evidence=expected.constraints))
+                                                         active=frozenset(expected.regions), evidence=expected.constraints,
+                                                         effect_variables={v.name: v for v in expected.effect_vars}))
         actual = result.type
         if isinstance(expected, Fn) and isinstance(actual, Fn):
             solver = Solver()

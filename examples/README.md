@@ -54,6 +54,16 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 | 2 | [existential associated types](02_ownership/existential_associated.eld) | `42` | Fixed associated results dispatch without exposing the hidden type |
 | 2 | [existential constraints](02_ownership/existential_constraints.eld) | `42` | Trait, method and implementation prerequisites with visible usage evidence |
 | 2 | [existential traits](02_ownership/existential_traits.eld) | `42` | One hidden value supplies several dictionaries; bound weakening preserves storage |
+| 2 | [associated only](02_ownership/associated_only.eld) | `42` | Associated-only implementation registers its equation |
+| 2 | [associated decrease](02_ownership/associated_decrease.eld) | `42` | Smaller projection inputs normalize with their prerequisites |
+| 2 | [associated alias](02_ownership/associated_alias.eld) | `42` | Acyclic local associated aliases expand |
+| 2 | [generic alias](02_ownership/generic_alias.eld) | `42` | Generic aliases instantiate before implementation selection |
+| 2 | [generic projection](02_ownership/generic_projection.eld) | `42` | Projection identity retains the explicit trait arguments |
+| 2 | [existential effect row](02_ownership/existential_effect_row.eld) | `42` | Implementation rows match closed interfaces and flow through generic erased calls and associated callbacks |
+| 2 | [capture trait bounds](02_ownership/capture_trait_bounds.eld) | `42` | Inherited capture-row evidence flows through erased helpers and associated duplicable callbacks |
+| 2 | [existential callback factory](02_ownership/existential_callback_factory.eld) | `42` | Dynamic method result names its own callback parameter |
+| 2 | [generic kinds](02_ownership/generic_kinds.eld) | `42` | Explicit constructor and natural arguments preserve declared kinds |
+| 2 | [nonabandoning](02_ownership/nonabandoning.eld) | `42` | Tail-only effect evidence permits a linear file to remain live across a generic call |
 | 2 | [traits](02_ownership/traits.eld) | `42` | Covered impl and associated type |
 | 2 | [trait prerequisites](02_ownership/trait_prerequisites.eld) | `42` | Decreasing element constraints and normalized associated results |
 | 3 | [option](03_results/option.eld) | `42` | Library method and lazy fallback |

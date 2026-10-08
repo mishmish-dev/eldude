@@ -8,5 +8,7 @@ pub fn main()->Int {region outer {region inner {
     let f=fn()->{state<@outer>,state<@inner>}Int captures {x,y} {x.get()+y.get()};
     let pure=relay::<{@outer}>(fn()->Int captures {x} {let copy=x;0});
     let ignored=pure();
+    let empty=relay::<{}>(fn()->Int {0});
+    let ignoredEmpty=empty();
     call::<@outer,@inner>(f)
 }}}

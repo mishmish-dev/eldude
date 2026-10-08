@@ -21,6 +21,16 @@ def executable_source(path):
 
 
 class SourceSemanticExampleTests(unittest.TestCase):
+    def test_generated_grant_errors_point_to_the_source_call(self):
+        path = REJECT / 'existential_mut_nonowner.eld'
+        source = path.read_text()
+        with self.assertRaises(Diagnostic) as caught:
+            compile_source(source, str(path))
+        self.assertEqual(caught.exception.code, 'semantic')
+        self.assertEqual(caught.exception.span.filename, str(path))
+        self.assertEqual(caught.exception.span.line, 4)
+        self.assertEqual(caught.exception.span.column, source.splitlines()[3].index('mut item.grow') + 1)
+
     def test_rejection_examples_reach_their_semantic_check(self):
         cases = {
             'linear_discard': ('semantic', 'Unconsumed resource ticket'),
@@ -38,6 +48,14 @@ class SourceSemanticExampleTests(unittest.TestCase):
             'await_whole_argument_capture': ('semantic', 'region would escape'),
             'mut_capture_escape': ('semantic', 'mutable owner'),
             'trait_missing_prerequisite': ('semantic', 'Missing trait evidence'),
+            'static_member_collision': ('type', 'Ambiguous implementation member'),
+            'associated_equation_growth': ('semantic', 'strictly decrease'),
+            'associated_alias_cycle': ('semantic', 'Cyclic local associated alias'),
+            'projection_prerequisite': ('semantic', 'projection-free'),
+            'projection_head': ('semantic', 'heads must be projection-free'),
+            'generic_constructor_as_type': ('type', 'kind mismatch'),
+            'nonabandoning_affine': ('semantic', 'NonAbandoning'),
+            'nonabandoning_suspend': ('semantic', 'NonAbandoning'),
             'trait_overlap': ('semantic', 'Overlapping'),
             'trait_constraint_cycle': ('semantic', 'decrease'),
             'trait_stronger_method': ('semantic', 'stronger'),

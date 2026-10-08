@@ -28,6 +28,7 @@ class SourceElaborator(Elaborator):
         self.impl_heads, self.impl_contracts = {}, {}
         self.impl_constraints = {}
         self.trait_solver = TraitSolver()
+        self.trait_solver.operations = self.operations
         self.function_constraints = {}
         self.function_evidence = {}
         self.dynamic_methods, self.trait_methods = {}, {}
@@ -41,6 +42,11 @@ class SourceElaborator(Elaborator):
         self.generic_types, self.generic_regions, self.generic_effects = {}, (), {}
         self.generic_captures, self.capture_usage = {}, {}
         self.generic_binders = []
+        self.resolving_aliases = set()
+        self.equation_sources = None
+        self.resolving_equations = set()
+        self.projection_evidence = ()
+        self.constraint_evidence = ()
         self.exit_stack, self.region_stack = [], []
         self.recursive_allowed = set()
         self.types['Nat'] = NAT
@@ -102,14 +108,20 @@ class SourceElaborator(Elaborator):
         for node in nodes:
             if node.kind == 'type_equality':
                 result.append(Ty('Equality', tuple(self.type(t) for t in node.items)))
-            elif node.items[0].kind != 'capture_variable':
+            else:
                 subject, bounds = node.items
+                row_subject = subject.kind == 'capture_variable'
+                effect_subject = subject.kind == 'type' and subject.items[0] in self.generic_effects
+                target = self.argument_term(subject) if row_subject else Ty('Effects', (Ty('$!' + subject.items[0]),)) if effect_subject else self.type(subject)
                 for bound in bounds:
                     identity = self.canonical(bound.items[0])
                     if identity not in self.traits and identity not in ('Dup', 'Discard', 'NonAbandoning'):
                         self.error('name', 'Unknown trait constraint ' + identity, bound)
                     arguments = self.trait_arguments(self.traits[identity], bound.items[1] if bound.kind == 'applied_type' else ()) if identity in self.traits else ()
-                    result.append(Ty('Trait:' + identity, (self.type(subject), *arguments)))
+                    if (row_subject and identity not in ('Dup', 'Discard') or effect_subject and identity != 'NonAbandoning'
+                            or identity == 'NonAbandoning' and not effect_subject):
+                        self.error('type', 'Constraint subject kind mismatch', subject)
+                    result.append(Ty('Trait:' + identity, (target, *arguments)))
         return tuple(result)
 
     def argument_term(self, node):
@@ -121,9 +133,17 @@ class SourceElaborator(Elaborator):
                             entries + ((Node('effect_tail', tail.span, tail.items),) if tail else ())))
             row = self.contract(contract)[1]
             labels = tuple(Ty('state', region=l[7:-1]) if l.startswith('state<@') else Ty(l) for l in row.labels)
+            if not labels and row.tail:
+                return Ty('$!' + row.tail.name)
             return Ty('Effects', tuple(sorted(labels, key=repr)) + ((Ty('$!' + row.tail.name),) if row.tail else ()))
         if node.kind == 'capture_variable':
-            return Ty('$..' + node.items[0].items[0])
+            name = node.items[0].items[0]
+            if name in self.capture_arguments:
+                row = self.capture_arguments[name]
+                if len(row) == 1 and isinstance(next(iter(row)), Variable):
+                    return Ty('$..' + next(iter(row)).name)
+                return Ty('Captures', tuple(sorted((Ty('Region', region=c) if isinstance(c, str) else Ty('Capture:' + str(c)) for c in row), key=repr)))
+            return Ty('$..' + name)
         if node.kind == 'capture_set':
             return Ty('Captures', tuple(sorted((self.argument_term(c) if c.kind in ('region_type', 'capture_variable')
                                                else Ty('Capture:' + c.items[0]) for c in node.items[0]), key=repr)))
@@ -140,22 +160,9 @@ class SourceElaborator(Elaborator):
             if parameter.kind == 'name':
                 if argument.kind not in ('type', 'applied_type', 'tuple_type', 'fn_type', 'any_type'):
                     self.error('type', 'Trait argument kind mismatch: expected type', argument)
-                terms.append(self.type(argument))
+                terms.append(self.type_argument(argument))
             elif parameter.kind == 'constructor_parameter':
-                if argument.kind != 'type':
-                    self.error('type', 'Trait argument kind mismatch: expected constructor', argument)
-                name = argument.items[0]
-                if name in self.generic_types and self.generic_types[name].name.startswith('$'):
-                    if dict((n, k) for k, n in self.generic_binders).get(name) != 'constructor':
-                        self.error('type', 'Trait argument kind mismatch: expected constructor', argument)
-                    terms.append(self.generic_types[name])
-                else:
-                    identity = self.canonical(name)
-                    declaration = self.named.get(identity)
-                    arity = len([p for p in self.generics(declaration.items[1]) if p.kind == 'name']) if declaration else 0
-                    if arity != len(parameter.items[1]):
-                        self.error('type', 'Constructor argument arity mismatch', argument)
-                    terms.append(Ty('Constructor:' + unwrapped(self.type(argument)).name))
+                terms.append(self.constructor_argument(parameter, argument))
             else:
                 prefix = parameter.items[0]
                 kinds = {'@': ('region_type',), '!': ('effect_row',), '..': ('capture_set', 'capture_variable', 'effect_row'), '#': ('int', 'nat', 'type')}
@@ -173,6 +180,35 @@ class SourceElaborator(Elaborator):
                         self.error('name', 'Unknown region argument ' + term.region, argument)
                     terms.append(term)
         return tuple(terms)
+
+    def type_argument(self, argument):
+        if argument.kind == 'type':
+            name = argument.items[0]
+            if name in self.generic_types:
+                term = self.generic_types[name]
+                kinds = dict((n, k) for k, n in self.generic_binders)
+                kind = kinds.get(term.name[1:], kinds.get(name, 'type')) if term.name.startswith('$') else 'type'
+                if kind != 'type' or term.name.startswith('$#'):
+                    self.error('type', 'Generic argument kind mismatch: expected type', argument)
+            else:
+                declaration = self.named.get(self.canonical(name))
+                if declaration and self.generics(declaration.items[1]):
+                    self.error('type', 'Generic argument kind mismatch: expected type, got constructor', argument)
+        return self.type(argument)
+
+    def constructor_argument(self, parameter, argument):
+        if argument.kind != 'type':
+            self.error('type', 'Generic argument kind mismatch: expected constructor', argument)
+        name = argument.items[0]
+        if name in self.generic_types and self.generic_types[name].name.startswith('$'):
+            if dict((n, k) for k, n in self.generic_binders).get(name) != 'constructor':
+                self.error('type', 'Generic argument kind mismatch: expected constructor', argument)
+            return self.generic_types[name]
+        declaration = self.named.get(self.canonical(name))
+        arity = len([p for p in self.generics(declaration.items[1]) if p.kind == 'name']) if declaration else 0
+        if arity != len(parameter.items[1]):
+            self.error('type', 'Constructor argument arity mismatch', argument)
+        return Ty('Constructor:' + unwrapped(self.type(argument)).name)
 
     def apply_trait_arguments(self, trait, arguments):
         terms = self.trait_arguments(trait, arguments)
@@ -353,16 +389,29 @@ class SourceElaborator(Elaborator):
                                           tuple(t.name[1:] for t in self.generic_types.values()) +
                                           tuple('!' + n for n in self.generic_effects) + tuple('..' + n for n in self.generic_captures),
                                           self.generic_regions, prerequisites)
-                    try:
-                        self.trait_solver.add(impl)
-                    except ValueError as error:
-                        self.error('semantic', str(error), implementation)
                 if trait:
                     self.impl_heads[head] = target
                     self.impl_contracts[head] = Fn((target,), UNIT, Row(),
                                                   type_vars=tuple(self.generic_types), regions=self.generic_regions)
                     self.impl_constraints[head] = constraints
-                equations = {m.items[0].items[0]: self.type(m.items[1]) for m in members if m.kind == 'associated_type'}
+                old = (self.interface_self, self.associated_bindings, self.equation_sources, self.projection_evidence, self.capture_usage)
+                self.interface_self, self.associated_bindings = target, {}
+                self.equation_sources = {m.items[0].items[0]: m.items[1] for m in members if m.kind == 'associated_type'}
+                self.projection_evidence = impl.prerequisites if impl is not None else ()
+                self.capture_usage = {}
+                for prerequisite in self.projection_evidence:
+                    if prerequisite.name in ('Trait:Dup', 'Trait:Discard') and prerequisite.args[0].name.startswith('$..'):
+                        self.capture_usage.setdefault(prerequisite.args[0].name[3:], set()).add(prerequisite.name[6:])
+                try:
+                    equations = {name: self.associated_equation(name) for name in self.equation_sources}
+                finally:
+                    self.interface_self, self.associated_bindings, self.equation_sources, self.projection_evidence, self.capture_usage = old
+                if impl is not None:
+                    impl.equations = equations
+                    try:
+                        self.trait_solver.add(impl)
+                    except ValueError as error:
+                        self.error('semantic', str(error), implementation)
                 for method in members:
                     if method.kind != 'function':
                         continue
@@ -375,7 +424,6 @@ class SourceElaborator(Elaborator):
                     self.function_evidence[symbol] = impl.prerequisites if impl is not None else self.constraints(constraints)
                     if impl is not None:
                         impl.methods[method.items[1].items[0]] = symbol
-                        impl.equations = equations
                     if trait:
                         requirement = next((m for m in self.traits[trait_name].items[2]
                                             if m.kind == 'function' and m.items[1].items[0] == method.items[1].items[0]), None)
@@ -387,10 +435,13 @@ class SourceElaborator(Elaborator):
                     method_key = (unwrapped(target).name, method.items[1].items[0])
                     if method_key in self.methods:
                         previous_symbol = self.methods[method_key][0]
+                        if previous_symbol is None:
+                            continue
                         if self.function_self[previous_symbol][0] != target:
                             self.limit('multiple specialized methods for one nominal type', method)
                         if not trait:
                             self.error('semantic', 'Duplicate or ambiguous implementation method', method.items[1])
+                        self.methods[method_key] = (None, None)
                     else:
                         self.methods[method_key] = (symbol, None)
         self.module = self.root_module
@@ -490,6 +541,17 @@ class SourceElaborator(Elaborator):
         self.__dict__.update(old)
         return result
 
+    def associated_equation(self, name):
+        if name in self.resolving_equations:
+            self.error('semantic', 'Cyclic local associated alias', self.equation_sources[name])
+        if name not in self.associated_bindings:
+            self.resolving_equations.add(name)
+            try:
+                self.associated_bindings[name] = self.type(self.equation_sources[name])
+            finally:
+                self.resolving_equations.remove(name)
+        return self.associated_bindings[name]
+
     def type(self, node):
         if node.kind == 'projection_type':
             receiver, member, arguments = node.items
@@ -497,9 +559,44 @@ class SourceElaborator(Elaborator):
                 self.limit('GAT projection normalization', node)
             candidates = [name for name, trait in self.traits.items()
                           if any(m.kind == 'associated_type' and m.items[0].items[0] == member.items[0] for m in trait.items[2])]
+            target = self.type(receiver)
+            evidence = self.function_evidence.get(self.current_function, ()) + self.projection_evidence
+            nodes = self.function_constraints.get(self.current_function, ())
+            if self.current_function in self.definitions:
+                name = self.definitions[self.current_function].items[1]
+                nodes += name.items[2] if len(name.items) > 2 else ()
+            for constraint in nodes:
+                if constraint.kind != 'bound' or constraint.items[0].kind == 'capture_variable':
+                    continue
+                subject, bounds = constraint.items
+                if subject.kind == 'type' and subject.items[0] in self.generic_effects:
+                    continue
+                for bound in bounds:
+                    name = self.canonical(bound.items[0])
+                    if name in candidates:
+                        terms = self.trait_arguments(self.traits[name], bound.items[1] if bound.kind == 'applied_type' else ())
+                        evidence += (Ty('Trait:' + name, (self.type(subject), *terms)),)
+            visible = {e.name[6:] for e in evidence if e.name.startswith('Trait:') and e.name[6:] in candidates and e.args[0] == target}
+            if visible:
+                candidates = sorted(visible)
             if len(candidates) != 1:
                 self.error('type', 'Associated projection needs an unambiguous trait', node)
-            return Ty('Projection:' + candidates[0] + ':' + member.items[0], (self.type(receiver),))
+            trait = candidates[0]
+            goals = [e for e in evidence if e.name == 'Trait:' + trait and e.args[0] == target]
+            if not goals:
+                from trait_constraints import match
+                for impl in self.trait_solver.implementations:
+                    if impl.head.name != 'Trait:' + trait:
+                        continue
+                    try:
+                        types, regions = match(impl.head.args[0], target, impl.type_vars, impl.region_vars)
+                    except ValueError:
+                        continue
+                    goals.append(substitute(impl.head, types, regions))
+            terms = tuple(dict.fromkeys(g.args[1:] for g in goals))
+            if len(terms) > 1 or not terms and self.generics(self.traits[trait].items[1]):
+                self.error('type', 'Associated projection needs an unambiguous instantiated trait bound', node)
+            return Ty('Projection:' + trait + ':' + member.items[0], (target, *(terms[0] if terms else ())))
         if node.kind == 'access_type':
             return Ty(node.items[0].title(), (self.type(node.items[1]),))
         if node.kind == 'tuple_type':
@@ -512,25 +609,47 @@ class SourceElaborator(Elaborator):
             if spelling == 'Self' and self.interface_self is not None:
                 return self.interface_self
             if spelling.startswith('Self::') and self.interface_self is not None:
+                if self.equation_sources is not None and spelling[6:] in self.equation_sources:
+                    return self.associated_equation(spelling[6:])
                 if spelling[6:] not in self.associated_bindings:
                     self.error('type', 'Trait is not DynCompatible: unresolved associated type ' + spelling, node)
-                return self.associated_bindings[spelling[6:]]
+                return substitute(self.associated_bindings[spelling[6:]], effect_variables=self.generic_effects)
             if spelling.startswith('Self::') and self.current_function in self.function_self:
                 equations = self.function_self[self.current_function][1]
-                return substitute(equations.get(spelling[6:], UNKNOWN), self.generic_types)
-            if '::' in spelling and spelling.split('::')[0] in self.generic_types:
+                return substitute(equations.get(spelling[6:], UNKNOWN), self.generic_types, effect_variables=self.generic_effects)
+            if '::' in spelling and (spelling.rsplit('::', 1)[0] in self.generic_types
+                    or self.canonical(spelling.rsplit('::', 1)[0]) in self.records
+                    or self.canonical(spelling.rsplit('::', 1)[0]) in self.types):
                 receiver, member = spelling.rsplit('::', 1)
                 return self.type(Node('projection_type', node.span,
                                       (Node('type', node.span, (receiver,)), Node('name', node.span, (member,)), ())))
             if spelling == 'Self' and self.current_function in self.function_self:
                 return substitute(self.function_self[self.current_function][0], self.generic_types)
             name = self.canonical(spelling)
+            if name in self.named and self.named[name].kind == 'type_alias':
+                declaration = self.named[name]
+                if name in self.resolving_aliases:
+                    self.error('semantic', 'Cyclic type alias', node)
+                parameters = self.generics(declaration.items[1])
+                arguments = node.items[1] if node.kind == 'applied_type' else ()
+                if len(arguments) != len(parameters):
+                    self.error('type', 'Generic type argument arity mismatch', node)
+                keys = ('module', 'generic_types', 'region_arguments', 'effect_arguments', 'capture_arguments')
+                previous = {key: getattr(self, key) for key in keys}
+                self.generic_types = dict(self.generic_types)
+                self.region_arguments, self.effect_arguments, self.capture_arguments = {}, {}, {}
+                self.apply_trait_arguments(declaration, arguments)
+                self.module = self.owners[id(declaration)]
+                self.resolving_aliases.add(name)
+                try:
+                    return self.type(declaration.items[2])
+                finally:
+                    self.resolving_aliases.remove(name)
+                    self.__dict__.update(previous)
             if name in self.records:
                 template = self.record_type(name)
             elif name in self.types:
                 template = self.types[name]
-            elif name in self.named and self.named[name].kind == 'type_alias':
-                template = self.type(self.named[name].items[2])
             else:
                 if name in OTHER_PRIMITIVES:
                     self.limit('type ' + name + ' does not execute in this profile', node)
@@ -642,6 +761,7 @@ class SourceElaborator(Elaborator):
         self.interface_variables[t] = (tuple(v.name[1:] for v in self.generic_types.values() if v.name.startswith('$')), self.generic_regions)
         evidence = tuple(Ty('Trait:' + name, (t, *terms)) for name, terms, _ in canonical)
         evidence += tuple(Ty('Trait:' + name, (t,)) for name in ('Dup', 'Discard') if Ty(name) in t.args)
+        evidence += self.constraint_evidence
         methods = {}
         def raw_self(part):
             if isinstance(part, Node):
@@ -651,7 +771,7 @@ class SourceElaborator(Elaborator):
             return part == 'Self'
         keys = ('module', 'current_function', 'generic_types', 'generic_regions', 'generic_effects',
                 'generic_captures', 'generic_binders', 'capture_names', 'region_arguments',
-                'effect_arguments', 'capture_arguments', 'interface_self', 'associated_bindings')
+                'effect_arguments', 'capture_arguments', 'interface_self', 'associated_bindings', 'capture_parameter_types', 'capture_usage')
         for trait_name, terms, associated in canonical:
             trait, arguments, bindings = resolved[(trait_name, terms, associated)]
             previous = {key: getattr(self, key) for key in keys}
@@ -678,6 +798,10 @@ class SourceElaborator(Elaborator):
                     receiver = Ty(parameters[0].items[2].title(), (t,)) if len(parameters[0].items) == 3 else t
                     rest = tuple(Ty(p.items[2].title(), (self.type(p.items[1]),)) if len(p.items) == 3
                                  else self.type(p.items[1]) for p in parameters[1:])
+                    self.capture_names = {p.items[0].items[0]: Argument(i, 0, *permissions(unwrapped(part)))
+                                          for i, (p, part) in enumerate(zip(parameters, (receiver, *rest)))}
+                    self.capture_parameter_types = {p.items[0].items[0]: unwrapped(part)
+                                                    for p, part in zip(parameters, (receiver, *rest))}
                     result, effects = self.contract(contract)
                     constraints = self.constraints(name.items[2] if len(name.items) > 2 else ())
                     for constraint in constraints:
@@ -798,6 +922,7 @@ class SourceElaborator(Elaborator):
         previous_types = self.capture_parameter_types
         if node.kind == 'function':
             self.capture_usage = {}
+            self.constraint_evidence = ()
             name = node.items[1]
             for constraint in name.items[2] if len(name.items) > 2 else ():
                 if constraint.kind == 'bound' and constraint.items[0].kind == 'capture_variable':
@@ -807,6 +932,10 @@ class SourceElaborator(Elaborator):
         constraints = self.constraints(self.function_constraints.get(self.current_function, ()) +
                                        (name.items[2] if name and len(name.items) > 2 else ())) if node.kind == 'function' else ()
         constraints = tuple(dict.fromkeys(constraints + self.function_evidence.get(self.current_function, ())))
+        self.constraint_evidence = constraints
+        for constraint in constraints:
+            if constraint.name in ('Trait:Dup', 'Trait:Discard') and constraint.args[0].name.startswith('$..'):
+                self.capture_usage.setdefault(constraint.args[0].name[3:], set()).add(constraint.name[6:])
         for constraint in constraints:
             if constraint.name in ('Trait:Dup', 'Trait:Discard') and constraint.args[0].name.startswith('$'):
                 subject = constraint.args[0]
@@ -922,7 +1051,10 @@ class SourceElaborator(Elaborator):
         if node.kind == 'specialize':
             callee, arguments = node.items
             resolved = []
-            for argument in arguments:
+            symbol = environment.get(callee.items[0]) if callee.kind == 'path' else None
+            parameters = self.function_generics.get(symbol, ())
+            for index, argument in enumerate(arguments):
+                parameter = parameters[index] if index < len(parameters) else None
                 if argument.kind == 'region_type':
                     name = argument.items[0].items[0]
                     if name not in self.region_stack and name not in self.generic_regions:
@@ -934,11 +1066,19 @@ class SourceElaborator(Elaborator):
                     resolved.append(('capture', self.capture_contract(contract)))
                 elif argument.kind == 'effect_row':
                     labels, tail = argument.items
+                    if parameter is not None and parameter.kind == 'generic_parameter' and parameter.items[0] == '..' and not labels and tail is None:
+                        resolved.append(('capture', frozenset()))
+                        continue
                     entries = labels + ((Node('effect_tail', tail.span, tail.items),) if tail else ())
                     row = self.contract(Node('contract', argument.span, (Node('type', argument.span, ('Unit',)), entries)))[1]
                     resolved.append(('effect', row))
+                elif argument.kind in ('int', 'nat') or (argument.kind == 'type' and argument.items[0] in self.generic_types and self.generic_types[argument.items[0]].name.startswith('$#')):
+                    resolved.append(('nat', self.argument_term(argument)))
+                elif parameter is not None and parameter.kind == 'constructor_parameter':
+                    term = self.constructor_argument(parameter, argument)
+                    resolved.append(('constructor', Ty(term.name.removeprefix('Constructor:'))))
                 else:
-                    resolved.append(('type', self.type(argument)))
+                    resolved.append(('type', self.type_argument(argument)))
             return self.ir(node, 'specialize', self.expression(callee, environment, handlers), tuple(resolved))
         previous = self.capture_names
         self.capture_names = environment | {name: pair[1] for name, pair in handlers.items()}
@@ -1140,6 +1280,8 @@ class SourceElaborator(Elaborator):
             if self.structurally_recursive(expression, symbol):
                 self.recursive_allowed.add(symbol)
         for key, (symbol, _) in tuple(self.methods.items()):
+            if symbol is None:
+                continue
             signature = self.signatures[symbol]
             self.methods[key] = (symbol, signature)
             if key[1] == 'cleanup':
@@ -1228,7 +1370,7 @@ class SourceElaborator(Elaborator):
             return
         requirement, trait, applied = self.function_traits[symbol]
         keys = ('module', 'generic_types', 'generic_regions', 'generic_effects', 'region_arguments',
-                'effect_arguments', 'capture_arguments', 'interface_self', 'associated_bindings')
+                'effect_arguments', 'capture_arguments', 'interface_self', 'associated_bindings', 'capture_names', 'capture_parameter_types')
         previous = {key: getattr(self, key) for key in keys}
         self.generic_types = dict(self.generic_types)
         self.region_arguments, self.effect_arguments, self.capture_arguments = {}, {}, {}
@@ -1244,6 +1386,10 @@ class SourceElaborator(Elaborator):
             if len(parameter.items) == 3:
                 t = Ty(parameter.items[2].title(), (t,))
             expected_parameters.append(t)
+        self.capture_names = {p.items[0].items[0]: Argument(i, 0, *permissions(unwrapped(t)))
+                              for i, (p, t) in enumerate(zip(requirement.items[2], expected_parameters))}
+        self.capture_parameter_types = {p.items[0].items[0]: unwrapped(t)
+                                        for p, t in zip(requirement.items[2], expected_parameters)}
         result, effects = self.contract(requirement.items[3])
         actual = self.signatures[symbol]
         allowed = self.function_evidence.get(symbol, ())

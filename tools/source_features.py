@@ -9,19 +9,34 @@ from inference import (Ty, Fn, Value, Binding, Context, INT, BOOL, UNIT, E, valu
 NAT, NEVER, UNKNOWN = Ty('Nat'), Ty('Never'), Ty('Unknown')
 
 
-def substitute(t, types=None, regions=None):
+def substitute(t, types=None, regions=None, effect_variables=None):
     types, regions = types or {}, regions or {}
     if isinstance(t, Fn):
-        return replace(t, parameters=tuple(substitute(p, types, regions) for p in t.parameters),
-                       result=substitute(t.result, types, regions),
+        effect_variables = {n: v for n, v in (effect_variables or {}).items() if n not in {v.name for v in t.effect_vars}}
+        tail = t.effects.tail
+        row = Row((), (effect_variables or {}).get(tail.name, tail)) if tail else Row()
+        if tail and '!' + tail.name in types:
+            from trait_constraints import effect_row
+            row = effect_row(types['!' + tail.name], effect_variables)
+        from capture_rows import Variable, substitute_captures
+        from trait_constraints import capture_row
+        replacements = {c: capture_row(types['..' + c.name]) for c in set(t.captures or ()) | set(t.bound)
+                        if isinstance(c, Variable) and '..' + c.name in types}
+        dup, discard = t.dup, t.discard
+        if t.captures and all(c in replacements for c in t.captures):
+            usage = [permissions(types['..' + c.name]) for c in t.captures]
+            dup, discard = dup or all(u[0] for u in usage), discard or all(u[1] for u in usage)
+        return replace(t, parameters=tuple(substitute(p, types, regions, effect_variables) for p in t.parameters),
+                       result=substitute(t.result, types, regions, effect_variables),
                        effects=Row(tuple(next((state(v) for k, v in regions.items() if label == state(k)), label)
-                                         for label in t.effects.labels), t.effects.tail),
-                       bound=frozenset(regions.get(c, c) for c in t.bound),
+                                         for label in t.effects.labels) + row.labels, row.tail),
+                       bound=frozenset(regions.get(c, c) for c in substitute_captures(t.bound, replacements)),
+                       dup=dup, discard=discard,
                        result_owner='region:' + regions.get(t.result_owner[7:], t.result_owner[7:]) if t.result_owner and t.result_owner.startswith('region:') else t.result_owner,
-                       captures=None if t.captures is None else frozenset(regions.get(c, c) for c in t.captures))
+                       captures=None if t.captures is None else frozenset(regions.get(c, c) for c in substitute_captures(t.captures, replacements)))
     if t.name.startswith('$'):
         return types.get(t.name[1:], t)
-    return replace(t, args=tuple(substitute(a, types, regions) for a in t.args), region=regions.get(t.region, t.region))
+    return replace(t, args=tuple(substitute(a, types, regions, effect_variables) for a in t.args), region=regions.get(t.region, t.region))
 
 
 def compatible(left, right):
@@ -149,7 +164,7 @@ class FeatureChecker(HandlerChecker):
 
     def bind_pattern(self, pattern, retained, context, borrowed=False):
         bound = {}
-        def bind(p, t):
+        def bind(p, t, whole=False):
             original = t
             t = unwrapped(t)
             kind = p[0]
@@ -159,7 +174,8 @@ class FeatureChecker(HandlerChecker):
             elif kind == 'bind':
                 if borrowed and not permissions(original)[0]:
                     raise InferenceError('Inspection pattern binding requires Dup')
-                bound[p[1]] = Binding(value(original, captures=retained.captures))
+                bound[p[1]] = Binding(replace(retained, type=original, effects=Row()) if whole
+                                     else value(original, captures=retained.captures))
             elif kind == 'tuple_pat':
                 if t.name != 'Tuple' or len(t.args) != len(p) - 1:
                     raise InferenceError('Tuple pattern shape mismatch', code='type')
@@ -187,7 +203,7 @@ class FeatureChecker(HandlerChecker):
                     raise InferenceError('Literal pattern type mismatch', code='type')
             else:
                 raise InferenceError('Implementation limit: pattern ' + kind, code='unsupported')
-        bind(pattern, retained.type)
+        bind(pattern, retained.type, True)
         return bound
 
     def exhaustive(self, patterns, t):
@@ -311,6 +327,8 @@ class FeatureChecker(HandlerChecker):
                 if target is None:
                     return self.primitive_method(expression, method, receiver, arguments, mode, context, retained)
                 name, signature = target
+                if signature is None:
+                    raise InferenceError('Ambiguous implementation member ' + method, code='type')
                 parameter = signature.parameters[0]
                 borrowed = isinstance(parameter, Ty) and parameter.name in ('View', 'Mut')
                 if not borrowed and mode:

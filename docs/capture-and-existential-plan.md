@@ -1,6 +1,6 @@
 # Capture and existential completeness implementation plan
 
-> **For agentic workers:** Use `superpowers:executing-plans` to implement this plan task by task. Steps use checkbox (`- [x]`) syntax for tracking. The tasks share checker contracts; execute them in order.
+> **For agentic workers:** Use `superpowers:executing-plans` to implement this plan task by task. Steps use checkbox (`- [ ]`) syntax for tracking. The tasks share checker contracts; execute them in order.
 
 **Goal:** Remove the six capture and existential implementation restrictions, with working Eldude programs demonstrating every new feature.
 
@@ -10,7 +10,7 @@
 
 **Spec:** [Types and ownership](language-spec/02-types-and-ownership.md) (§§6, 9), [traits](language-spec/03-traits.md) (§§10–11), [captures and access](language-spec/04-captures-and-access.md) (§§12–15), [canonical interfaces](language-spec/12-interfaces-and-tooling.md) (§72). Use the [code/test map](../tools/README.md#file-map) to find the current implementation.
 
-**Status:** Implementation and acceptance programs are complete through task 8; final whole-branch review and verification are in progress. The task programs are runnable in the example corpus.
+**Status:** Complete. All eight tasks have runnable acceptance programs. A fresh whole-branch review identified eight groups of composition defects; the follow-up fixes have source regression coverage. The milestone adds no dependency.
 
 ## Global constraints
 
@@ -191,3 +191,25 @@ git diff --check
 ```
 
 Completion means all tests pass, the positive corpus has zero unsupported/failed examples, and rejection programs fail for their intended reason. Report the program paths, expected and actual outputs, relevant event assertions, and any remaining implementation limits. Passing Python-only tests or changing an expected result to match the implementation cannot substitute for making the Eldude programs work.
+
+
+## Verified results
+
+All root checks pass: **312 tests**, **81 runnable examples**, **0 unsupported**, **0 failed**, and no pending examples. Documentation links/results, generated grammar, and whitespace checks pass. The table records independently specified expectations and checked interpreter results; `1` is a `Nat` in the mutation programs.
+
+| Task | Acceptance programs | Expected | Actual |
+| --- | --- | --- | --- |
+| 1 | [File factory](../examples/02_ownership/parameter_capture.eld), [shadowed regional factories](../examples/05_state_and_collections/parameter_capture.eld) | `42` each | `42` each |
+| 2 | [Linear callback rows](../examples/02_ownership/capture_rows.eld), [affine callback row](../examples/05_state_and_collections/affine_capture_row.eld) | `42` each | `42` each |
+| 3 | [Inferred regions](../examples/05_state_and_collections/inferred_regions.eld), [explicit regions/rows](../examples/05_state_and_collections/explicit_regions.eld), [constructor/natural arguments](../examples/02_ownership/generic_kinds.eld) | `42` each | `42` each |
+| 4 | [Trait prerequisites](../examples/02_ownership/trait_prerequisites.eld), [associated-only](../examples/02_ownership/associated_only.eld), [decreasing equations](../examples/02_ownership/associated_decrease.eld), [associated aliases](../examples/02_ownership/associated_alias.eld), [generic aliases](../examples/02_ownership/generic_alias.eld), [generic projections](../examples/02_ownership/generic_projection.eld), [NonAbandoning](../examples/02_ownership/nonabandoning.eld) | `42` each | `42` each |
+| 5 | [All argument categories](../examples/02_ownership/existential_arguments.eld), [fixed associated type](../examples/02_ownership/existential_associated.eld), [visible constraints](../examples/02_ownership/existential_constraints.eld), [effect-row helpers/callbacks](../examples/02_ownership/existential_effect_row.eld), [capture-row helpers/callbacks](../examples/02_ownership/capture_trait_bounds.eld), [dynamic callback factory](../examples/02_ownership/existential_callback_factory.eld) | `42` each | `42` each |
+| 6 | [Multiple trait bounds](../examples/02_ownership/existential_traits.eld) | `42` | `42` |
+| 7 | [Forwarded mutation](../examples/05_state_and_collections/forwarded_mut.eld), [projection](../examples/05_state_and_collections/projected_mut.eld), [suspension](../examples/05_state_and_collections/mut_suspension.eld), [exit paths](../examples/05_state_and_collections/mut_exit_paths.eld) | `1`, `42`, `42`, `42` | `1`, `42`, `42`, `42` |
+| 8 | [Dynamic mutation](../examples/05_state_and_collections/existential_mut.eld), [dynamic projection](../examples/05_state_and_collections/existential_projected_mut.eld), [callback await](../examples/06_tasks/capture_rows.eld), [integration](../examples/07_source_pipeline/capture_trait_integration.eld) | `1`, `42`, `42`, `42` | `1`, `42`, `42`, `42` |
+
+The File factory, linear callback relay, and integration program each assert exactly `acquire File 1` followed by `close 1 explicit`. The `NonAbandoning` program preserves the same resource across a generic tail-effect call and asserts one acquire/close pair. Grant tests assert handler dispatch and affine abandonment, mutation of original storage, and no callback execution for an absent index. Callable wire checks preserve capture/result bounds, owner facts, generic kinds, constraint terms, and effect-binder identity within each imported contract.
+
+Rejection programs assert category, message and source filename. The generated-grant regression also pins the offending call's line and column. Original whole-argument, await and mutation escape programs still reject. Additional boundary programs reject static member ambiguity in both declaration orders, growing/cyclic associated equations, projection-bearing heads/prerequisites, constructor/type kind confusion, and affine/suspending substitutions for `NonAbandoning`.
+
+Remaining experimental limits are documented in [the implementation guide](../tools/README.md#implementation-limits): bounded trait/termination checking and specialized static methods, recursive record representations, guarded matches, untyped closure parameters, operation resource/callback payloads, general foreign execution, and parts of the library/runtime. The language's DynCompatible restrictions remain normative, including method-local generics, raw `Self`, missing receivers and GAT projections.

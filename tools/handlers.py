@@ -165,7 +165,8 @@ class HandlerChecker(Checker):
             if frame and frame.collecting:
                 frame.sites.extend(obligations)
                 frame.opaque |= self.in_call
-        for label in (*row.labels, *(['unknown tail'] if row.tail else [])):
+        unknown = row.tail and not self.non_abandoning(Row((), row.tail), context.evidence)
+        for label in (*row.labels, *(['unknown tail'] if unknown else [])):
             family = self.handler_ids[label][0] if label in self.handler_ids else label
             if family not in ('suspend', 'unknown tail') and (mode or self.modes.get(family)) != 'affine':
                 continue
@@ -208,7 +209,8 @@ class HandlerChecker(Checker):
         copies = {name: replace(b, consumed=False, managed=False) for name, b in frame.captures.items()}
         return Context(bindings=dict(copies), live=list(copies.items()), regions=dict(outer.regions),
                        handlers=outer.handlers, names=dict(outer.names), active=outer.active,
-                       trace=False, evidence=outer.evidence, grants=outer.grants), copies
+                       trace=False, evidence=outer.evidence, grants=outer.grants,
+                       effect_variables=outer.effect_variables), copies
 
     @staticmethod
     def _discharge(bindings):

@@ -9,6 +9,42 @@ from source_syntax import Diagnostic
 
 
 class SourceCaptureContractTests(unittest.TestCase):
+    def test_review_composition_programs(self):
+        root = Path(__file__).resolve().parents[1] / 'examples/02_ownership'
+        for name in ('associated_only', 'associated_decrease', 'associated_alias', 'generic_alias',
+                     'generic_projection', 'existential_effect_row', 'capture_trait_bounds',
+                     'existential_callback_factory', 'generic_kinds', 'nonabandoning'):
+            with self.subTest(program=name):
+                path = root / (name + '.eld')
+                checked = compile_source(path.read_text(), str(path))
+                execution = run(checked.program)
+                self.assertEqual(execution.value, 42)
+                for signature in checked.functions.values():
+                    imported = Fn.loads(signature.dumps())
+                    self.assertEqual(imported.dumps(), signature.dumps())
+                    if imported.effect_vars and imported.effects.tail:
+                        self.assertIs(imported.effects.tail, imported.effect_vars[0])
+                        if imported.parameters and isinstance(imported.parameters[0], Fn):
+                            self.assertIs(imported.parameters[0].effects.tail, imported.effect_vars[0])
+                    if imported.effect_vars and isinstance(imported.result, Fn) and imported.result.effects.tail:
+                        self.assertIs(imported.result.effects.tail, imported.effect_vars[0])
+                if name == 'nonabandoning':
+                    self.assertEqual([e for e in execution.events if e[0] in ('acquire', 'close')],
+                                     [('acquire', 'File', 1), ('close', 1, 'explicit')])
+
+    def test_static_member_collision_rejects_both_declaration_orders(self):
+        path = Path(__file__).resolve().parents[1] / 'examples/reject/semantics/static_member_collision.eld'
+        source = path.read_text()
+        lines = source.splitlines()
+        first, second = [i for i, line in enumerate(lines) if line.startswith('impl ')]
+        lines[first], lines[second] = lines[second], lines[first]
+        for text in (source, '\n'.join(lines)):
+            with self.assertRaises(Diagnostic) as caught:
+                compile_source(text, str(path))
+            self.assertEqual(caught.exception.code, 'type')
+            self.assertIn('Ambiguous implementation member', caught.exception.message)
+            self.assertEqual(caught.exception.span.filename, str(path))
+
     def test_dynamic_mutation_and_integration_programs(self):
         root = Path(__file__).resolve().parents[1] / 'examples'
         for name, expected in (('05_state_and_collections/existential_mut', 1),

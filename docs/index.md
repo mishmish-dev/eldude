@@ -14,7 +14,7 @@ Choose a task below, then read the linked chapter or component. The language spe
 | Understand the design goals | [Manifesto](#the-eldude-manifesto); [precedents](language-spec/precedents.md) for background |
 | Look up a language rule | [Topic map below](#language-topics); [specification index](language-specification.md) for conventions and a full reading order |
 | Find implemented behavior or a compiler component | [Implementation guide and code/test map](../tools/README.md) |
-| Find capture and existential acceptance coverage | [Current implementation plan](capture-and-existential-plan.md), with executable acceptance programs for each step |
+| Find capture and existential acceptance coverage | [Completed implementation plan](capture-and-existential-plan.md), with executable acceptance programs and verified results for each step |
 | Find a small program or expected diagnostic | [Executable examples](../examples/README.md); [illustrative spec snippets](language-spec/examples.md) |
 | Check library APIs, ownership, or cost contracts | [Module/API map](../stdlib/README.md); [library profile](standard-library.md) |
 | Work on syntax or grammar consumers | [Normative EBNF](eldude.ebnf); generated [grammar reference](formal-grammar.md) and [JSON export](eldude-grammar.json) |
