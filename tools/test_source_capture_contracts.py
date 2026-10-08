@@ -9,6 +9,18 @@ from source_syntax import Diagnostic
 
 
 class SourceCaptureContractTests(unittest.TestCase):
+    def test_instantiated_existential_programs(self):
+        root = Path(__file__).resolve().parents[1] / 'examples/02_ownership'
+        for name in ('arguments', 'associated', 'constraints'):
+            path = root / ('existential_' + name + '.eld')
+            source = path.read_text()
+            self.assertEqual(run(compile_source(source, str(path)).program).value, 42)
+            if name == 'arguments':
+                lines = source.splitlines()
+                first, second = [i for i, line in enumerate(lines) if line.startswith('impl Read')]
+                lines[first], lines[second] = lines[second], lines[first]
+                self.assertEqual(run(compile_source('\n'.join(lines), str(path)).program).value, 42)
+
     def test_region_arguments_and_inference_programs(self):
         root = Path(__file__).resolve().parents[1] / 'examples'
         for name in ('inferred_regions', 'explicit_regions'):
@@ -214,17 +226,15 @@ struct A {} impl Read for A {fn read(view self)->Int {42}}
 fn inspect(view item:any Read+Discard)->Int {view item.read()}
 pub fn main()->Int {let a:any Read%s+Discard=A{};view a.read()}'''
         for arguments in ('<Int>', '<Item=Int>'):
-            with self.subTest(arguments=arguments), self.assertRaisesRegex(Diagnostic, 'generic existential'):
+            with self.subTest(arguments=arguments), self.assertRaisesRegex(Diagnostic, 'arity|associated binding'):
                 compile_source(base % arguments)
         method = base.replace('fn read(view self)->Int;', 'fn read(view self)->Int where Self:Dup;')
         with self.assertRaisesRegex(Diagnostic, 'DynCompatible'):
             compile_source(method % '')
         implementation = base.replace('impl Read for A {', 'impl Read for A where A:Dup {')
-        with self.assertRaisesRegex(Diagnostic, 'existential implementation constraints'):
-            compile_source(implementation % '')
+        self.assertEqual(run(compile_source(implementation % '').program).value, 42)
         implementation = base.replace('fn read(view self)->Int {42}', 'fn read(view self)->Int where A:Dup {42}')
-        with self.assertRaisesRegex(Diagnostic, 'existential implementation constraints'):
-            compile_source(implementation % '')
+        self.assertEqual(run(compile_source(implementation % '').program).value, 42)
 
     def test_dynamic_consumption_and_enum_wrapping_preserve_linear_usage(self):
         prefix = '''module m; trait Take {fn take(self)->Int;}

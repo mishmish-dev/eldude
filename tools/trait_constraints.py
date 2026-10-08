@@ -113,7 +113,9 @@ class TraitSolver:
 
     def select_impl(self, goal, evidence=()):
         from inference import permissions
-        if goal in evidence:
+        def identity(t):
+            return replace(t, args=() if t.name.startswith('$') else tuple(identity(a) for a in t.args))
+        if any(identity(goal) == identity(e) for e in evidence):
             return None, {}, {}
         if goal.name in ('Trait:Dup', 'Trait:Discard'):
             if permissions(goal.args[0])[goal.name == 'Trait:Discard']:
@@ -150,7 +152,7 @@ class TraitSolver:
                 return self.normalize_type(equation.args[1], evidence, active | {term})
         term = replace(term, args=tuple(self.normalize_type(a, evidence, active) for a in term.args))
         if term.name.startswith('Projection:'):
-            _, trait, member = term.name.split(':', 2)
+            trait, member = term.name.removeprefix('Projection:').rsplit(':', 1)
             from inference import Ty
             goal = Ty('Trait:' + trait, term.args)
             try:

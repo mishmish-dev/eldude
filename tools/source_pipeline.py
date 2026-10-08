@@ -80,6 +80,8 @@ class SourceChecker(FeatureChecker):
         self.data_parameters = getattr(elaborator, 'data_parameters', {})
         self.methods = getattr(elaborator, 'methods', {})
         self.dynamic_methods = getattr(elaborator, 'dynamic_methods', {})
+        self.interfaces = getattr(elaborator, 'interfaces', {})
+        self.interface_members = getattr(elaborator, 'interface_members', {})
         self.trait_methods = getattr(elaborator, 'trait_methods', {})
         self.impl_contracts = getattr(elaborator, 'impl_contracts', {})
         self.impl_constraints = getattr(elaborator, 'impl_constraints', {})
@@ -123,9 +125,19 @@ class SourceChecker(FeatureChecker):
         return frozenset().union(*(self.capture_sources.get(c, {c}) for c in captures))
 
     def resolve_type(self, t, context):
+        original = t
         t = substitute(t, regions=context.regions)
         if not isinstance(t, Fn):
             t = replace(t, args=tuple(self.resolve_type(a, context) for a in t.args))
+            if original in self.dynamic_methods and t not in self.dynamic_methods:
+                self.dynamic_methods[t] = {name: substitute(signature, regions=context.regions)
+                                           for name, signature in self.dynamic_methods[original].items()}
+                self.interfaces[t] = tuple((name, tuple(substitute(a, regions=context.regions) for a in arguments),
+                                           tuple((n, substitute(v, regions=context.regions)) for n, v in bindings))
+                                          for name, arguments, bindings in self.interfaces[original])
+                for name in self.dynamic_methods[t]:
+                    trait, arguments, member = self.interface_members[(original, name)]
+                    self.interface_members[(t, name)] = (trait, tuple(substitute(a, regions=context.regions) for a in arguments), member)
             if self.trait_solver:
                 try:
                     t = self.trait_solver.normalize_type(t, context.evidence)

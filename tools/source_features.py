@@ -249,6 +249,7 @@ class FeatureChecker(HandlerChecker):
     def _infer_expression(self, expression, context):
         match expression:
             case ('pack', t, initial):
+                t = self.resolve_type(t, context)
                 retained = self._infer(initial, context)
                 if retained.type == t:
                     self.packages[id(expression)] = None
@@ -256,19 +257,25 @@ class FeatureChecker(HandlerChecker):
                 wanted, actual = permissions(t), permissions(retained.type)
                 if any(w and not a for w, a in zip(wanted, actual)):
                     raise InferenceError('Existential usage promises require Dup/Discard of the hidden value', code='type')
-                if isinstance(retained.type, Ty) and retained.type.name == t.name:
+                if (isinstance(retained.type, Ty) and retained.type.name == t.name and
+                        self.interfaces[retained.type] == self.interfaces[t]):
                     self.packages[id(expression)] = {}
                     return value(t, retained.effects, retained.captures)
-                trait = t.name[4:]
-                concrete = unwrapped(retained.type)
-                head = (trait, concrete.name if isinstance(concrete, Ty) else None)
-                contract = self.impl_contracts.get(head)
-                if contract is None:
-                    raise InferenceError('Existential package requires a matching trait implementation', code='type')
-                if self.impl_constraints.get(head):
-                    raise InferenceError('Implementation limit: existential implementation constraints', code='unsupported')
-                self._apply(value(contract), [retained], context)
-                methods = {method: self.trait_methods[(*head, method)] for method in self.dynamic_methods[t.name]}
+                methods = {}
+                for trait, arguments, bindings in self.interfaces[t]:
+                    goal = Ty('Trait:' + trait, (retained.type, *arguments))
+                    try:
+                        implementation, types, regions = self.trait_solver.select_impl(goal, context.evidence)
+                        if implementation is None:
+                            raise ValueError('Existential package requires concrete implementation evidence')
+                        for member, expected in bindings:
+                            actual = substitute(implementation.equations[member], types, regions)
+                            if self.trait_solver.normalize_type(actual, context.evidence) != expected:
+                                raise ValueError('Existential associated binding does not match implementation')
+                    except ValueError as error:
+                        raise InferenceError('Existential implementation: ' + str(error), code='type') from error
+                    for member, target in implementation.methods.items():
+                        methods[(trait, arguments, member)] = target
                 self.packages[id(expression)] = methods
                 return value(t, retained.effects, retained.captures)
             case ('definitions', _, _, _):
@@ -285,7 +292,7 @@ class FeatureChecker(HandlerChecker):
                     t = retained.type
                 dynamic = isinstance(t, Ty) and t.name.startswith('Any:')
                 if dynamic:
-                    signature = self.dynamic_methods[t.name].get(method)
+                    signature = self.dynamic_methods[t].get(method)
                     if signature is None:
                         raise InferenceError('Unknown existential method ' + method, code='type')
                     receiver_type = signature.parameters[0]
@@ -322,9 +329,10 @@ class FeatureChecker(HandlerChecker):
                 if not dynamic:
                     self.method_calls[id(expression)] = (name, parameter.name.lower() if borrowed else '')
                 else:
-                    targets = tuple(symbol for (trait, _, member), symbol in self.trait_methods.items()
-                                    if trait == t.name[4:] and member == method)
-                    self.dynamic_calls[id(expression)] = (parameter.name.lower() if borrowed else '', targets)
+                    identity = self.interface_members[(t, method)]
+                    targets = tuple(impl.methods[method] for impl in self.trait_solver.implementations
+                                    if impl.head.name == 'Trait:' + identity[0] and method in impl.methods)
+                    self.dynamic_calls[id(expression)] = (parameter.name.lower() if borrowed else '', targets, identity)
                 return replace(result, effects=ambient(result.effects, *(v.effects for v in values)))
             case ('field', name, ('var', symbol)) if symbol in context.bindings:
                 binding = context.bindings[symbol]
@@ -684,9 +692,9 @@ def lower_feature(expr, names, lower, checker):
             return lower_declarations(expr, names, lower)
         case ('method_call', method, receiver, arguments, mode):
             if id(expr) in checker.dynamic_calls:
-                access, _ = checker.dynamic_calls[id(expr)]
+                access, _, identity = checker.dynamic_calls[id(expr)]
                 first = E('access', access, receiver[1]) if access else lower(receiver, names)
-                return E('dynamic_call', method, first, tuple(lower(a, names) for a in arguments))
+                return E('dynamic_call', identity, first, tuple(lower(a, names) for a in arguments))
             target = checker.method_calls.get(id(expr))
             if target:
                 name, access = target

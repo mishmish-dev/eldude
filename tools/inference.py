@@ -151,7 +151,9 @@ def permissions(t):
         return False, permissions(t.args[0])[1]
     if t.name == 'Task':
         return False, True
-    if t.name.startswith('$') or t.name == 'Owned':
+    if t.name.startswith('$'):
+        return Ty('Dup') in t.args, Ty('Discard') in t.args
+    if t.name == 'Owned':
         return False, False
     if t.name == 'DynArray':
         return False, permissions(t.args[0])[1]
@@ -480,6 +482,7 @@ class Checker:
                     types[name] = actual
                 return
             if isinstance(expected, Fn) and isinstance(actual, Fn):
+                self.check_constraints(actual.constraints, {}, {}, replace(context, evidence=context.evidence + expected.constraints))
                 if invariant and (expected.dup, expected.discard) != (actual.dup, actual.discard):
                     raise InferenceError('Invariant callback usage mismatch')
                 if (expected.dup and not actual.dup) or (expected.discard and not actual.discard):
@@ -760,6 +763,10 @@ class Checker:
                         captures[Variable(name)] = frozenset(context.regions.get(c, c) for c in actual)
                     elif kind == 'effect':
                         rows[name] = actual
+                    elif kind == 'constructor':
+                        substitutions[name] = actual
+                    elif kind == 'nat':
+                        substitutions['#' + name] = actual
                 def substitute(t):
                     if isinstance(t, Ty):
                         return substitutions.get(t.name[1:], t) if t.name.startswith('$') else replace(t, args=tuple(substitute(a) for a in t.args), region=regions.get(t.region, t.region))

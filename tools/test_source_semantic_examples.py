@@ -41,6 +41,8 @@ class SourceSemanticExampleTests(unittest.TestCase):
             'trait_overlap': ('semantic', 'Overlapping'),
             'trait_constraint_cycle': ('semantic', 'decrease'),
             'trait_stronger_method': ('semantic', 'stronger'),
+            'existential_hidden_prerequisite': ('type', 'DynCompatible'),
+            'existential_unfixed_associated': ('type', 'unresolved associated'),
         }
         for name, (code, message) in cases.items():
             path = REJECT / (name + '.eld')
