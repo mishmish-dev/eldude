@@ -75,11 +75,14 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 | 5 | [projected mutation](05_state_and_collections/projected_mut.eld) | `42` | Parent projection, independent inner state, and skipped callback on lookup miss |
 | 5 | [mutation exits](05_state_and_collections/mut_exit_paths.eld) | `42` | Early return, recoverable failure and affine abandonment release the interval |
 | 5 | [mutation suspension](05_state_and_collections/mut_suspension.eld) | `42` | A grant remains valid while a tail handler suspends its call |
+| 5 | [existential mutation](05_state_and_collections/existential_mut.eld) | `1nat` | Erased owner facts survive factories, branches, early return and match forwarding |
+| 5 | [existential projected mutation](05_state_and_collections/existential_projected_mut.eld) | `42` | Dynamic mutation through a parent projection preserves inner state |
 | 5 | [list failure](05_state_and_collections/list_failure.eld) | `3nat` | Failed removal returns original collection |
 | 5 | [finite loop](05_state_and_collections/finite_loop.eld) | `42` | Ownership-threaded finite iteration |
 | 5 | [freeze](05_state_and_collections/freeze.eld) | `2nat` | Capture-free elements escape after freezing through a generic wrapper |
 | 5 | [cleanup](05_state_and_collections/cleanup.eld) | `1` | `using` discharges a linear guard |
 | 5 | [tail cleanup](05_state_and_collections/tail_cleanup.eld) | `42` | Clause-local early return cleans up before resumption |
+| 6 | [capture rows](06_tasks/capture_rows.eld) | `42` | Affine callback captures survive spawn and consuming await |
 | 6 | [join](06_tasks/join.eld) | `42` | Spawn and await |
 | 6 | [inherited handler](06_tasks/inherited_handler.eld) | `42` | Same inherited handler, different child result types |
 | 6 | [child-local handler](06_tasks/child_local_handler.eld) | `42` | Answer-changing handler inside a child |
@@ -114,6 +117,7 @@ These fixtures cover handler evidence, ownership, resumption, and cleanup throug
 | [affine asynchronous cleanup](07_source_pipeline/affine_async.eld) | `()` | Abandonment triggers masked suspension and cleanup; body yield is skipped |
 | [forwarding](07_source_pipeline/forwarding.eld) | `42` | Inner then outer dispatch, outer then inner resumption; outer residual slot retained |
 | [callbacks](07_source_pipeline/callbacks.eld) | `20` | Fixed callback dispatches outer (`10`); ambient callback/source function dispatches inner (`20`) |
+| [capture/trait integration](07_source_pipeline/capture_trait_integration.eld) | `42` | Callback capture rows through tuples, generic multi-trait dispatch and dynamic mutation; one explicit file close |
 | [combined](07_source_pipeline/combined.eld) | `42` | Nested handlers, forwarding, deep once resumption and resource cleanup |
 
 In `combined`, allocation identities are deterministic: frame `1`, protected body `2`, tail-clause temporary `3`, and post-resume locals `4` and `5`. The significant ordering is:

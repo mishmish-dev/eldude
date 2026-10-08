@@ -9,6 +9,20 @@ from source_syntax import Diagnostic
 
 
 class SourceCaptureContractTests(unittest.TestCase):
+    def test_dynamic_mutation_and_integration_programs(self):
+        root = Path(__file__).resolve().parents[1] / 'examples'
+        for name, expected in (('05_state_and_collections/existential_mut', 1),
+                               ('05_state_and_collections/existential_projected_mut', 42),
+                               ('06_tasks/capture_rows', 42),
+                               ('07_source_pipeline/capture_trait_integration', 42)):
+            path = root / (name + '.eld')
+            checked = compile_source(path.read_text(), str(path))
+            execution = run(checked.program)
+            self.assertEqual(execution.value, expected)
+            if 'integration' in name:
+                self.assertEqual(execution.events, (('acquire', 'File', 1), ('close', 1, 'explicit')))
+            for signature in checked.functions.values():
+                self.assertEqual(Fn.loads(signature.dumps()), signature)
     def test_mutable_grant_programs(self):
         root = Path(__file__).resolve().parents[1] / 'examples'
         for name, expected in (('forwarded_mut', 1), ('projected_mut', 42), ('mut_suspension', 42), ('mut_exit_paths', 42)):

@@ -82,6 +82,7 @@ class SourceChecker(FeatureChecker):
         self.dynamic_methods = getattr(elaborator, 'dynamic_methods', {})
         self.interfaces = getattr(elaborator, 'interfaces', {})
         self.interface_members = getattr(elaborator, 'interface_members', {})
+        self.interface_variables = getattr(elaborator, 'interface_variables', {})
         self.trait_methods = getattr(elaborator, 'trait_methods', {})
         self.impl_contracts = getattr(elaborator, 'impl_contracts', {})
         self.impl_constraints = getattr(elaborator, 'impl_constraints', {})
@@ -124,20 +125,39 @@ class SourceChecker(FeatureChecker):
         """Expand closed annotations without narrowing whole-argument bounds."""
         return frozenset().union(*(self.capture_sources.get(c, {c}) for c in captures))
 
+    def _apply(self, function, arguments, context):
+        result = super()._apply(function, arguments, context)
+        if isinstance(result.type, Ty) and result.type.name.startswith('Any:'):
+            result = replace(result, type=self.resolve_type(result.type, context))
+        return result
+
     def resolve_type(self, t, context):
         original = t
         t = substitute(t, regions=context.regions)
         if not isinstance(t, Fn):
             t = replace(t, args=tuple(self.resolve_type(a, context) for a in t.args))
+            mapping_types, mapping_regions = {}, context.regions
+            if t.name.startswith('Any:') and original not in self.dynamic_methods:
+                from trait_constraints import match
+                for template in tuple(self.dynamic_methods):
+                    if template.name != t.name:
+                        continue
+                    type_vars, region_vars = self.interface_variables.get(template, ((), ()))
+                    try:
+                        mapping_types, mapping_regions = match(template, t, type_vars, region_vars)
+                    except ValueError:
+                        continue
+                    original = template
+                    break
             if original in self.dynamic_methods and t not in self.dynamic_methods:
-                self.dynamic_methods[t] = {name: substitute(signature, regions=context.regions)
+                self.dynamic_methods[t] = {name: substitute(signature, mapping_types, mapping_regions)
                                            for name, signature in self.dynamic_methods[original].items()}
-                self.interfaces[t] = tuple((name, tuple(substitute(a, regions=context.regions) for a in arguments),
-                                           tuple((n, substitute(v, regions=context.regions)) for n, v in bindings))
+                self.interfaces[t] = tuple((name, tuple(substitute(a, mapping_types, mapping_regions) for a in arguments),
+                                           tuple((n, substitute(v, mapping_types, mapping_regions)) for n, v in bindings))
                                           for name, arguments, bindings in self.interfaces[original])
                 for name in self.dynamic_methods[t]:
                     trait, arguments, member = self.interface_members[(original, name)]
-                    self.interface_members[(t, name)] = (trait, tuple(substitute(a, regions=context.regions) for a in arguments), member)
+                    self.interface_members[(t, name)] = (trait, tuple(substitute(a, mapping_types, mapping_regions) for a in arguments), member)
             if self.trait_solver:
                 try:
                     t = self.trait_solver.normalize_type(t, context.evidence)

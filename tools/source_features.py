@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 from effect_rows import Row
 from handlers import HandlerChecker, Defect, _bind, _protect_call, _Slot, _Request, _read
 from inference import (Ty, Fn, Value, Binding, Context, INT, BOOL, UNIT, E, value, ambient,
-                       permissions, capture_free, required_captures, InferenceError, state, Owner, Grant)
+                       permissions, capture_free, required_captures, InferenceError, state, Owner, Grant, joined_owner)
 
 NAT, NEVER, UNKNOWN = Ty('Nat'), Ty('Never'), Ty('Unknown')
 
@@ -304,7 +304,7 @@ class FeatureChecker(HandlerChecker):
                     if signature is None:
                         raise InferenceError('Unknown existential method ' + method, code='type')
                     receiver_type = signature.parameters[0]
-                    receiver_type = replace(receiver_type, args=(t,)) if receiver_type.name == 'View' else t
+                    receiver_type = replace(receiver_type, args=(t,)) if receiver_type.name in ('View', 'Mut') else t
                     target = (method, replace(signature, parameters=(receiver_type, *signature.parameters[1:])))
                 else:
                     target = self.methods.get((unwrapped(t).name, method))
@@ -446,7 +446,7 @@ class FeatureChecker(HandlerChecker):
                 for result in results:
                     t = join_type(t, result.type)
                 return value(t, ambient(retained.effects, *(r.effects for r in results)),
-                             frozenset().union(*(r.captures for r in results)))
+                             frozenset().union(*(r.captures for r in results)), owner=joined_owner(*results))
             case ('exit_scope', key, expected, body, wrap):
                 self.exit_contracts[key] = expected
                 self.exit_values[key] = []
@@ -459,12 +459,13 @@ class FeatureChecker(HandlerChecker):
                     inferred = result.type
                 t = join_type(expected, inferred) if expected else inferred
                 captures = result.captures
-                for exited in self.exit_values.pop(key):
+                exits = self.exit_values.pop(key)
+                for exited in exits:
                     t = join_type(t, exited.type)
                     captures |= exited.captures
                 del self.exit_active[key]
                 del self.exit_outside[key]
-                return value(t, result.effects, captures)
+                return value(t, result.effects, captures, owner=None if wrap else joined_owner(result, *exits))
             case ('early', key, argument):
                 result = self._infer(argument, context)
                 expected = self.exit_contracts[key]
@@ -592,7 +593,7 @@ class FeatureChecker(HandlerChecker):
                     raise InferenceError('await requires Task', code='type')
                 effects = ambient(retained.effects, Row(('suspend',)))
                 self._control(effects, context)
-                group_keys = {c for c in retained.captures if c.startswith('taskgroup:')}
+                group_keys = {c for c in retained.captures if isinstance(c, str) and c.startswith('taskgroup:')}
                 return value(retained.type.args[0], effects, retained.captures - group_keys)
         return super()._infer_expression(expression, context)
 
@@ -785,8 +786,12 @@ def evaluate_feature(machine, term, environment, evidence, resume):
                          else Package(t, retained, {method: _read(name, environment) for method, name in methods}))
         case ('dynamic_call', method, receiver, arguments):
             def invoke_package(package):
+                # Generic arguments are erased; the checked interface gives
+                # exactly one dictionary slot for this canonical trait/member.
+                target = next(function for (trait, _, member), function in package.methods.items()
+                              if trait == method[0] and member == method[2])
                 return machine.evaluate_arguments(arguments, environment, evidence, resume,
-                    lambda args: machine.invoke(package.methods[method], evidence, [package.value, *args]))
+                    lambda args: machine.invoke(target, evidence, [package.value, *args]))
             return _bind(evaluate(receiver), invoke_package)
         case ('definitions', _, _, _):
             from source_declarations import evaluate_declarations

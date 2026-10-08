@@ -14,7 +14,7 @@ Choose a task below, then read the linked chapter or component. The language spe
 | Understand the design goals | [Manifesto](#the-eldude-manifesto); [precedents](language-spec/precedents.md) for background |
 | Look up a language rule | [Topic map below](#language-topics); [specification index](language-specification.md) for conventions and a full reading order |
 | Find implemented behavior or a compiler component | [Implementation guide and code/test map](../tools/README.md) |
-| Implement the remaining capture and existential features | [Current implementation plan](capture-and-existential-plan.md), with executable acceptance programs for each step |
+| Find capture and existential acceptance coverage | [Current implementation plan](capture-and-existential-plan.md), with executable acceptance programs for each step |
 | Find a small program or expected diagnostic | [Executable examples](../examples/README.md); [illustrative spec snippets](language-spec/examples.md) |
 | Check library APIs, ownership, or cost contracts | [Module/API map](../stdlib/README.md); [library profile](standard-library.md) |
 | Work on syntax or grammar consumers | [Normative EBNF](eldude.ebnf); generated [grammar reference](formal-grammar.md) and [JSON export](eldude-grammar.json) |
@@ -51,7 +51,7 @@ Use the chapter's local contents and section links for a precise lookup. Chapter
 | [stdlib/](../stdlib/README.md) | `.eld` declarations and source bodies, grouped by module; the README maps APIs and implementation status |
 | [pyproject.toml](../pyproject.toml), [.python-version](../.python-version), [uv.lock](../uv.lock) | Project metadata, Python version, and locked environment |
 | [.gitignore](../.gitignore) | Local environment and Python cache exclusions |
-| [Capture and existential implementation plan](capture-and-existential-plan.md) | Current work order, dependencies, and program-based acceptance criteria for the six remaining restrictions |
+| [Capture and existential implementation plan](capture-and-existential-plan.md) | Implementation work order, dependencies, and program-based acceptance criteria for capture and existential support |
 | [implementation-plan.md](implementation-plan.md) | Completed example-coverage milestone; historical context, not a current backlog |
 
 ## Editing and checking

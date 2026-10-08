@@ -32,6 +32,7 @@ class SourceElaborator(Elaborator):
         self.function_evidence = {}
         self.dynamic_methods, self.trait_methods = {}, {}
         self.interfaces, self.interface_members = {}, {}
+        self.interface_variables = {}
         self.region_arguments, self.capture_arguments = {}, {}
         self.interface_self, self.associated_bindings = None, {}
         self.capture_names = {}
@@ -638,6 +639,7 @@ class SourceElaborator(Elaborator):
         if t in self.dynamic_methods:
             return t
         self.interfaces[t] = canonical
+        self.interface_variables[t] = (tuple(v.name[1:] for v in self.generic_types.values() if v.name.startswith('$')), self.generic_regions)
         evidence = tuple(Ty('Trait:' + name, (t, *terms)) for name, terms, _ in canonical)
         evidence += tuple(Ty('Trait:' + name, (t,)) for name in ('Dup', 'Discard') if Ty(name) in t.args)
         methods = {}
@@ -674,8 +676,6 @@ class SourceElaborator(Elaborator):
                     if name.items[0] in methods:
                         self.error('type', 'Ambiguous existential member ' + name.items[0], member)
                     receiver = Ty(parameters[0].items[2].title(), (t,)) if len(parameters[0].items) == 3 else t
-                    if isinstance(receiver, Ty) and receiver.name == 'Mut':
-                        self.limit('existential mut receivers', member)
                     rest = tuple(Ty(p.items[2].title(), (self.type(p.items[1]),)) if len(p.items) == 3
                                  else self.type(p.items[1]) for p in parameters[1:])
                     result, effects = self.contract(contract)

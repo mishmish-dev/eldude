@@ -122,6 +122,18 @@ class Value:
     grant: Grant | None = None
 
 
+def joined_owner(*values):
+    """Keep owner facts only when every continuing alternative establishes them."""
+    owners = [v.owner for v in values if v.type != Ty('Never')]
+    if not owners or any(o is None for o in owners):
+        return None
+    if all(o == owners[0] for o in owners):
+        return owners[0]
+    if owners[0].region is not None and all(o.region == owners[0].region for o in owners):
+        return Owner(owners[0].region)
+    return None
+
+
 @dataclass(eq=False)
 class Binding:
     value: Value
@@ -785,7 +797,7 @@ class Checker:
                     if resumption:
                         resumption.used = resumed
                 return value(result_type, ambient(test.effects, first.effects, second.effects),
-                             first.captures | second.captures)
+                             first.captures | second.captures, owner=joined_owner(first, second))
             case ('var', name):
                 return self._lookup(name, context)
             case ('specialize', callee, arguments):

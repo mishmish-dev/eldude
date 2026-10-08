@@ -49,6 +49,11 @@ class SourceSemanticExampleTests(unittest.TestCase):
             'mut_grant_escape': ('semantic', 'Access grants cannot be captured'),
             'mut_wrong_authority': ('effect', 'declared effect row'),
             'mut_root_effect': ('effect', 'declared effect row'),
+            'existential_mut_nonowner': ('semantic', 'intrinsic mutable owner'),
+            'existential_mut_capture_escape': ('semantic', 'mutable owner'),
+            'existential_mut_branch_escape': ('semantic', 'mutable owner'),
+            'existential_mut_failure_escape': ('semantic', 'mutable owner'),
+            'existential_mut_handler_escape': ('semantic', 'mutable owner'),
         }
         for name, (code, message) in cases.items():
             path = REJECT / (name + '.eld')
