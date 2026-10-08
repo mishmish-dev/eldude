@@ -601,83 +601,96 @@ class SourceElaborator(Elaborator):
     def existential_type(self, node):
         bounds = node.items[0]
         ordinary = [b for b in bounds if b.items[0] not in ('Dup', 'Discard')]
-        if len(ordinary) != 1:
-            self.limit('existential packages require one trait plus Dup/Discard', node)
-        bound = ordinary[0]
-        trait_name = self.canonical(bound.items[0])
-        if trait_name not in self.traits:
-            self.error('name', 'Unknown trait ' + trait_name, bound)
-        trait = self.traits[trait_name]
-        supplied = bound.items[1] if bound.kind == 'applied_type' else ()
-        arguments = tuple(a for a in supplied if a.kind != 'type_binding')
-        bindings = {}
-        associated = {m.items[0].items[0]: m for m in trait.items[2] if m.kind == 'associated_type'}
-        for binding in supplied:
-            if binding.kind != 'type_binding':
-                continue
-            name = binding.items[0].items[0]
-            if name not in associated or self.generics(associated[name].items[0]):
-                self.error('type', 'Unknown or generic associated binding ' + name, binding)
-            t = self.type(binding.items[1])
-            if name in bindings and bindings[name] != t:
-                self.error('type', 'Conflicting associated bindings', binding)
-            bindings[name] = t
-        terms = self.trait_arguments(trait, arguments)
-        identity = trait_name
+        if not ordinary:
+            self.error('type', 'Existential package requires an ordinary trait', node)
+        resolved = {}
+        equations = {}
+        for bound in ordinary:
+            trait_name = self.canonical(bound.items[0])
+            if trait_name not in self.traits:
+                self.error('name', 'Unknown trait ' + trait_name, bound)
+            trait = self.traits[trait_name]
+            supplied = bound.items[1] if bound.kind == 'applied_type' else ()
+            arguments = tuple(a for a in supplied if a.kind != 'type_binding')
+            bindings = {}
+            associated = {m.items[0].items[0]: m for m in trait.items[2] if m.kind == 'associated_type'}
+            terms = self.trait_arguments(trait, arguments)
+            for binding in supplied:
+                if binding.kind != 'type_binding':
+                    continue
+                name = binding.items[0].items[0]
+                if name not in associated or self.generics(associated[name].items[0]):
+                    self.error('type', 'Unknown or generic associated binding ' + name, binding)
+                t = self.type(binding.items[1])
+                key = trait_name, terms, name
+                if key in equations and equations[key] != t:
+                    self.error('type', 'Conflicting associated bindings', binding)
+                equations[key] = t
+                bindings[name] = t
+            key = trait_name, terms, tuple(sorted(bindings.items()))
+            resolved[key] = trait, arguments, bindings
+        canonical = tuple(sorted(resolved, key=repr))
         usage = tuple(Ty(b.items[0]) for b in bounds if b.items[0] in ('Dup', 'Discard'))
-        interface = Ty('Interface:' + trait_name, terms + tuple(Ty('Associated:' + n, (v,)) for n, v in sorted(bindings.items())))
-        t = Ty('Any:' + identity, tuple(sorted(set(usage), key=repr)) + (interface,))
+        interfaces = tuple(Ty('Interface:' + name, terms + tuple(Ty('Associated:' + n, (v,)) for n, v in bindings))
+                           for name, terms, bindings in canonical)
+        t = Ty('Any:' + '+'.join(sorted({name for name, _, _ in canonical})),
+               tuple(sorted(set(usage), key=repr)) + interfaces)
         if t in self.dynamic_methods:
             return t
-        self.interfaces[t] = ((trait_name, terms, tuple(sorted(bindings.items()))),)
+        self.interfaces[t] = canonical
+        evidence = tuple(Ty('Trait:' + name, (t, *terms)) for name, terms, _ in canonical)
+        evidence += tuple(Ty('Trait:' + name, (t,)) for name in ('Dup', 'Discard') if Ty(name) in t.args)
+        methods = {}
+        def raw_self(part):
+            if isinstance(part, Node):
+                return raw_self(part.items)
+            if isinstance(part, tuple):
+                return any(raw_self(p) for p in part)
+            return part == 'Self'
         keys = ('module', 'current_function', 'generic_types', 'generic_regions', 'generic_effects',
                 'generic_captures', 'generic_binders', 'capture_names', 'region_arguments',
                 'effect_arguments', 'capture_arguments', 'interface_self', 'associated_bindings')
-        previous = {key: getattr(self, key) for key in keys}
-        self.generic_types = dict(self.generic_types)
-        self.region_arguments, self.effect_arguments, self.capture_arguments = {}, {}, {}
-        self.apply_trait_arguments(trait, arguments)
-        self.module, self.current_function = self.owners[id(trait)], None
-        self.interface_self, self.associated_bindings = t, bindings
-        self.capture_names = {}
-        evidence = tuple(Ty('Trait:' + name, (t,)) for name in ('Dup', 'Discard') if Ty(name) in t.args)
-        methods = {}
-        try:
-            trait_constraints = self.constraints(trait.items[1].items[2] if len(trait.items[1].items) > 2 else ())
-            for constraint in trait_constraints:
-                self.trait_solver.check(constraint, evidence)
-            def raw_self(part):
-                if isinstance(part, Node):
-                    return raw_self(part.items)
-                if isinstance(part, tuple):
-                    return any(raw_self(p) for p in part)
-                return part == 'Self'
-            for member in trait.items[2]:
-                if member.kind != 'function':
-                    continue
-                _, name, parameters, contract, _ = member.items
-                if (self.generics(name) or not parameters or parameters[0].items[0].items[0] != 'self'
-                        or sum(p.items[0].items[0] == 'self' for p in parameters) != 1
-                        or parameters[0].items[1] is not None or raw_self((parameters[1:], contract))):
-                    self.error('type', 'Trait is not DynCompatible', member)
-                receiver = Ty(parameters[0].items[2].title(), (t,)) if len(parameters[0].items) == 3 else t
-                if isinstance(receiver, Ty) and receiver.name == 'Mut':
-                    self.limit('existential mut receivers', member)
-                rest = tuple(Ty(p.items[2].title(), (self.type(p.items[1]),)) if len(p.items) == 3
-                             else self.type(p.items[1]) for p in parameters[1:])
-                result, effects = self.contract(contract)
-                constraints = self.constraints(name.items[2] if len(name.items) > 2 else ())
-                for constraint in constraints:
+        for trait_name, terms, associated in canonical:
+            trait, arguments, bindings = resolved[(trait_name, terms, associated)]
+            previous = {key: getattr(self, key) for key in keys}
+            self.generic_types = dict(self.generic_types)
+            self.region_arguments, self.effect_arguments, self.capture_arguments = {}, {}, {}
+            self.apply_trait_arguments(trait, arguments)
+            self.module, self.current_function = self.owners[id(trait)], None
+            self.interface_self, self.associated_bindings = t, bindings
+            self.capture_names = {}
+            try:
+                trait_constraints = self.constraints(trait.items[1].items[2] if len(trait.items[1].items) > 2 else ())
+                for constraint in trait_constraints:
                     self.trait_solver.check(constraint, evidence)
-                result = self.trait_solver.normalize_type(result, evidence)
-                bound = frozenset() if capture_free(result) else frozenset(f'arg:{i}' for i in range(len(parameters)))
-                methods[name.items[0]] = Fn((receiver, *rest), result, effects, bound,
-                                           captures=self.capture_contract(contract))
-                self.interface_members[(t, name.items[0])] = (trait_name, terms, name.items[0])
-        except ValueError as error:
-            self.error('type', 'Trait is not DynCompatible: ' + str(error), node)
-        finally:
-            self.__dict__.update(previous)
+                for member in trait.items[2]:
+                    if member.kind != 'function':
+                        continue
+                    _, name, parameters, contract, _ = member.items
+                    if (self.generics(name) or not parameters or parameters[0].items[0].items[0] != 'self'
+                            or sum(p.items[0].items[0] == 'self' for p in parameters) != 1
+                            or parameters[0].items[1] is not None or raw_self((parameters[1:], contract))):
+                        self.error('type', 'Trait is not DynCompatible', member)
+                    if name.items[0] in methods:
+                        self.error('type', 'Ambiguous existential member ' + name.items[0], member)
+                    receiver = Ty(parameters[0].items[2].title(), (t,)) if len(parameters[0].items) == 3 else t
+                    if isinstance(receiver, Ty) and receiver.name == 'Mut':
+                        self.limit('existential mut receivers', member)
+                    rest = tuple(Ty(p.items[2].title(), (self.type(p.items[1]),)) if len(p.items) == 3
+                                 else self.type(p.items[1]) for p in parameters[1:])
+                    result, effects = self.contract(contract)
+                    constraints = self.constraints(name.items[2] if len(name.items) > 2 else ())
+                    for constraint in constraints:
+                        self.trait_solver.check(constraint, evidence)
+                    result = self.trait_solver.normalize_type(result, evidence)
+                    bound = frozenset() if capture_free(result) else frozenset(f'arg:{i}' for i in range(len(parameters)))
+                    methods[name.items[0]] = Fn((receiver, *rest), result, effects, bound,
+                                               captures=self.capture_contract(contract))
+                    self.interface_members[(t, name.items[0])] = (trait_name, terms, name.items[0])
+            except ValueError as error:
+                self.error('type', 'Trait is not DynCompatible: ' + str(error), node)
+            finally:
+                self.__dict__.update(previous)
         self.dynamic_methods[t] = methods
         return t
 

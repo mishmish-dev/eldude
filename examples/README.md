@@ -53,6 +53,7 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 | 2 | [existential arguments](02_ownership/existential_arguments.eld) | `42` | Full instantiated interfaces across all six generic categories |
 | 2 | [existential associated types](02_ownership/existential_associated.eld) | `42` | Fixed associated results dispatch without exposing the hidden type |
 | 2 | [existential constraints](02_ownership/existential_constraints.eld) | `42` | Trait, method and implementation prerequisites with visible usage evidence |
+| 2 | [existential traits](02_ownership/existential_traits.eld) | `42` | One hidden value supplies several dictionaries; bound weakening preserves storage |
 | 2 | [traits](02_ownership/traits.eld) | `42` | Covered impl and associated type |
 | 2 | [trait prerequisites](02_ownership/trait_prerequisites.eld) | `42` | Decreasing element constraints and normalized associated results |
 | 3 | [option](03_results/option.eld) | `42` | Library method and lazy fallback |

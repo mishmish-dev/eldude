@@ -11,7 +11,7 @@ from source_syntax import Diagnostic
 class SourceCaptureContractTests(unittest.TestCase):
     def test_instantiated_existential_programs(self):
         root = Path(__file__).resolve().parents[1] / 'examples/02_ownership'
-        for name in ('arguments', 'associated', 'constraints'):
+        for name in ('arguments', 'associated', 'constraints', 'traits'):
             path = root / ('existential_' + name + '.eld')
             source = path.read_text()
             self.assertEqual(run(compile_source(source, str(path)).program).value, 42)

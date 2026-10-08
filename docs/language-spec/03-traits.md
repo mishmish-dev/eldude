@@ -144,6 +144,10 @@ any Parser<Token = Token>
 
 Creating such a package is explicit; there is no universal implicit coercion.
 
+Multiple ordinary bounds describe the same hidden value, for example `any First + Second + Discard`. Every bound must be dynamically compatible and have implementation evidence for that value. Dictionaries are keyed by the canonical instantiated trait and member. Identical bounds normalize to one; contradictory equations for the same associated member reject. Unqualified lookup that collides between distinct trait members is ambiguous and rejects; the core adds no qualified-call syntax.
+
+Explicit weakening may remove bounds or usage promises while preserving the remaining evidence and the hidden value's whole capture summary and ownership obligations. Removing a bound does not establish `Dup`, `Discard`, or capture freedom.
+
 ### 11.2 Dynamic compatibility
 
 Dynamic compatibility is a closed static judgment over the erased package interface. Write conceptually:

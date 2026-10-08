@@ -43,6 +43,8 @@ class SourceSemanticExampleTests(unittest.TestCase):
             'trait_stronger_method': ('semantic', 'stronger'),
             'existential_hidden_prerequisite': ('type', 'DynCompatible'),
             'existential_unfixed_associated': ('type', 'unresolved associated'),
+            'existential_member_collision': ('type', 'Ambiguous existential member'),
+            'existential_conflicting_bindings': ('type', 'Conflicting associated'),
         }
         for name, (code, message) in cases.items():
             path = REJECT / (name + '.eld')

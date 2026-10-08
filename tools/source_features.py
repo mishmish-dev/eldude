@@ -257,8 +257,9 @@ class FeatureChecker(HandlerChecker):
                 wanted, actual = permissions(t), permissions(retained.type)
                 if any(w and not a for w, a in zip(wanted, actual)):
                     raise InferenceError('Existential usage promises require Dup/Discard of the hidden value', code='type')
-                if (isinstance(retained.type, Ty) and retained.type.name == t.name and
-                        self.interfaces[retained.type] == self.interfaces[t]):
+                if isinstance(retained.type, Ty) and retained.type.name.startswith('Any:'):
+                    if not set(self.interfaces[t]) <= set(self.interfaces[retained.type]):
+                        raise InferenceError('Existential weakening requires every remaining trait bound', code='type')
                     self.packages[id(expression)] = {}
                     return value(t, retained.effects, retained.captures)
                 methods = {}

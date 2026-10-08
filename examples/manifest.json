@@ -13,6 +13,7 @@
     "02_ownership/existential_arguments.eld": 42,
     "02_ownership/existential_associated.eld": 42,
     "02_ownership/existential_constraints.eld": 42,
+    "02_ownership/existential_traits.eld": 42,
     "02_ownership/existentials.eld": 42,
     "02_ownership/explicit_captures.eld": 42,
     "02_ownership/linear_closure.eld": 42,
