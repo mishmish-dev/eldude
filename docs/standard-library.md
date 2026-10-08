@@ -71,6 +71,7 @@ For methods below, parameter 0 is `self`; other positions count left to right. `
 | `List::next` | Empty returns `Done`; otherwise transfers first element and tail; whole result bound `S`, with no discarded elements |
 | `DynArray::push` | Appends at the end; receiver keeps `S` and conservatively accumulates `V` under [§13.6](language-spec/04-captures-and-access.md#136-canonical-interfaces-and-conservative-mutation) |
 | `DynArray::pop` | Empty returns `None`; otherwise transfers the last element; result bound `S`, and surviving receiver keeps `S` |
+| `DynArray::withMut` | Invalid index skips a `Discard` callback; valid index derives a `mut` grant from the parent and invokes once on the original slot; result bound `S ∪ C`. Admits `state<@r>` plus the callback row; independent nested identities retain their own declared effects |
 | `DynArray::freeze` | Consumes owner, preserves element order; result bound `S`, including `@r`, unless `T` is provably capture-free |
 | `Ref::replace` / `set` | Install value only if its provenance meets `@r`'s retention horizon; `replace` returns old payload, `set` discards it using `T: Discard` |
 

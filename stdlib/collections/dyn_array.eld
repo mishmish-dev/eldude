@@ -11,6 +11,13 @@ impl<T, @r> DynArray<T, @r> {
     pub fn length(view self) ->{state<@r>} Nat;
     pub fn push(mut self, value: T) ->{state<@r>} Unit;
     pub fn pop(mut self) ->{state<@r>} Option<T>;
+    // Conditional projection preserves the parent grant and original storage.
+    pub fn withMut<R, !e, ..C>(
+        mut self,
+        index: Int,
+        inspect: fn(mut T) ->{| e} R captures {..C},
+    ) ->{state<@r> | e} Option<R>
+    where ..C: Discard;
     // Result retains the whole owner summary unless T is provably capture-free.
     pub fn freeze(self) ->{state<@r>} List<T>;
 }

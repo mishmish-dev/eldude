@@ -9,6 +9,16 @@ from source_syntax import Diagnostic
 
 
 class SourceCaptureContractTests(unittest.TestCase):
+    def test_mutable_grant_programs(self):
+        root = Path(__file__).resolve().parents[1] / 'examples'
+        for name, expected in (('forwarded_mut', 1), ('projected_mut', 42), ('mut_suspension', 42), ('mut_exit_paths', 42)):
+            path = root / '05_state_and_collections' / (name + '.eld')
+            execution = run(compile_source(path.read_text(), str(path)).program)
+            self.assertEqual(execution.value, expected)
+            if name == 'mut_suspension':
+                self.assertTrue(any(event[0] == 'dispatch' for event in execution.events))
+            if name == 'mut_exit_paths':
+                self.assertTrue(any(event[0] == 'abandon' for event in execution.events))
     def test_instantiated_existential_programs(self):
         root = Path(__file__).resolve().parents[1] / 'examples/02_ownership'
         for name in ('arguments', 'associated', 'constraints', 'traits'):

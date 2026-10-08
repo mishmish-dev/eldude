@@ -45,6 +45,10 @@ class SourceSemanticExampleTests(unittest.TestCase):
             'existential_unfixed_associated': ('type', 'unresolved associated'),
             'existential_member_collision': ('type', 'Ambiguous existential member'),
             'existential_conflicting_bindings': ('type', 'Conflicting associated'),
+            'mut_alias_conflict': ('semantic', 'Conflicting access'),
+            'mut_grant_escape': ('semantic', 'Access grants cannot be captured'),
+            'mut_wrong_authority': ('effect', 'declared effect row'),
+            'mut_root_effect': ('effect', 'declared effect row'),
         }
         for name, (code, message) in cases.items():
             path = REJECT / (name + '.eld')

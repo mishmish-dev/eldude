@@ -49,6 +49,7 @@ class Fn:
     capture_vars: tuple = ()
     generic_binders: tuple = ()
     constraints: tuple = ()
+    result_owner: str | None = None
 
     def dumps(self):
         def encode(t):
@@ -62,7 +63,7 @@ class Fn:
                     'dup': t.dup, 'discard': t.discard,
                     'captures': None if t.captures is None else encode_captures(t.captures),
                     'capture_vars': encode_captures(t.capture_vars), 'generic_binders': t.generic_binders,
-                    'constraints': [encode(c) for c in t.constraints]}
+                    'constraints': [encode(c) for c in t.constraints], 'result_owner': t.result_owner}
         return json.dumps(encode(self), sort_keys=True)
 
     @staticmethod
@@ -82,7 +83,7 @@ class Fn:
                       None if data.get('captures') is None else decode_captures(data['captures']),
                       tuple(next(iter(decode_captures([a]))) for a in data.get('capture_vars', ())),
                       tuple(tuple(b) for b in data.get('generic_binders', ())),
-                      tuple(decode(c, scope) for c in data.get('constraints', ())))
+                      tuple(decode(c, scope) for c in data.get('constraints', ())), data.get('result_owner'))
         try:
             result = decode(json.loads(wire), {})
         except (KeyError, TypeError, json.JSONDecodeError) as error:
@@ -98,10 +99,27 @@ def E(kind, *arguments):
 
 
 @dataclass(frozen=True)
+class Owner:
+    region: str | None
+    origin: int | None = None
+    identity: object = field(default_factory=object)
+
+
+@dataclass(frozen=True)
+class Grant:
+    owner: Owner
+    mode: str
+    path: tuple = ()
+    parent: object = None
+
+
+@dataclass(frozen=True)
 class Value:
     type: object
     effects: Row = Row()
     captures: frozenset = frozenset()
+    owner: Owner | None = None
+    grant: Grant | None = None
 
 
 @dataclass(eq=False)
@@ -129,6 +147,7 @@ class Context:
     blocked_family: str | None = None
     group: object = None
     evidence: tuple = ()
+    grants: tuple = ()
 
 
 def state(region):
@@ -189,9 +208,11 @@ def required_captures(t):
     return frozenset(result)
 
 
-def value(t, effects=Row(), captures=frozenset()):
+def value(t, effects=Row(), captures=frozenset(), *, owner=None, grant=None):
     captures = frozenset() if capture_free(t) else frozenset(captures) | required_captures(t)
-    return Value(t, effects, captures)
+    if isinstance(t, Ty) and t.name == 'DynArray' and owner is None:
+        owner = Owner(t.region)
+    return Value(t, effects, captures, owner, grant)
 
 
 def ambient(*rows):
@@ -318,6 +339,7 @@ class Checker:
                 return value(self.functions[name])
             raise InferenceError(f'Unknown value {name}')
         binding = context.bindings[name]
+        self._check_owner_available(binding.value, context)
         if binding.consumed and not permissions(binding.value.type)[0]:
             raise InferenceError(f'{name} was already consumed', subject=name)
         context.references.add(binding)
@@ -327,6 +349,15 @@ class Checker:
             binding.consumed = True
             self.transfers[name] = self.current_expression
         return binding.value
+
+    def _check_owner_available(self, retained, context, mode=None):
+        owner = retained.grant.owner if retained.grant else retained.owner
+        if owner is None:
+            return
+        active = [v.grant for v in context.temporaries if v.grant]
+        active += [v.grant for _, v, _, _ in context.suspended if v.grant]
+        if any(g.owner == owner and (mode is None or mode == 'mut' or g.mode == 'mut') for g in active):
+            raise InferenceError('Conflicting access to an active mutable owner')
 
     def _resolve(self, row, context):
         labels = Counter()
@@ -403,6 +434,12 @@ class Checker:
                 self.capture_sources[source] = required_captures(t)
             mode = t.name.lower() if isinstance(t, Ty) and t.name in ('View', 'Mut') else None
             binding = Binding(value(t.args[0] if mode else t, captures={source}), mode=mode)
+            if isinstance(binding.value.type, Ty) and binding.value.type.name.startswith('Any:'):
+                binding.value = replace(binding.value, owner=Owner(None, index))
+            if mode:
+                grant = Grant(Owner(None), mode)
+                binding.value = replace(binding.value, grant=grant)
+                context.grants += (grant,)
             context.bindings[name] = binding
             parameter_bindings.append((name, binding))
             context.live.append((name, binding))
@@ -413,6 +450,7 @@ class Checker:
         captures, captured_types = set(), []
         for copy in context.references & originals.keys():
             original = originals[copy]
+            self._check_owner_available(original.value, outer)
             if original.mode:
                 raise InferenceError('Access grants cannot be captured by a function')
             if original.consumed:
@@ -442,6 +480,10 @@ class Checker:
         signature = Fn(tuple(t for _, t in parameters), export(result.type), result.effects,
                        frozenset(bound), dup=all(permissions(t)[0] for t in captured_types),
                        discard=all(permissions(t)[1] for t in captured_types))
+        if result.owner:
+            origin = next((i for i, (_, b) in enumerate(parameter_bindings) if b.value.owner == result.owner), None)
+            signature = replace(signature, result_owner='region:' + result.owner.region if result.owner.region is not None
+                                else 'arg:' + str(origin) if origin is not None else None)
         return value(signature, captures=captures)
 
     def check_constraints(self, constraints, types, regions, context):
@@ -609,7 +651,11 @@ class Checker:
             else:
                 retained.update(captures({source}))
         self._control(effects, context)
-        return value(substitute(signature.result), effects, retained)
+        owner = None
+        if signature.result_owner:
+            source = signature.result_owner
+            owner = arguments[int(source[4:])].owner if source.startswith('arg:') else Owner(regions.get(source[7:], source[7:]))
+        return value(substitute(signature.result), effects, retained, owner=owner)
 
     def _infer(self, expression, context):
         previous, self.current_expression = self.current_expression, expression
@@ -778,7 +824,8 @@ class Checker:
                         return frozenset(regions.get(c, c) for c in substitute_captures(expression, captures))
                     return replace(t, parameters=tuple(substitute(p) for p in t.parameters), result=substitute(t.result),
                                    effects=effects, bound=capture_set(t.bound), captures=None if t.captures is None else capture_set(t.captures),
-                                   constraints=tuple(substitute(c) for c in t.constraints))
+                                   constraints=tuple(substitute(c) for c in t.constraints),
+                                   result_owner='region:' + regions.get(t.result_owner[7:], t.result_owner[7:]) if t.result_owner and t.result_owner.startswith('region:') else t.result_owner)
                 return replace(function, type=replace(substitute(signature), type_vars=(), regions=(), effect_vars=(), capture_vars=(), generic_binders=()))
             case ('lambda', parameters, body):
                 return self._function(parameters, body, context)

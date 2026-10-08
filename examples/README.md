@@ -71,6 +71,10 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 | 5 | [affine capture row](05_state_and_collections/affine_capture_row.eld) | `42` | Generic relay retains a nonduplicable array callback |
 | 5 | [inferred regions](05_state_and_collections/inferred_regions.eld) | `42` | Joint callback/type/effect constraints in either argument order |
 | 5 | [explicit regions](05_state_and_collections/explicit_regions.eld) | `42` | Ordered explicit region and capture-row arguments |
+| 5 | [forwarded mutation](05_state_and_collections/forwarded_mut.eld) | `1nat` | Two helpers forward one grant to the same array |
+| 5 | [projected mutation](05_state_and_collections/projected_mut.eld) | `42` | Parent projection, independent inner state, and skipped callback on lookup miss |
+| 5 | [mutation exits](05_state_and_collections/mut_exit_paths.eld) | `42` | Early return, recoverable failure and affine abandonment release the interval |
+| 5 | [mutation suspension](05_state_and_collections/mut_suspension.eld) | `42` | A grant remains valid while a tail handler suspends its call |
 | 5 | [list failure](05_state_and_collections/list_failure.eld) | `3nat` | Failed removal returns original collection |
 | 5 | [finite loop](05_state_and_collections/finite_loop.eld) | `42` | Ownership-threaded finite iteration |
 | 5 | [freeze](05_state_and_collections/freeze.eld) | `2nat` | Capture-free elements escape after freezing through a generic wrapper |

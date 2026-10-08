@@ -152,6 +152,7 @@ class HandlerChecker(Checker):
         # must not retroactively discharge an earlier suspended segment.
         entries = [(name, b.value, b.managed, id(b)) for name, b in context.live if not b.consumed]
         entries.extend(('argument temporary', v, False, id(v)) for v in context.temporaries)
+        entries.extend(('active access', value(Ty(g.mode.title(), (UNIT,)), grant=g), False, id(g)) for g in context.grants)
         entries.extend(context.suspended)
         if context.resumption is not None and not context.resumption.used:
             entries.extend(context.resumption.pending)
@@ -207,7 +208,7 @@ class HandlerChecker(Checker):
         copies = {name: replace(b, consumed=False, managed=False) for name, b in frame.captures.items()}
         return Context(bindings=dict(copies), live=list(copies.items()), regions=dict(outer.regions),
                        handlers=outer.handlers, names=dict(outer.names), active=outer.active,
-                       trace=False), copies
+                       trace=False, evidence=outer.evidence, grants=outer.grants), copies
 
     @staticmethod
     def _discharge(bindings):
@@ -240,6 +241,8 @@ class HandlerChecker(Checker):
         captures = {}
         for captured in sorted(free & context.bindings.keys()):
             original = context.bindings[captured]
+            if original.mode:
+                raise InferenceError('Access grants cannot be captured by a handler')
             if original.consumed:
                 raise InferenceError(f'{captured} was already consumed', subject=captured)
             captures[captured] = replace(original, managed=False)

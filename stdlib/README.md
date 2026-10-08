@@ -15,7 +15,7 @@ The [library profile](../docs/standard-library.md) owns representation, cost, ow
 | [collections::linked_list](collections/linked_list.eld) | `LinkedList`, `prepend`, consuming `length`, `next` | Ordinary source bodies |
 | [collections::list](collections/list.eld) | `List`, bounds errors, lookup, push, remove, replace, inspection, filter, partition, `next` | Opaque representation and method contracts |
 | [state::ref](state/ref.eld) | Regional `Ref`, `new`, `get`, `replace`, `set` | Cell primitives; `set` has a source body |
-| [collections::dyn_array](collections/dyn_array.eld) | `DynArray`, `new`, `length`, `push`, `pop`, `freeze` | Mutable-owner primitives |
+| [collections::dyn_array](collections/dyn_array.eld) | `DynArray`, `new`, `length`, `push`, `pop`, `withMut`, `freeze` | Mutable-owner primitives and conditional grant projection |
 | [task](task.eld) | `Task`, `cancel`, `yield`, `join2` | Runtime primitives; `join2` has a source body |
 
 Callbacks used by `Option`/`Result` transformations may be skipped, so their environments must be `Discard`. They need no `Dup` guarantee because each selected callback runs once. Collection filtering/partitioning may skip and repeat their predicate, so its environment needs both permissions. `filter` additionally needs `T: Discard`; `partition` preserves all elements. Initial collection predicates are pure. These are ordinary usage rules, not new callback modes.

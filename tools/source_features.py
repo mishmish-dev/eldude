@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 from effect_rows import Row
 from handlers import HandlerChecker, Defect, _bind, _protect_call, _Slot, _Request, _read
 from inference import (Ty, Fn, Value, Binding, Context, INT, BOOL, UNIT, E, value, ambient,
-                       permissions, capture_free, required_captures, InferenceError, state)
+                       permissions, capture_free, required_captures, InferenceError, state, Owner, Grant)
 
 NAT, NEVER, UNKNOWN = Ty('Nat'), Ty('Never'), Ty('Unknown')
 
@@ -17,6 +17,7 @@ def substitute(t, types=None, regions=None):
                        effects=Row(tuple(next((state(v) for k, v in regions.items() if label == state(k)), label)
                                          for label in t.effects.labels), t.effects.tail),
                        bound=frozenset(regions.get(c, c) for c in t.bound),
+                       result_owner='region:' + regions.get(t.result_owner[7:], t.result_owner[7:]) if t.result_owner and t.result_owner.startswith('region:') else t.result_owner,
                        captures=None if t.captures is None else frozenset(regions.get(c, c) for c in t.captures))
     if t.name.startswith('$'):
         return types.get(t.name[1:], t)
@@ -230,13 +231,19 @@ class FeatureChecker(HandlerChecker):
         if isinstance(function.type, Fn):
             arguments = [replace(a, type=join_type(p, a.type)) if compatible(p, a.type) and a.type != p else a
                          for p, a in zip(function.type.parameters, arguments)] if len(arguments) == len(function.type.parameters) else arguments
-        result = super()._apply(function, arguments, context)
+        previous = context.grants
+        context.grants += tuple(a.grant for a in arguments if a.grant)
+        try:
+            result = super()._apply(function, arguments, context)
+        finally:
+            context.grants = previous
         retained = function.captures | frozenset().union(*(a.captures for a in arguments))
         for borrowing in borrowed:
             if borrowing is None:
                 continue
             argument, binding = borrowing
-            if argument.type.name == 'Mut':
+            t = unwrapped(binding.value.type)
+            if argument.type.name == 'Mut' and not (t.name == 'DynArray' and capture_free(t.args[0])):
                 binding.value = replace(binding.value, captures=binding.value.captures | retained)
         return result
 
@@ -261,7 +268,7 @@ class FeatureChecker(HandlerChecker):
                     if not set(self.interfaces[t]) <= set(self.interfaces[retained.type]):
                         raise InferenceError('Existential weakening requires every remaining trait bound', code='type')
                     self.packages[id(expression)] = {}
-                    return value(t, retained.effects, retained.captures)
+                    return value(t, retained.effects, retained.captures, owner=retained.owner)
                 methods = {}
                 for trait, arguments, bindings in self.interfaces[t]:
                     goal = Ty('Trait:' + trait, (retained.type, *arguments))
@@ -278,7 +285,7 @@ class FeatureChecker(HandlerChecker):
                     for member, target in implementation.methods.items():
                         methods[(trait, arguments, member)] = target
                 self.packages[id(expression)] = methods
-                return value(t, retained.effects, retained.captures)
+                return value(t, retained.effects, retained.captures, owner=retained.owner)
             case ('definitions', _, _, _):
                 from source_declarations import infer_declarations
                 return infer_declarations(self, expression, context)
@@ -497,14 +504,24 @@ class FeatureChecker(HandlerChecker):
                 if not binding or binding.consumed:
                     raise InferenceError(f'{name} is unavailable for {mode}', subject=name)
                 context.references.add(binding)
-                result = value(Ty(mode.title(), (binding.value.type,)), captures=binding.value.captures)
+                self._check_owner_available(binding.value, context, mode)
+                incoming = binding.value.grant
+                if mode == 'mut' and incoming and incoming.mode != 'mut':
+                    raise InferenceError('Shared view grant cannot authorize mut access')
+                if mode == 'mut' and incoming is None and (binding.value.owner is None or binding.value.owner.region is None):
+                    raise InferenceError('Root mut access requires an intrinsic mutable owner')
+                owner = incoming.owner if incoming else binding.value.owner or Owner(None)
+                grant = Grant(owner, mode, incoming.path if incoming else (), incoming)
+                effects = Row((state(owner.region),)) if mode == 'mut' and incoming is None else Row()
+                result = value(Ty(mode.title(), (binding.value.type,)), effects, binding.value.captures,
+                               owner=binding.value.owner, grant=grant)
                 self.borrowed_values[id(result)] = (result, binding)
                 return result
             case ('region', name, body):
                 outside = list(context.bindings.values())
                 result = super()._infer_expression(expression, context)
                 for binding in outside:
-                    if not binding.consumed and any(c.startswith(name + '#') for c in binding.value.captures):
+                    if not binding.consumed and any(isinstance(c, str) and c.startswith(name + '#') for c in binding.value.captures):
                         raise InferenceError('Local region would escape through a mutable owner')
                 return result
             case ('list_values', declared, items):
@@ -593,7 +610,7 @@ class FeatureChecker(HandlerChecker):
         return result.effects
 
     def primitive_method(self, expression, method, receiver, arguments, mode, context, retained=None):
-        required_mode = {'length': 'view', 'push': 'mut'}.get(method, '')
+        required_mode = {'length': 'view', 'push': 'mut', 'pop': 'mut', 'withMut': 'mut'}.get(method, '')
         if mode != required_mode:
             raise InferenceError(f'{method} requires {required_mode or "consuming"} access')
         inspected = receiver[0] == 'var' and receiver[1] in context.bindings
@@ -602,15 +619,14 @@ class FeatureChecker(HandlerChecker):
         if borrowed and binding:
             if binding.consumed:
                 raise InferenceError(f'{receiver[1]} was already consumed', subject=receiver[1])
-            context.references.add(binding)
-            retained = binding.value
+            retained = self._infer(E('access', mode, receiver[1]), context)
+            retained = replace(retained, type=binding.value.type)
         elif retained is None:
             retained = self._infer(receiver, context)
         t = unwrapped(retained.type)
         values = []
         start = len(context.temporaries)
-        if not borrowed:
-            context.temporaries.append(retained)
+        context.temporaries.append(retained)
         for argument in arguments:
             actual = self._infer(argument, context)
             values.append(actual)
@@ -640,6 +656,23 @@ class FeatureChecker(HandlerChecker):
                 raise InferenceError('Array element type mismatch', code='type')
             binding.value = replace(binding.value, captures=captures)
             result = UNIT
+        elif method == 'pop' and t.name == 'DynArray' and not values:
+            result = Ty('Option', t.args)
+        elif method == 'withMut' and t.name == 'DynArray' and len(values) == 2:
+            index, callback = values
+            if index.type != INT:
+                raise InferenceError('Array index must be Int', code='type')
+            if not isinstance(callback.type, Fn) or not callback.type.discard:
+                raise InferenceError('Conditional projection callback must satisfy Discard')
+            parent = retained.grant
+            projected = Grant(parent.owner, 'mut', parent.path + ('element',), parent)
+            argument = value(Ty('Mut', (t.args[0],)), captures=retained.captures, grant=projected)
+            mapped = self._apply(callback, [argument], context)
+            if not capture_free(t.args[0]):
+                binding.value = replace(binding.value, captures=captures)
+            result = Ty('Option', (mapped.type,))
+            rows.append(mapped.effects)
+            captures |= mapped.captures
         elif method == 'freeze' and t.name == 'DynArray' and not values:
             result = Ty('List', t.args)
             if capture_free(t.args[0]):
@@ -824,6 +857,14 @@ def evaluate_feature(machine, term, environment, evidence, resume):
                     if method == 'push':
                         retained.values.append(args[0])
                         return None
+                    if method == 'pop':
+                        return Variant(None, 'Some', (retained.values.pop(),)) if retained.values else Variant(None, 'None')
+                    if method == 'withMut':
+                        index, callback = args
+                        if not 0 <= index < len(retained.values):
+                            return Variant(None, 'None')
+                        return _bind(machine.invoke(callback, evidence, [retained.values[index]]),
+                                     lambda result: Variant(None, 'Some', (result,)))
                     if method == 'freeze':
                         return tuple(retained.values)
                     if method == 'remove':

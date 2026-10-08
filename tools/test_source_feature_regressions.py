@@ -3,7 +3,7 @@ import unittest
 
 from effect_rows import Row
 from handlers import Defect, compile_program, run
-from inference import Binding, Context, E, Fn, INT, UNIT, Ty, InferenceError, value
+from inference import Binding, Context, E, Fn, INT, UNIT, Ty, InferenceError, value, Grant, Owner
 from source_features import FeatureChecker, NAT, UNKNOWN
 
 
@@ -116,7 +116,7 @@ class SourceFeatureRegressionTests(unittest.TestCase):
     def test_mut_wrapper_keeps_provenance_after_contextual_type_normalization(self):
         checker = FeatureChecker()
         reference = Ty('Ref', (INT,), 'r')
-        owner = Binding(value(Ty('Option', (UNKNOWN,))))
+        owner = Binding(value(Ty('Option', (UNKNOWN,)), grant=Grant(Owner('r'), 'mut', ('element',))), mode='mut')
         context = Context(bindings={'owner': owner}, active=frozenset({'r'}))
         access = checker._infer(E('access', 'mut', 'owner'), context)
         signature = Fn((Ty('Mut', (Ty('Option', (reference,)),)), reference), UNIT, Row())
