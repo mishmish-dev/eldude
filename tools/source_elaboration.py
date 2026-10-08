@@ -4,6 +4,7 @@ from pathlib import Path
 
 from effect_rows import Row, Var, Solver
 from capture_rows import Argument, Variable
+from trait_constraints import TraitSolver, Implementation
 from handlers import Operation, compile_program, operation_type
 from inference import E, Fn, Ty, INT, UNIT, BOOL, InferenceError, capture_free, state, permissions, required_captures
 from source_features import NAT, UNKNOWN, substitute, unwrapped
@@ -26,6 +27,8 @@ class SourceElaborator(Elaborator):
         self.function_traits, self.effect_arguments = {}, {}
         self.impl_heads, self.impl_contracts = {}, {}
         self.impl_constraints = {}
+        self.trait_solver = TraitSolver()
+        self.function_constraints = {}
         self.dynamic_methods, self.trait_methods = {}, {}
         self.capture_names = {}
         self.capture_parameter_types = {}
@@ -81,6 +84,40 @@ class SourceElaborator(Elaborator):
     def is_library(self, module):
         path = Path(self.graph.modules[module].span.filename)
         return path.is_relative_to(STDLIB)
+
+    def constraints(self, nodes):
+        result = []
+        for node in nodes:
+            if node.kind == 'type_equality':
+                result.append(Ty('Equality', tuple(self.type(t) for t in node.items)))
+            elif node.items[0].kind != 'capture_variable':
+                subject, bounds = node.items
+                for bound in bounds:
+                    identity = self.canonical(bound.items[0])
+                    if identity not in self.traits and identity not in ('Dup', 'Discard', 'NonAbandoning'):
+                        self.error('name', 'Unknown trait constraint ' + identity, bound)
+                    arguments = tuple(self.argument_term(a) for a in bound.items[1]) if bound.kind == 'applied_type' else ()
+                    result.append(Ty('Trait:' + identity, (self.type(subject), *arguments)))
+        return tuple(result)
+
+    def argument_term(self, node):
+        if node.kind == 'region_type':
+            return Ty('Region', region=node.items[0].items[0])
+        if node.kind == 'effect_row':
+            entries, tail = node.items
+            contract = Node('contract', node.span, (Node('type', node.span, ('Unit',)),
+                            entries + ((Node('effect_tail', tail.span, tail.items),) if tail else ())))
+            row = self.contract(contract)[1]
+            labels = tuple(Ty('state', region=l[7:-1]) if l.startswith('state<@') else Ty(l) for l in row.labels)
+            return Ty('Effects', tuple(sorted(labels, key=repr)) + ((Ty('$!' + row.tail.name),) if row.tail else ()))
+        if node.kind == 'capture_variable':
+            return Ty('$..' + node.items[0].items[0])
+        if node.kind == 'capture_set':
+            return Ty('Captures', tuple(sorted((self.argument_term(c) if c.kind in ('region_type', 'capture_variable')
+                                               else Ty('Capture:' + c.items[0]) for c in node.items[0]), key=repr)))
+        if node.kind in ('int', 'nat'):
+            return Ty('Nat:' + str(node.items[0]))
+        return self.type(node)
 
     def collect(self):
         # Allocate identities before resolving imports, recursive types or function bodies.
@@ -217,6 +254,15 @@ class SourceElaborator(Elaborator):
                     if not associated <= equations:
                         self.error('type', 'Trait implementation is missing an associated type', implementation)
                 head = (self.canonical(trait.items[0]) if trait else None, unwrapped(target).name)
+                impl = None
+                if trait:
+                    arguments = tuple(self.argument_term(a) for a in trait.items[1]) if trait.kind == 'applied_type' else ()
+                    impl = Implementation(Ty('Trait:' + trait_name, (target, *arguments)),
+                                          tuple(self.generic_types), self.generic_regions, self.constraints(constraints))
+                    try:
+                        self.trait_solver.add(impl)
+                    except ValueError as error:
+                        self.error('semantic', str(error), implementation)
                 if trait and head in self.impl_heads:
                     previous_target = self.impl_heads[head]
                     if previous_target != target:
@@ -236,6 +282,10 @@ class SourceElaborator(Elaborator):
                     self.function_modules[symbol] = module
                     self.function_generics[symbol] = parameters + self.generics(method.items[1])
                     self.function_self[symbol] = (target, equations)
+                    self.function_constraints[symbol] = constraints
+                    if impl is not None:
+                        impl.methods[method.items[1].items[0]] = symbol
+                        impl.equations = equations
                     if trait:
                         requirement = next((m for m in self.traits[trait_name].items[2]
                                             if m.kind == 'function' and m.items[1].items[0] == method.items[1].items[0]), None)
@@ -348,6 +398,15 @@ class SourceElaborator(Elaborator):
         return result
 
     def type(self, node):
+        if node.kind == 'projection_type':
+            receiver, member, arguments = node.items
+            if arguments:
+                self.limit('GAT projection normalization', node)
+            candidates = [name for name, trait in self.traits.items()
+                          if any(m.kind == 'associated_type' and m.items[0].items[0] == member.items[0] for m in trait.items[2])]
+            if len(candidates) != 1:
+                self.error('type', 'Associated projection needs an unambiguous trait', node)
+            return Ty('Projection:' + candidates[0] + ':' + member.items[0], (self.type(receiver),))
         if node.kind == 'access_type':
             return Ty(node.items[0].title(), (self.type(node.items[1]),))
         if node.kind == 'tuple_type':
@@ -359,6 +418,10 @@ class SourceElaborator(Elaborator):
             if spelling.startswith('Self::') and self.current_function in self.function_self:
                 equations = self.function_self[self.current_function][1]
                 return equations.get(spelling[6:], UNKNOWN)
+            if '::' in spelling and spelling.split('::')[0] in self.generic_types:
+                receiver, member = spelling.rsplit('::', 1)
+                return self.type(Node('projection_type', node.span,
+                                      (Node('type', node.span, (receiver,)), Node('name', node.span, (member,)), ())))
             if spelling == 'Self' and self.current_function in self.function_self:
                 return self.function_self[self.current_function][0]
             name = self.canonical(spelling)
@@ -593,6 +656,9 @@ class SourceElaborator(Elaborator):
                 if constraint.kind == 'bound' and constraint.items[0].kind == 'capture_variable':
                     subject, bounds = constraint.items
                     self.capture_usage[subject.items[0].items[0]] = {b.items[0] for b in bounds}
+        name = node.items[1] if node.kind == 'function' else None
+        constraints = self.constraints(self.function_constraints.get(self.current_function, ()) +
+                                       (name.items[2] if name and len(name.items) > 2 else ())) if node.kind == 'function' else ()
         local, typed, names = dict(environment), [], set()
         for parameter in parameters:
             name, annotation = parameter.items[:2]
@@ -633,7 +699,7 @@ class SourceElaborator(Elaborator):
                            effect_vars=tuple(self.generic_effects.values()) if node.kind == 'function' else (),
                            captures=captures,
                            capture_vars=tuple(self.generic_captures.values()) if node.kind == 'function' else (),
-                           generic_binders=tuple(self.generic_binders) if node.kind == 'function' else ())
+                           generic_binders=tuple(self.generic_binders) if node.kind == 'function' else (), constraints=constraints)
             self.annotations.setdefault(id(expression), []).append(signature)
         return expression
 
@@ -1035,6 +1101,14 @@ class SourceElaborator(Elaborator):
         result, effects = self.contract(requirement.items[3])
         actual = self.signatures[symbol]
         self.module, self.generic_types, self.effect_arguments = previous_module, previous_types, previous_rows
+        allowed = self.constraints(self.function_constraints.get(symbol, ()))
+        method_constraints = requirement.items[1].items[2] if len(requirement.items[1].items) > 2 else ()
+        allowed += self.constraints(method_constraints)
+        for constraint in actual.constraints:
+            try:
+                self.trait_solver.check(constraint, allowed)
+            except ValueError:
+                self.error('semantic', 'Implementation method has stronger prerequisites than its trait declaration', declaration.items[1])
         if actual.parameters != tuple(expected_parameters) or actual.result != result:
             self.error('type', 'Method signature does not match its trait declaration', declaration.items[3])
         solver = Solver()

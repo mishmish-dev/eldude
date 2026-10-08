@@ -23,6 +23,7 @@ Read the component and its tests for the task at hand. All tools use the Python 
 | [source_features.py](source_features.py) | Data/control checking and execution, library primitives, source task integration | [Features](test_source_features.py), [integration regressions](test_source_feature_regressions.py), [semantic examples](test_source_semantic_examples.py), [source tasks](test_source_tasks.py) |
 | [effect_rows.py](effect_rows.py) | Scoped-row equality and closed-row opening on resolved labels (§16.5) | [Row counterexamples](test_effect_rows.py) |
 | [capture_rows.py](capture_rows.py) | Finite capture unions and scoped whole-argument substitution (§13) | [Capture rows](test_capture_rows.py) |
+| [trait_constraints.py](trait_constraints.py) | Full trait heads, one-way evidence selection, prerequisite checks and associated normalization (§10) | [Trait constraints](test_trait_constraints.py) |
 | [inference.py](inference.py) | Annotated expression IR, type/effect/capture inference, ownership | [Inference](test_inference.py) |
 | [handlers.py](handlers.py) | Handler clause/resumption checks, evidence lowering, interpreter | [Handlers](test_handlers.py) |
 | [task_runtime.py](task_runtime.py) | Per-execution cooperative scheduling, cancellation, group draining | [Scheduler](test_task_runtime.py), [source integration](test_source_tasks.py) |

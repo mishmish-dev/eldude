@@ -37,6 +37,10 @@ class SourceSemanticExampleTests(unittest.TestCase):
             'whole_argument_capture': ('semantic', 'region would escape'),
             'await_whole_argument_capture': ('semantic', 'region would escape'),
             'mut_capture_escape': ('semantic', 'mutable owner'),
+            'trait_missing_prerequisite': ('semantic', 'Missing trait evidence'),
+            'trait_overlap': ('semantic', 'Overlapping'),
+            'trait_constraint_cycle': ('semantic', 'decrease'),
+            'trait_stronger_method': ('semantic', 'stronger'),
         }
         for name, (code, message) in cases.items():
             path = REJECT / (name + '.eld')

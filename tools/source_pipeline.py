@@ -87,6 +87,7 @@ class SourceChecker(FeatureChecker):
         self.structural_functions = getattr(elaborator, 'recursive_allowed', set())
         self.annotations = elaborator.annotations
         self.results = {}
+        self.trait_solver = getattr(elaborator, 'trait_solver', None)
 
     def effect_origin(self, expression, labels):
         for child in children(expression):
@@ -102,7 +103,8 @@ class SourceChecker(FeatureChecker):
             regions = signature.regions if signature else ()
             capture_vars = signature.capture_vars if signature else ()
             context = replace(context, regions=context.regions | {r: r for r in regions},
-                              active=context.active | set(regions))
+                              active=context.active | set(regions),
+                              evidence=context.evidence + (signature.constraints if signature else ()))
             parameters = tuple((name, self.resolve_type(t, context)) for name, t in expression[1])
             result = self._function(parameters, expression[2], context)
             retained = self.closed_captures(result.captures) - set(regions) - set(capture_vars)
@@ -123,7 +125,13 @@ class SourceChecker(FeatureChecker):
     def resolve_type(self, t, context):
         t = substitute(t, regions=context.regions)
         if not isinstance(t, Fn):
-            return replace(t, args=tuple(self.resolve_type(a, context) for a in t.args))
+            t = replace(t, args=tuple(self.resolve_type(a, context) for a in t.args))
+            if self.trait_solver:
+                try:
+                    t = self.trait_solver.normalize_type(t, context.evidence)
+                except ValueError as error:
+                    raise InferenceError(str(error)) from error
+            return t
         captures, dup, discard = set(), t.dup, t.discard
         for source in t.captures or ():
             if isinstance(source, Symbol):
@@ -150,6 +158,9 @@ class SourceChecker(FeatureChecker):
                        captures=frozenset(captures) if t.captures is not None else None)
 
     def annotate(self, expression, result, expected):
+        if isinstance(expected, Fn):
+            expected = self.resolve_type(expected, Context(regions={r: r for r in expected.regions},
+                                                         active=frozenset(expected.regions), evidence=expected.constraints))
         actual = result.type
         if isinstance(expected, Fn) and isinstance(actual, Fn):
             solver = Solver()
@@ -175,7 +186,8 @@ class SourceChecker(FeatureChecker):
                 raise InferenceError('Capture annotation omits retained obligations', code='type')
             result = replace(result, type=replace(admitted_type(actual, expected), type_vars=expected.type_vars,
                                                  regions=expected.regions, effect_vars=expected.effect_vars,
-                                                 capture_vars=expected.capture_vars, generic_binders=expected.generic_binders),
+                                                 capture_vars=expected.capture_vars, generic_binders=expected.generic_binders,
+                                                 constraints=expected.constraints),
                              captures=result.captures - set(expected.regions))
         return result
 

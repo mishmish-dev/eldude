@@ -48,6 +48,7 @@ class Fn:
     captures: frozenset | None = None
     capture_vars: tuple = ()
     generic_binders: tuple = ()
+    constraints: tuple = ()
 
     def dumps(self):
         def encode(t):
@@ -60,7 +61,8 @@ class Fn:
                     'regions': list(t.regions), 'effect_vars': [v.name for v in t.effect_vars],
                     'dup': t.dup, 'discard': t.discard,
                     'captures': None if t.captures is None else encode_captures(t.captures),
-                    'capture_vars': encode_captures(t.capture_vars), 'generic_binders': t.generic_binders}
+                    'capture_vars': encode_captures(t.capture_vars), 'generic_binders': t.generic_binders,
+                    'constraints': [encode(c) for c in t.constraints]}
         return json.dumps(encode(self), sort_keys=True)
 
     @staticmethod
@@ -79,7 +81,8 @@ class Fn:
                       tuple(data['regions']), quantified, data['dup'], data['discard'],
                       None if data.get('captures') is None else decode_captures(data['captures']),
                       tuple(next(iter(decode_captures([a]))) for a in data.get('capture_vars', ())),
-                      tuple(tuple(b) for b in data.get('generic_binders', ())))
+                      tuple(tuple(b) for b in data.get('generic_binders', ())),
+                      tuple(decode(c, scope) for c in data.get('constraints', ())))
         try:
             result = decode(json.loads(wire), {})
         except (KeyError, TypeError, json.JSONDecodeError) as error:
@@ -125,6 +128,7 @@ class Context:
     suspended: tuple = ()
     blocked_family: str | None = None
     group: object = None
+    evidence: tuple = ()
 
 
 def state(region):
@@ -385,7 +389,7 @@ class Checker:
         originals = {binding: outer.bindings[name] for name, binding in copies.items()}
         context = Context(bindings=copies, live=list(copies.items()),
                           regions=dict(outer.regions), names=dict(outer.names),
-                          active=outer.active, trace=False, blocked_family=outer.blocked_family)
+                          active=outer.active, trace=False, blocked_family=outer.blocked_family, evidence=outer.evidence)
         parameter_bindings, sources = [], {}
         if len({name for name, _ in parameters}) != len(parameters):
             raise InferenceError('Duplicate parameter name')
@@ -437,6 +441,15 @@ class Checker:
                        frozenset(bound), dup=all(permissions(t)[0] for t in captured_types),
                        discard=all(permissions(t)[1] for t in captured_types))
         return value(signature, captures=captures)
+
+    def check_constraints(self, constraints, types, regions, context):
+        from trait_constraints import TraitSolver, substitute
+        solver = getattr(self, 'trait_solver', None) or TraitSolver()
+        for constraint in constraints:
+            try:
+                solver.check(substitute(constraint, types, regions), context.evidence)
+            except ValueError as error:
+                raise InferenceError(str(error)) from error
 
     def _apply(self, function, arguments, context):
         signature = function.type
@@ -534,6 +547,7 @@ class Checker:
             if len(solutions) != 1:
                 raise InferenceError('Cannot infer an unambiguous callback capture region; supply explicit generic arguments', code='type')
             regions = solutions[0]
+        self.check_constraints(signature.constraints, types, regions, context)
         for expected, actual in zip(signature.parameters, arguments):
             if isinstance(expected, Fn) and expected.captures is not None:
                 allowed = captures(expected.captures) | captures(required_captures(expected)) | set(expected.regions)
@@ -756,7 +770,8 @@ class Checker:
                     def capture_set(expression):
                         return frozenset(regions.get(c, c) for c in substitute_captures(expression, captures))
                     return replace(t, parameters=tuple(substitute(p) for p in t.parameters), result=substitute(t.result),
-                                   effects=effects, bound=capture_set(t.bound), captures=None if t.captures is None else capture_set(t.captures))
+                                   effects=effects, bound=capture_set(t.bound), captures=None if t.captures is None else capture_set(t.captures),
+                                   constraints=tuple(substitute(c) for c in t.constraints))
                 return replace(function, type=replace(substitute(signature), type_vars=(), regions=(), effect_vars=(), capture_vars=(), generic_binders=()))
             case ('lambda', parameters, body):
                 return self._function(parameters, body, context)

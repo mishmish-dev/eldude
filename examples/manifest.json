@@ -16,6 +16,7 @@
     "02_ownership/numeric_recursion.eld": 6,
     "02_ownership/parameter_capture.eld": 42,
     "02_ownership/structural_recursion.eld": 42,
+    "02_ownership/trait_prerequisites.eld": 42,
     "02_ownership/traits.eld": 42,
     "02_ownership/view.eld": 42,
     "03_results/option.eld": 42,

@@ -51,6 +51,7 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 | 2 | [capture rows](02_ownership/capture_rows.eld) | `42` | Generic callback forwarding preserves linear usage; bounded repetition |
 | 2 | [existentials](02_ownership/existentials.eld) | `42` | Distinct concrete values share a checked dynamic trait interface |
 | 2 | [traits](02_ownership/traits.eld) | `42` | Covered impl and associated type |
+| 2 | [trait prerequisites](02_ownership/trait_prerequisites.eld) | `42` | Decreasing element constraints and normalized associated results |
 | 3 | [option](03_results/option.eld) | `42` | Library method and lazy fallback |
 | 3 | [propagation](03_results/propagation.eld) | `42` | Error identity and `?` |
 | 3 | [try scope](03_results/try_scope.eld) | `42` | Local error propagation |
