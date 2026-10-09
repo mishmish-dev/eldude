@@ -1,16 +1,37 @@
 """Regressions for declaration, ownership, and control-flow integration."""
 import unittest
+from pathlib import Path
 
 from eldude.core.rows import Row
 from eldude.core.handlers import Defect, compile_program, run
 from eldude.core.inference import Binding, Context, E, Fn, INT, UNIT, Ty, InferenceError, value, Grant, Owner
 from eldude.source.features import FeatureChecker
 from eldude.core.types import NAT, UNKNOWN
+from eldude.source.pipeline import compile_file
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class SourceFeatureRegressionTests(unittest.TestCase):
     def compile(self, expression, checker=None):
         return compile_program(expression, checker=checker or FeatureChecker())
+
+    def test_record_patterns_cover_fields_in_declaration_order(self):
+        program = compile_file(ROOT / 'examples/src/01_values/record_patterns.eld')
+        self.assertEqual(run(program.program).value, 42)
+
+    def test_local_try_preserves_an_outer_owned_argument_temporary(self):
+        program = compile_file(ROOT / 'examples/src/03_results/try_argument_owner.eld')
+        result = run(program.program)
+        self.assertEqual(result.value, 42)
+        self.assertEqual(result.events, (('acquire', 'File', 1), ('close', 1, 'explicit')))
+
+    def test_repeated_record_field_is_rejected_before_binding(self):
+        checker = FeatureChecker()
+        record = Ty('Record:R', (Ty('file', (Ty('Owned', (Ty('File'),)),)),))
+        with self.assertRaisesRegex(InferenceError, 'Duplicate record pattern field'):
+            checker.bind_pattern(('record_pat', 'Record:R', ('file', 'file'),
+                                  ('bind', 'a'), ('bind', 'b')), value(record), Context())
 
     def test_early_return_cannot_smuggle_a_local_region_in_a_closure(self):
         signature = Fn((), INT, Row())

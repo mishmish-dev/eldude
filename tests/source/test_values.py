@@ -108,6 +108,29 @@ pub fn main()->Int {handle {!E::get(20) + !E::get(22)} with handler E {get(x)=>x
         self.assertEqual(result.events, (('dispatch', 'E', 'E'), ('resume', 'E', 20),
                                          ('dispatch', 'E', 'E'), ('resume', 'E', 22)))
 
+    def test_record_variant_fields_dispatch_once_in_written_order(self):
+        result = execute_file(ROOT / 'examples/src/01_values/variant_field_order.eld')
+        self.assertEqual(result.value, 12)
+        self.assertEqual(result.events, (('dispatch', 'Echo', 'Echo'), ('resume', 'Echo', 2),
+                                         ('dispatch', 'Echo', 'Echo'), ('resume', 'Echo', 1)))
+
+    def test_recursive_declarations_require_finite_positive_storage(self):
+        self.assertEqual(execute_file(ROOT / 'examples/src/02_ownership/recursive_positive_storage.eld').value, 42)
+        for name in ('parameter', 'result', 'group', 'container', 'alias'):
+            path = ROOT / f'examples/reject/semantics/recursive_callable_{name}.eld'
+            with self.subTest(example=name):
+                with self.assertRaises(Diagnostic) as caught:
+                    compile_source(path.read_text(), str(path))
+                self.assertEqual(caught.exception.code, 'type')
+                self.assertIn('finite strictly positive storage', caught.exception.message)
+
+    def test_list_new_rejects_extra_arguments_before_elaboration(self):
+        path = ROOT / 'examples/reject/semantics/list_new_arity.eld'
+        with self.assertRaises(Diagnostic) as caught:
+            compile_source(path.read_text(), str(path))
+        self.assertEqual(caught.exception.code, 'type')
+        self.assertIn('List::new expects no arguments', caught.exception.message)
+
     def test_branch_consumption_and_resume_must_agree(self):
         prefix = 'module m; import eldude::fixture::{acquire,close}; '
         source = prefix + 'pub fn main()->Unit {let f=acquire(); if true {close(f)} else {close(f)}}'

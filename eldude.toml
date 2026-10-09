@@ -844,3 +844,93 @@ host = "python::experimental"
 name = "test_tooling_test_runner"
 entry = "tooling_tests::verify"
 host = "python::experimental"
+
+[[app]]
+name = "values_member_visibility"
+entry = "examples::values::member_visibility::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_values_member_visibility"
+entry = "examples::values::member_visibility::verify"
+host = "python::experimental"
+
+[[app]]
+name = "values_member_visibility_facade"
+entry = "examples::values::member_visibility_facade::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_values_member_visibility_facade"
+entry = "examples::values::member_visibility_facade::verify"
+host = "python::experimental"
+
+[[app]]
+name = "values_member_visibility_library"
+entry = "examples::values::member_visibility_library::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_values_member_visibility_library"
+entry = "examples::values::member_visibility_library::verify"
+host = "python::experimental"
+
+[[app]]
+name = "values_record_patterns"
+entry = "examples::values::record_patterns::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_values_record_patterns"
+entry = "examples::values::record_patterns::verify"
+host = "python::experimental"
+
+[[app]]
+name = "values_variant_field_order"
+entry = "examples::values::variant_field_order::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_values_variant_field_order"
+entry = "examples::values::variant_field_order::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_recursive_positive_storage"
+entry = "examples::ownership::recursive_positive_storage::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_recursive_positive_storage"
+entry = "examples::ownership::recursive_positive_storage::verify"
+host = "python::experimental"
+
+[[app]]
+name = "results_try_argument_owner"
+entry = "examples::results::try_argument_owner::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_results_try_argument_owner"
+entry = "examples::results::try_argument_owner::verify"
+host = "python::experimental"
+
+[[app]]
+name = "tasks_cleanup_mask"
+entry = "examples::tasks::cleanup_mask::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_tasks_cleanup_mask"
+entry = "examples::tasks::cleanup_mask::verify"
+host = "python::experimental"
+
+[[app]]
+name = "tasks_cleanup_mask_pending"
+entry = "examples::tasks::cleanup_mask_pending::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_tasks_cleanup_mask_pending"
+entry = "examples::tasks::cleanup_mask_pending::verify"
+host = "python::experimental"

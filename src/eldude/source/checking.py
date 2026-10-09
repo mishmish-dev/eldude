@@ -4,8 +4,8 @@ from dataclasses import replace
 from eldude.core.rows import Row, Solver
 from eldude.core.inference import Context, Fn, UNIT, Ty, InferenceError, permissions, value, required_captures
 from eldude.source.features import FeatureChecker
-from eldude.core.model import Symbol
-from eldude.core.types import ASYNC_FILE, substitute
+from eldude.core.model import Symbol, Node
+from eldude.core.types import ASYNC_FILE, substitute, unwrapped
 
 
 def children(expression):
@@ -63,6 +63,7 @@ class SourceChecker(FeatureChecker):
         self.results = {}
         self.trait_solver = getattr(elaborator, 'trait_solver', None)
         self.origins = elaborator.origins
+        self.elaborator = elaborator
 
     def _infer(self, expression, context):
         try:
@@ -96,6 +97,28 @@ class SourceChecker(FeatureChecker):
                              captures=retained), captures=result.captures - set(capture_vars))
         else:
             result = super()._infer_expression(expression, context)
+        if expression[0] == 'field':
+            _, member, receiver = expression
+            retained = self.results.get(id(receiver))
+            t = retained.type if retained else context.bindings[receiver[1]].value.type
+            identity = self.elaborator.nominal_identities.get(unwrapped(t).name)
+            if identity:
+                self.elaborator.member_visibility(identity, member,
+                    Node('name', self.origins[id(expression)], (member,)),
+                    self.elaborator.expression_modules[id(expression)])
+        elif expression[0] == 'method_call' and id(expression) in self.method_calls:
+            receiver = expression[2]
+            retained = self.results.get(id(receiver))
+            t = retained.type if retained else context.bindings[receiver[1]].value.type
+            identity = self.elaborator.nominal_identities.get(unwrapped(t).name)
+            if identity:
+                self.elaborator.nominal_visibility(identity,
+                    Node('name', self.origins[id(expression)], (expression[1],)),
+                    self.elaborator.expression_modules[id(expression)])
+            target, _ = self.method_calls[id(expression)]
+            module, public = self.elaborator.inherent_members.get(target, (None, True))
+            if not public and module != self.elaborator.expression_modules[id(expression)]:
+                raise InferenceError('Cannot access private inherent method ' + expression[1], code='visibility')
         self.results[id(expression)] = result
         for expected in annotations:
             result = self.annotate(expression, result, self.resolve_type(expected, context))

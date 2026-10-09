@@ -648,8 +648,7 @@ def _bind(computation, then):
 def _protect(computation, finish):
     if isinstance(computation, _Request):
         def abandon():
-            computation.abandon()
-            finish()
+            return _protect_call(computation.abandon, finish)
         return replace(computation,
                        continue_with=lambda result: _protect_call(lambda: computation.continue_with(result), finish), abandon=abandon)
     finish()
@@ -661,8 +660,16 @@ def _protect_call(compute, finish):
     from eldude.runtime.tasks import TaskCancelled
     try:
         computation = compute()
-    except (Defect, EarlyExit, TaskCancelled):
-        finish()
+    except (Defect, EarlyExit, TaskCancelled) as primary:
+        try:
+            finish()
+        except Defect as secondary:
+            if not isinstance(primary, Defect):
+                raise
+            if primary is not secondary:
+                primary.add_note(f'Suppressed cleanup defect: {type(secondary).__name__}: {secondary}')
+                for note in getattr(secondary, '__notes__', ()):
+                    primary.add_note(note)
         raise
     return _protect(computation, finish)
 

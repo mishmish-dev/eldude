@@ -162,7 +162,7 @@ def format_paths(args):
         for path in sorted(paths):
             if not (args.check or args.diff) and path.is_symlink():
                 raise ValueError(f'{path}: refusing to replace a symlink')
-            if nearest_manifest(path):
+            if args.paths and nearest_manifest(path):
                 check_toolchain(select_project(path))
             stat = path.stat()
             identity = path.resolve()
@@ -248,7 +248,9 @@ def check_project(graph, args, reporter):
             own = source_files(package, tests=kind == 'test')
             matches = [p for p in own if (header := _header(p.read_text(encoding='utf-8'), p)) and header[0] == module]
             if len(matches) != 1:
-                package.fail(kind + '.entry', f'entry module {module!r} must be provided by this package')
+                field = 'exports' if kind == 'embed' else 'entry'
+                package.fail(kind + '.' + field, f'entry module {module!r} must be provided by this package',
+                             occurrence=package.data[kind].index(target))
             entries.append((package, kind, target, matches[0], function))
     selected_paths = sorted({item[3] for item in entries}) if selector or args.command == 'run' else sorted({
         path for package in selection.packages for path in source_files(package, tests=tests)})

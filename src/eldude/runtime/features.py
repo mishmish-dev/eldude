@@ -101,7 +101,14 @@ def evaluate_feature(machine, term, environment, evidence, resume):
                 def finish():
                     if not slot.consumed:
                         slot.consumed = True
-                        machine.invoke(_read(cleanup, environment), evidence, [retained])
+                        task = machine.tasks._current_task
+                        if task is not None:
+                            task.mask_depth += 1
+                        try:
+                            machine.invoke(_read(cleanup, environment), evidence, [retained])
+                        finally:
+                            if task is not None:
+                                task.mask_depth -= 1
                 return _protect_call(lambda: evaluate(body, environment | {name: slot}), finish)
             return _bind(evaluate(initial), enter)
         case ('nat', number):

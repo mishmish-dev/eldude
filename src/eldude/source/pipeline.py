@@ -35,4 +35,5 @@ def execute_file(path):
         return run(program.program)
     except Defect as error:
         span = program.program.origins.get(id(error.expression), program.ast.span)
-        raise Diagnostic('defect', str(error), span) from error
+        raise Diagnostic('defect', str(error), span,
+                         [(note, span) for note in getattr(error, '__notes__', ())]) from error

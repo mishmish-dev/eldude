@@ -207,6 +207,9 @@ def write_file(path, original, formatted, mode):
             os.fchmod(stream.fileno(), stat.S_IMODE(mode))
         if path.is_symlink() or path.read_bytes() != original:
             raise OSError(f'{path}: source changed while formatting')
+        if stat.S_IMODE(path.stat().st_mode) != stat.S_IMODE(mode):
+            raise OSError(f'{path}: permissions changed while formatting')
+        # shortcut: checks and replacement can race, coordinate writers if exclusion is required.
         os.replace(temporary, path)
     finally:
         if temporary is not None:

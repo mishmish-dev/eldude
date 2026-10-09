@@ -72,68 +72,18 @@ class Elaborator:
                 return self.ir(node, 'bool', boolean)
             case 'tuple', (items,):
                 return self.ir(node, 'tuple', *(self.expression(item, environment, handlers) for item in items))
-            case 'record', (path, fields):
-                name = self.local_name(path)
-                if name not in self.records:
-                    self.error('name', 'Unknown record ' + name, path)
-                t = self.types[name]
-                names = [name.items[0] for name, _ in fields]
-                if len(set(names)) != len(names) or set(names) != {f.name for f in t.args}:
-                    self.error('type', 'Record fields must match the declaration exactly', node)
-                # Source order governs evaluation, even when fields are reordered.
-                expression = self.ir(node, 'record', t, tuple(names),
-                                     *(self.expression(item, environment, handlers) for _, item in fields))
-                return expression
             case 'field', (base, name):
                 return self.ir(node, 'field', name.items[0], self.expression(base, environment, handlers))
-            case 'specialize', (callee, arguments):
-                return self.ir(node, 'specialize', self.expression(callee, environment, handlers),
-                               tuple(self.type(t) for t in arguments))
             case 'unary', (operator, operand):
                 return self.ir(node, 'unary', operator, self.expression(operand, environment, handlers))
             case 'binary', (operator, left, right):
                 return self.ir(node, 'binary', operator, self.expression(left, environment, handlers),
                                self.expression(right, environment, handlers))
-            case 'if', branches:
-                return self.ir(node, 'if', *(self.expression(b, environment, handlers) for b in branches))
             case 'path', _:
                 symbol = self.lookup(node, environment)
                 if isinstance(symbol, Host):
                     self.limit('fixture primitives must be called directly; wrap one in a source closure to pass it', node)
                 return self.ir(node, 'var', symbol)
-            case 'block', (statements, result):
-                def sequence(index, local):
-                    if index == len(statements):
-                        return self.expression(result, local, handlers)
-                    statement = statements[index]
-                    if statement.kind == 'let':
-                        name, annotation, initializer = statement.items
-                        initial = self.expression(initializer, local, handlers)
-                        if annotation:
-                            self.annotations.setdefault(id(initial), []).append(self.type(annotation))
-                        if name.kind == 'tuple_pattern':
-                            local = dict(local)
-                            names = set()
-                            def pattern(node):
-                                if node.kind == 'tuple_pattern':
-                                    return tuple(pattern(p) for p in node.items[0])
-                                spelling = node.items[0]
-                                if spelling != '_' and spelling in names:
-                                    self.error('name', 'Duplicate pattern binding', node)
-                                names.add(spelling)
-                                symbol = self.symbol(node)
-                                local[spelling] = symbol
-                                return symbol
-                            bound = pattern(name)
-                            return self.ir(statement, 'unpack', bound, initial, sequence(index + 1, local))
-                        if name.items[0] == '_':
-                            return self.ir(statement, 'seq', initial, sequence(index + 1, local))
-                        symbol = self.symbol(name)
-                        return self.ir(statement, 'let', symbol, initial,
-                                       sequence(index + 1, local | {name.items[0]: symbol}))
-                    expression = self.expression(statement.items[0], local, handlers)
-                    return self.ir(statement, 'seq', expression, sequence(index + 1, local))
-                return sequence(0, environment)
             case 'lambda', (parameters, contract, body):
                 return self.function(node, parameters, contract, body, environment, handlers)
             case 'call', (callee, arguments):

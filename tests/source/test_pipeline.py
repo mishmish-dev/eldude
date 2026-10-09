@@ -31,6 +31,19 @@ class LibraryCheckingTests(unittest.TestCase):
 
 
 class SourcePipelineTests(SourceAssertions, unittest.TestCase):
+    def test_execution_diagnostic_preserves_secondary_cleanup_defects(self):
+        from pathlib import Path
+        from eldude.source.pipeline import execute_file
+        path = Path(__file__).resolve().parents[2] / 'examples/reject/runtime/cleanup_primary.eld'
+        with self.assertRaises(Diagnostic) as caught:
+            execute_file(path)
+        diagnostic = caught.exception
+        self.assertEqual((diagnostic.code, diagnostic.message),
+                         ('defect', 'Integer division or remainder by zero'))
+        self.assertEqual(path.read_text()[diagnostic.span.start:diagnostic.span.end], '1 / 0')
+        self.assertEqual([message for message, _ in diagnostic.related],
+                         ['Suppressed cleanup defect: Defect: Integer arithmetic overflow'] * 4)
+
     def test_scalar_functions_forward_references_and_calls_execute_bodies(self):
         source = '''module m;
 pub fn main()->Int { identity(answer()) }

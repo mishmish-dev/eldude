@@ -6,7 +6,7 @@
 
 [Positive programs](#positive-programs) · [Source fixtures](#executable-source-fixtures) · [Test host](#fixture-host-profile) · [Rejections](#rejection-targets) · [Handler counterexamples](#enforced-source-rejections)
 
-All **84 positive examples** execute through the source checker and interpreter. The repository root is the Eldude project, with positive programs under [src/](src) and application/test targets declared in [eldude.toml](../eldude.toml). Its `source-dir = "examples/src"` keeps the programs here; build output goes to the repository's `build/` directory.
+All **93 positive examples** execute through the source checker and interpreter. The repository root is the Eldude project, with positive programs under [src/](src) and application/test targets declared in [eldude.toml](../eldude.toml). Its `source-dir = "examples/src"` keeps the programs here; build output goes to the repository's `build/` directory.
 
 From the repository root:
 
@@ -36,19 +36,19 @@ The fixture runner still prints individual `main` results:
 
 ```sh
 uv run python -m eldude.tooling.run --examples --strict
-# 84 passed, 0 unsupported, 0 failed
+# 93 passed, 0 unsupported, 0 failed
 ```
 
 [manifest.json](manifest.json) records independently specified expected values for every positive file. Corpus execution fails for wrong values, unexpected diagnostics, missing manifest entries, or regressions. `--strict` also rejects pending implementation limits; there are currently none in this corpus. Rejection fixtures are checked separately by the test suite.
 
 | Stage | Runnable | Capabilities exercised |
 | --- | ---: | --- |
-| [1. Values](src/01_values) | 9 / 9 | Arithmetic, closures, generics, records, tuples, enums and startup |
-| [2. Ownership](src/02_ownership) | 24 / 24 | Linear nominal types, capture contracts, inspection, recursion and trait erasure |
-| [3. Results](src/03_results) | 3 / 3 | Library imports, matching, `?` and `try` |
+| [1. Values](src/01_values) | 14 / 14 | Arithmetic, closures, generics, records, tuples, enums and startup |
+| [2. Ownership](src/02_ownership) | 25 / 25 | Linear nominal types, capture contracts, inspection, recursion and trait erasure |
+| [3. Results](src/03_results) | 4 / 4 | Library imports, matching, `?` and `try` |
 | [4. Effects](src/04_effects) | 6 / 6 | Generic instances, handlers, forwarding and `Result` payloads |
 | [5. State and collections](src/05_state_and_collections) | 17 / 17 | Regions, captured callbacks, collection primitives, iteration and cleanup traits |
-| [6. Tasks](src/06_tasks) | 5 / 5 | Cooperative scheduling, task groups, spawn/await and library join |
+| [6. Tasks](src/06_tasks) | 7 / 7 | Cooperative scheduling, task groups, spawn/await and library join |
 | [7. Source pipeline](src/07_source_pipeline) | 17 / 17 | Handler evidence, ownership, resumption and cleanup regressions |
 | [8. Formatting](src/08_formatting) | 1 / 1 | Source formatting preserves field evaluation order, handlers and precedence |
 | [9. Project tooling](src/09_tooling) | 2 / 2 | Explicit application entries and process-status test runners |
@@ -66,11 +66,17 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 | 1 | [branches](src/01_values/branches.eld) | `7` | Conditional and unary arithmetic |
 | 1 | [tuples](src/01_values/tuples.eld) | `42` | Tuple construction/destructuring |
 | 1 | [records](src/01_values/records.eld) | `9` | Nominal records and field copies |
+| 1 | [record patterns](src/01_values/record_patterns.eld) | `42` | Exhaustive product patterns, reordered fields, and nested literal coverage |
+| 1 | [member visibility](src/01_values/member_visibility.eld) | `42` | Public fields and methods through reexports, with opaque enum remainder |
+| 1 | [visibility facade](src/01_values/member_visibility_facade.eld) | `42` | Reexports preserve the defining module's visibility |
+| 1 | [visibility library](src/01_values/member_visibility_library.eld) | `42` | Defining modules may use their private representation and helpers |
+| 1 | [variant field order](src/01_values/variant_field_order.eld) | `12` | Named variant fields evaluate once in written order |
 | 1 | [enums](src/01_values/enums.eld) | `42` | Exhaustive matching |
 | 1 | [closures](src/01_values/closures.eld) | `42` | Captures and repeated invocation |
 | 1 | [generics](src/01_values/generics.eld) | `42` | Type parameters and turbofish |
 | 1 | [startup](src/01_values/startup.eld) | `42` | Ordered pure top-level initialization |
 | 2 | [structural recursion](src/02_ownership/structural_recursion.eld) | `42` | Finite inductive recursion |
+| 2 | [recursive storage](src/02_ownership/recursive_positive_storage.eld) | `42` | Finite recursive enum groups and positive record/tuple storage |
 | 2 | [numeric recursion](src/02_ownership/numeric_recursion.eld) | `6nat` | Unproved termination requires `diverge`, including at the caller |
 | 2 | [view](src/02_ownership/view.eld) | `42` | Scoped inspection followed by consumption |
 | 2 | [linear closure](src/02_ownership/linear_closure.eld) | `42` | Transfer into a closure |
@@ -97,6 +103,7 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 | 3 | [option](src/03_results/option.eld) | `42` | Library method and lazy fallback |
 | 3 | [propagation](src/03_results/propagation.eld) | `42` | Error identity and `?` |
 | 3 | [try scope](src/03_results/try_scope.eld) | `42` | Local error propagation |
+| 3 | [try argument owner](src/03_results/try_argument_owner.eld) | `42` | Local propagation preserves a pending resource outside its boundary |
 | 4 | [handler](src/04_effects/handler.eld) | `42` | Tail clause returns its operation result for automatic resumption |
 | 4 | [generic instances](src/04_effects/generic_instances.eld) | `42` | Distinct `Read<Int>`/`Read<Bool>` instances |
 | 4 | [once](src/04_effects/once.eld) | `42` | Work after resumption; parent-local handler |
@@ -125,6 +132,8 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 | 6 | [inherited handler](src/06_tasks/inherited_handler.eld) | `42` | Same inherited handler, different child result types |
 | 6 | [child-local handler](src/06_tasks/child_local_handler.eld) | `42` | Answer-changing handler inside a child |
 | 6 | [library join](src/06_tasks/library_join.eld) | `42` | Higher-order task composition |
+| 6 | [cleanup cancellation mask](src/06_tasks/cleanup_mask.eld) | `42` | Pre-cancelled child finishes cleanup, then observes pending cancellation |
+| 6 | [cancellation during cleanup](src/06_tasks/cleanup_mask_pending.eld) | `42` | A sibling's cancellation request remains masked until cleanup completes |
 | 8 | [formatter semantics](src/08_formatting/semantics.eld) | `42` | Formatting retains field evaluation order, handler forwarding and precedence |
 | 9 | [application entry](src/09_tooling/application.eld) | `7` | An explicitly named application entry returns its exit status |
 | 9 | [test runner](src/09_tooling/test_runner.eld) | `0` | An ordinary function reports success through process status |
@@ -215,6 +224,15 @@ Source annotations, operation arguments, forwarding, lexical resumption, and imp
 
 `reject/syntax` must fail the grammar recognizer. `reject/semantics` must parse and reach its intended static failure; [source/test_semantic_examples.py](../tests/source/test_semantic_examples.py) checks these diagnostics, including all three existential capture cases. [Handler counterexamples](#enforced-source-rejections) are enforced separately below.
 
+`reject/runtime` programs parse and check successfully, then intentionally defect.
+[Cleanup abandonment](reject/runtime/cleanup_abandon.eld) verifies that failing inner
+cleanup still discharges outer resources; [primary cleanup failure](reject/runtime/cleanup_primary.eld)
+retains the original division defect and records every later cleanup failure.
+[Source fixture tests](../tests/source/test_handler_fixtures.py) assert these diagnostics and close events.
+Cross-module [visibility rejections](reject/semantics/member_visibility) are checked by
+[module tests](../tests/source/test_modules.py), and recursive storage/constructor arity
+rejections by [value tests](../tests/source/test_values.py).
+
 | Program | Required failure |
 | --- | --- |
 | [missing loop separator](reject/syntax/missing_loop_separator.eld) | Missing `;` after a nonfinal loop |
@@ -222,6 +240,17 @@ Source annotations, operation arguments, forwarding, lexical resumption, and imp
 | [multiple row tails](reject/syntax/multiple_row_tails.eld) | Only one tail may follow `\|` |
 | [decreases annotation](reject/syntax/decreases_annotation.eld) | Symbolic termination annotations are deferred |
 | [linear discard](reject/semantics/linear_discard.eld) | Unconsumed linear binding |
+| [duplicate record field](reject/semantics/duplicate_record_field.eld) | A pattern cannot transfer one field into two bindings |
+| [return argument temporary](reject/semantics/return_argument_temporary.eld) | Return cannot abandon an earlier owned argument |
+| [propagation argument temporary](reject/semantics/propagate_argument_temporary.eld) | Function propagation cannot abandon an earlier owned argument |
+| [try argument temporary](reject/semantics/try_argument_temporary.eld) | Local propagation cannot abandon an argument created inside its boundary |
+| [nonexhaustive record pattern](reject/semantics/nonexhaustive_record_pattern.eld) | Nested refutable fields require complete coverage |
+| [recursive callable parameter](reject/semantics/recursive_callable_parameter.eld) | Recursion beneath a callable parameter is not finite positive storage |
+| [recursive callable result](reject/semantics/recursive_callable_result.eld) | Recursion beneath a callable result is not finite positive storage |
+| [recursive callable group](reject/semantics/recursive_callable_group.eld) | Mutual recursion retains the storage restriction |
+| [recursive callable container](reject/semantics/recursive_callable_container.eld) | A generic record cannot hide recursion beneath a callable |
+| [recursive callable alias](reject/semantics/recursive_callable_alias.eld) | A type alias cannot hide recursion beneath a callable |
+| [list constructor arity](reject/semantics/list_new_arity.eld) | `List::new` requires zero arguments |
 | [uncovered impl](reject/semantics/uncovered_impl.eld) | Impl parameter absent from its head |
 | [inherited answer change](reject/semantics/inherited_answer_change.eld) | Baseline handler cannot preserve arbitrary child results |
 | [region escape](reject/semantics/region_escape.eld) | Returned closure retains a local cell |

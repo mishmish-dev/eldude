@@ -276,6 +276,20 @@ class FormatterCLITests(unittest.TestCase):
             self.assertEqual(path.read_text(), self.source)
             self.assertEqual(list(Path(directory).iterdir()), [path])
 
+    def test_stale_permissions_preserve_the_restricted_file(self):
+        from eldude.tooling.format import write_file
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'example.eld'
+            path.write_text(self.source)
+            path.chmod(0o640)
+            mode = path.stat().st_mode
+            path.chmod(0o600)
+            with self.assertRaisesRegex(OSError, 'permissions changed'):
+                write_file(path, self.source.encode(), self.formatted.encode(), mode)
+            self.assertEqual(path.read_text(), self.source)
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(list(Path(directory).iterdir()), [path])
+
     def test_errors_and_invalid_flag_combinations_are_nonzero(self):
         for args in (('--write', '-'), ('--write', '--check', 'missing.eld'),
                      ('a.eld', 'b.eld'), ('missing.eld',)):

@@ -16,6 +16,25 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class ProjectBuildTests(unittest.TestCase):
+    def test_built_runner_preserves_secondary_cleanup_defects(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'src').mkdir()
+            source = ROOT / 'examples/reject/runtime/cleanup_primary.eld'
+            (root / 'src/main.eld').write_text(source.read_text())
+            (root / 'eldude.toml').write_text('manifest-version=1\n[package]\nname="app"\nversion="0.1.0"\n'
+                '[[app]]\nname="app"\nentry="cleanup_primary::main"\nhost="python::experimental"')
+            built = subprocess.run([sys.executable, '-m', 'eldude', 'build', '--message-format=json'],
+                                   cwd=root, text=True, capture_output=True)
+            self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+            artifact = next(json.loads(line)['path'] for line in built.stdout.splitlines()
+                            if json.loads(line)['kind'] == 'artifact' and json.loads(line)['artifact_kind'] == 'application')
+            result = subprocess.run([sys.executable, artifact], cwd=root, text=True, capture_output=True)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertIn(': defect: Integer division or remainder by zero', result.stderr)
+            self.assertEqual(result.stderr.count('Suppressed cleanup defect: Defect: Integer arithmetic overflow'), 4)
+            self.assertNotIn('Traceback', result.stderr)
+
     def test_nested_compiler_changes_invalidate_build_identity(self):
         from eldude.tooling import build
         from eldude.tooling.cli import main

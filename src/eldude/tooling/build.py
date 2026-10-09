@@ -35,7 +35,8 @@ def machine_target(requested=None):
 def check_root(package, kind, target, path, function, sources, allowed):
     if target['host'] != 'python::experimental' or kind == 'embed':
         package.fail(kind + '.host', f'Implementation limit: {target["host"]} {kind} host is unavailable; '
-                     'Python applications/tests use python::experimental', 'unsupported')
+                     'Python applications/tests use python::experimental', 'unsupported',
+                     occurrence=package.data[kind].index(target))
     ast = parse_source(path.read_text(encoding='utf-8', newline=''), str(path))
     graph = load_modules(ast, sources=sources, import_allowed=allowed)
     declaration = graph.exports[ast.items[0].items[0]].get(function)

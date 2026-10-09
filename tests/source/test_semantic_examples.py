@@ -24,6 +24,11 @@ class SourceSemanticExampleTests(unittest.TestCase):
 
     def test_rejection_examples_reach_their_semantic_check(self):
         cases = {
+            'duplicate_record_field': ('type', 'Duplicate record pattern field'),
+            'return_argument_temporary': ('semantic', 'Early return would abandon an owned argument temporary'),
+            'propagate_argument_temporary': ('semantic', 'Propagation would abandon an owned argument temporary'),
+            'try_argument_temporary': ('semantic', 'Propagation would abandon an owned argument temporary'),
+            'nonexhaustive_record_pattern': ('semantic', 'Non-exhaustive match'),
             'linear_discard': ('semantic', 'Unconsumed resource ticket'),
             'parameter_capture_twice': ('semantic', 'already consumed'),
             'parameter_capture_escape': ('semantic', 'region would escape'),

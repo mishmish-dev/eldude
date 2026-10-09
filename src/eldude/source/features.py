@@ -23,6 +23,7 @@ class FeatureChecker(HandlerChecker):
         self.exit_values = {}
         self.exit_active = {}
         self.exit_outside = {}
+        self.exit_temporaries = {}
         self.baselines = {}
         self.borrowed_values = {}
         self.cleanup_methods = {}
@@ -84,6 +85,8 @@ class FeatureChecker(HandlerChecker):
             elif kind == 'record_pat':
                 if t.name != p[1]:
                     raise InferenceError('Record pattern has a different nominal type', code='type')
+                if len(set(p[2])) != len(p[2]):
+                    raise InferenceError('Duplicate record pattern field', code='type')
                 fields = {f.name: f.args[0] for f in t.args}
                 if set(p[2]) != fields.keys():
                     raise InferenceError('Record pattern must cover every field', code='type')
@@ -112,6 +115,8 @@ class FeatureChecker(HandlerChecker):
             head = unwrapped(types[0])
             if head.name == 'Tuple':
                 alternatives = [('tuple_pat', None, head.args)]
+            elif head.name.startswith('Record:'):
+                alternatives = [('record_pat', head.name, tuple(f.args[0] for f in head.args))]
             elif self.tags(head):
                 alternatives = [('variant_pat', tag, self.fields(head, tag)) for tag in self.tags(head)]
             elif head == BOOL:
@@ -126,6 +131,10 @@ class FeatureChecker(HandlerChecker):
                     p = row[0]
                     if p[0] in ('bind', 'wild'):
                         specialized.append((('wild',),) * len(fields) + row[1:])
+                    elif kind == 'record_pat' and p[0] == kind and p[1] == tag:
+                        named = dict(zip(p[2], p[3:]))
+                        if len(named) == len(p[2]) and named.keys() == {f.name for f in head.args}:
+                            specialized.append(tuple(named[f.name] for f in head.args) + row[1:])
                     elif p[0] == kind and (kind == 'tuple_pat' or p[2 if kind == 'variant_pat' else 1] == tag):
                         specialized.append(tuple(p[3:] if kind == 'variant_pat' else p[1:] if kind == 'tuple_pat' else ()) + row[1:])
                 if not covered(specialized, tuple(fields) + types[1:]):
@@ -362,6 +371,7 @@ class FeatureChecker(HandlerChecker):
                 self.exit_values[key] = []
                 self.exit_active[key] = frozenset(context.active)
                 self.exit_outside[key] = {binding for _, binding in context.live} if wrap else set()
+                self.exit_temporaries[key] = len(context.temporaries)
                 result = self._infer(body, context)
                 if wrap:
                     inferred = Ty('Result', (expected.args[0] if expected else UNKNOWN, result.type))
@@ -375,6 +385,7 @@ class FeatureChecker(HandlerChecker):
                     captures |= exited.captures
                 del self.exit_active[key]
                 del self.exit_outside[key]
+                del self.exit_temporaries[key]
                 return value(t, result.effects, captures, owner=None if wrap else joined_owner(result, *exits))
             case ('early', key, argument):
                 result = self._infer(argument, context)
@@ -385,6 +396,8 @@ class FeatureChecker(HandlerChecker):
                     if (binding not in self.exit_outside[key] and not binding.consumed
                             and not binding.managed and not permissions(binding.value.type)[1]):
                         raise InferenceError(f'Early return would abandon {name}', subject=name)
+                if any(not permissions(v.type)[1] for v in context.temporaries[self.exit_temporaries[key]:]):
+                    raise InferenceError('Early return would abandon an owned argument temporary')
                 self.record_exit(key, result, context)
                 return Value(NEVER, result.effects, result.captures)
             case ('propagate', key, argument):
@@ -398,6 +411,8 @@ class FeatureChecker(HandlerChecker):
                     if (binding not in self.exit_outside[key] and not binding.consumed
                             and not binding.managed and not permissions(binding.value.type)[1]):
                         raise InferenceError(f'Propagation would abandon {name}', subject=name)
+                if any(not permissions(v.type)[1] for v in context.temporaries[self.exit_temporaries[key]:]):
+                    raise InferenceError('Propagation would abandon an owned argument temporary')
                 self.record_exit(key, value(Ty('Result', (result.type.args[0], NEVER)),
                                             captures=result.captures), context)
                 return value(result.type.args[1], result.effects, result.captures)

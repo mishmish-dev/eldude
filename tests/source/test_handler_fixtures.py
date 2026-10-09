@@ -4,7 +4,7 @@ import unittest
 
 from eldude.core.rows import Row
 from eldude.core.inference import INT, UNIT
-from eldude.core.handlers import run
+from eldude.core.handlers import Defect, run
 from eldude.source.syntax import Diagnostic
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -44,6 +44,20 @@ MULTI_FAILURES = {
 }
 
 class SourceFixtureTests(unittest.TestCase):
+    def test_cleanup_defects_preserve_primary_and_discharge_outer_owners(self):
+        from eldude.source.pipeline import compile_file
+        from eldude.source.syntax import grammar
+        for name in ('cleanup_abandon', 'cleanup_primary'):
+            path = ROOT / 'examples/reject/runtime' / (name + '.eld')
+            with self.subTest(name=name):
+                self.assertTrue(grammar().accepts(path.read_text()))
+                with self.assertRaisesRegex(Defect, 'division or remainder by zero') as caught:
+                    run(compile_file(path).program)
+                self.assertEqual(caught.exception.events[-1], ('close', 1, 'cleanup'))
+                self.assertEqual(caught.exception.__notes__,
+                                 ['Suppressed cleanup defect: Defect: Integer arithmetic overflow'] *
+                                 (4 if name == 'cleanup_primary' else 1))
+
     def fixture(self, name):
         from eldude.source.pipeline import compile_file
         return compile_file(FIXTURES / (name + '.eld'))

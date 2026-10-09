@@ -51,7 +51,13 @@ class SourceElaborator(TypeElaborator):
         self.constraint_evidence = ()
         self.exit_stack, self.region_stack = [], []
         self.recursive_allowed = set()
+        self.expression_modules, self.nominal_identities, self.inherent_members = {}, {}, {}
         self.types['Nat'] = NAT
+
+    def ir(self, node, kind, *parts):
+        expression = super().ir(node, kind, *parts)
+        self.expression_modules[id(expression)] = self.module
+        return expression
 
     def canonical(self, spelling, module=None):
         module = module or self.module
@@ -167,7 +173,9 @@ class SourceElaborator(TypeElaborator):
             self.variants[unwrapped(self.types[identity]).name] = variants
         for identity in self.records:
             self.record_type(identity)
+        self.validate_recursive_storage()
         self.infer_enum_usage()
+        self.nominal_identities = {unwrapped(self.types[name]).name: name for name in self.records | self.enums}
         for identity, declaration in tuple(self.effects.items()):
             if not self.generics(declaration.items[1]):
                 self.instantiate_effect(identity, ())
@@ -254,6 +262,8 @@ class SourceElaborator(TypeElaborator):
                     self.function_self[symbol] = (target, equations)
                     self.function_constraints[symbol] = constraints
                     self.function_evidence[symbol] = impl.prerequisites if impl is not None else self.constraints(constraints)
+                    if not trait:
+                        self.inherent_members[symbol] = (module, method.items[0])
                     if impl is not None:
                         impl.methods[method.items[1].items[0]] = symbol
                     if trait:
@@ -406,11 +416,16 @@ class SourceElaborator(TypeElaborator):
                 family, tag = identity.rsplit('::', 1)
                 if family not in self.enums:
                     self.error('name', 'Unknown enum ' + family, path)
+                self.member_visibility(family, tag, path)
                 return E('variant_pat', unwrapped(self.types[family]).name, tag,
                          *(self.pattern(p, environment) for p in fields))
             if identity in self.records:
+                names = tuple(f.items[0] for f, _ in fields)
+                if len(set(names)) != len(names):
+                    self.error('type', 'Duplicate record pattern field', node)
+                self.member_visibility(identity, None, path)
                 t = unwrapped(self.record_type(identity))
-                return E('record_pat', t.name, tuple(f.items[0] for f, _ in fields),
+                return E('record_pat', t.name, names,
                          *(self.pattern(p, environment) for _, p in fields))
             family, _, tag = identity.rpartition('::')
             if family not in self.enums:
@@ -418,6 +433,7 @@ class SourceElaborator(TypeElaborator):
             declaration = next((v for v in self.enums[family].items[2] if v.items[1].items[0] == tag), None)
             if declaration is None or declaration.items[3] != 'record':
                 self.error('type', 'Expected record variant pattern', path)
+            self.member_visibility(family, tag, path)
             ordered = dict((n.items[0], p) for n, p in fields)
             if len(ordered) != len(fields) or set(ordered) != {f[0].items[0] for f in declaration.items[2]}:
                 self.error('type', 'Variant pattern fields must match its declaration', node)
@@ -436,6 +452,7 @@ class SourceElaborator(TypeElaborator):
         family, tag = identity.rsplit('::', 1)
         if family not in self.enums:
             return None
+        self.member_visibility(family, tag, path)
         t = self.types[family]
         if isinstance(expected, Ty) and unwrapped(expected).name == unwrapped(t).name:
             t = expected
@@ -544,8 +561,15 @@ class SourceElaborator(TypeElaborator):
                         provided = {n.items[0]: v for n, v in fields}
                         if declaration.items[3] != 'record' or len(provided) != len(fields) or set(provided) != {f[0].items[0] for f in declaration.items[2]}:
                             self.error('type', 'Variant fields must match its declaration', node)
-                        return self.variant(node, path, tuple(provided[f[0].items[0]] for f in declaration.items[2]), environment, handlers, expected)
+                        variant = self.variant(node, path, tuple(v for _, v in fields), environment, handlers, expected)
+                        symbols = {n.items[0]: self.symbol(n) for n, _ in fields}
+                        result = self.ir(node, 'variant', variant[1], variant[2],
+                                         tuple(self.ir(node, 'var', symbols[f[0].items[0]]) for f in declaration.items[2]))
+                        for (name, _), value in reversed(tuple(zip(fields, variant[3]))):
+                            result = self.ir(node, 'let', symbols[name.items[0]], value, result)
+                        return result
                 self.error('name', 'Unknown record ' + identity, path)
+            self.member_visibility(identity, None, path)
             template = self.record_type(identity)
             if expected is not None and (not isinstance(expected, Ty) or unwrapped(expected).name != unwrapped(template).name):
                 self.error('type', 'Record constructor does not match the expected nominal type', path)
@@ -633,6 +657,8 @@ class SourceElaborator(TypeElaborator):
                         region = t.region or (self.region_stack[-1] if self.region_stack else None)
                         return self.ir(node, 'buffer_new', region, t.args[0])
                     if t.name == 'List':
+                        if arguments:
+                            self.error('type', 'List::new expects no arguments', node)
                         return self.ir(node, 'list_values', t.args[0], ())
                 symbol = environment.get(callee.items[0])
                 if isinstance(symbol, Host) and symbol.name == 'task::join2':

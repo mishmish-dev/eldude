@@ -1,11 +1,14 @@
 """End-to-end CLI behavior in temporary projects, including filesystem safety."""
 import json
+from contextlib import redirect_stdout
+from io import StringIO
 import os
 from pathlib import Path
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 
 
@@ -88,6 +91,31 @@ class EldudeCLITests(unittest.TestCase):
         self.assertEqual(self.cli('fmt', '--check').returncode, 0)
         self.assertFalse((self.root / 'eldude.lock').exists())
         self.assertEqual(self.cli('fmt', '-','--check', input='module m;').returncode, 1)
+
+    def test_project_format_reads_the_manifest_once(self):
+        from eldude.tooling.cli import format_paths, parser
+        from eldude.tooling.model import read_manifest
+        self.package()
+        for index in range(19):
+            (self.root / f'src/extra_{index}.eld').write_text(f'module extra_{index};')
+        with patch('pathlib.Path.cwd', return_value=self.root), redirect_stdout(StringIO()), \
+                patch('eldude.tooling.model.read_manifest', wraps=read_manifest) as read:
+            self.assertEqual(format_paths(parser().parse_args(['fmt', '--check'])), 1)
+        self.assertEqual(read.call_count, 1)
+
+    def test_second_target_json_diagnostic_points_to_its_host_or_entry(self):
+        for kind, flag in (('app', '--app'), ('test', '--test')):
+            for field, value in (('host', 'cli::standard'), ('entry', 'missing::main')):
+                with self.subTest(kind=kind, field=field):
+                    second = {'host': 'python::experimental', 'entry': 'app::main'} | {field: value}
+                    self.package(targets=(
+                        f'[[{kind}]]\nname="good"\nentry="app::main"\nhost="python::experimental"\n'
+                        f'[[{kind}]]\nname="broken"\nentry="{second["entry"]}"\nhost="{second["host"]}"\n'))
+                    result = self.cli('check', flag, 'broken', '--message-format=json')
+                    self.assertEqual(result.returncode, 2, result.stderr + result.stdout)
+                    diagnostic = json.loads(result.stdout.splitlines()[0])
+                    self.assertEqual(diagnostic['kind'], 'diagnostic')
+                    self.assertEqual(diagnostic['primary']['line'], 12 if field == 'host' else 11)
 
     def test_metadata_does_not_resolve_or_reject_a_pin_mismatch(self):
         self.package(dependencies='[toolchain]\nversion="99.0.0"\n[dependencies]\nmissing={path="../missing"}')

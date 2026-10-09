@@ -26,7 +26,7 @@ The initial sequence was values and pure transformations, consuming sequences, r
 
 ## Initial API and builtin bindings
 
-The [stdlib module map](../stdlib/README.md) distinguishes source implementations from declarations requiring interpreter primitives or further work. The declared API is only partly implemented. The bundled profile uses these canonical identities for existing language hooks:
+The [stdlib module map](../stdlib/README.md) distinguishes primitive-backed operations, handwritten lowering, and declaration-only APIs. The experimental pipeline skips bundled function and implementation bodies, including supplied bodies for `Option`/`Result` transformations, `LinkedList` methods, `Ref::set`, and `task::join2`. `Option::map`, `Result::map`, and `Ref::set` use primitives; `join2` uses handwritten lowering to checked task IR. `isSome`, `isOk`, `andThen`, `mapError`, the `LinkedList` methods, and imported `task::yield` remain unavailable. User-defined function and method bodies are checked and executed. The contracts below describe the library profile, not complete executable coverage. The bundled profile uses these canonical identities for existing language hooks:
 
 | Language hook | Library identity |
 | --- | --- |

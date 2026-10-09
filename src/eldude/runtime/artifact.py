@@ -94,7 +94,8 @@ def main():
         return result
     except Defect as error:
         span = program.origins.get(id(error.expression), Span('<artifact>', 0, 0, 1, 1))
-        print(Diagnostic('defect', str(error), span), file=sys.stderr)
+        print(Diagnostic('defect', str(error), span,
+                         [(note, span) for note in getattr(error, '__notes__', ())]), file=sys.stderr)
         return 1
     except KeyboardInterrupt:
         return 130

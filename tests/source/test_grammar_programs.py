@@ -33,6 +33,9 @@ class ProgramSyntaxTests(unittest.TestCase):
     def test_semantic_rejection_targets_are_valid_syntax(self):
         self.check_files('examples/reject/semantics', True)
 
+    def test_runtime_defect_targets_are_valid_syntax(self):
+        self.check_files('examples/reject/runtime', True)
+
 
 if __name__ == '__main__':
     unittest.main()

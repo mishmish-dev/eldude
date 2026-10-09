@@ -54,8 +54,11 @@ never partially formatted. The CLI accepts one file or stdin for stdout output,
 and one or more explicit files with `--check` or `--write`. `--check` returns 1
 for formatting differences; input/formatting errors return 2. Write mode validates
 all inputs before editing any, replaces each changed file atomically, preserves
-file permissions, and leaves unchanged files untouched. It refuses symlinks so
-that replacement cannot silently change link identity.
+file permission bits, and leaves unchanged files untouched. Before replacement,
+it rejects detected symlinks, changed bytes, or changed permission bits. These
+checks and replacement are separate operations: a concurrent change after a check
+can still be overwritten. Writers requiring exclusion must coordinate access;
+atomic replacement alone does not provide it.
 
 ## Verification
 

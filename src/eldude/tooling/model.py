@@ -62,17 +62,21 @@ class Manifest:
     def name(self):
         return self.data.get('package', {}).get('name')
 
-    def fail(self, field, message, code='configuration'):
+    def fail(self, field, message, code='configuration', *, occurrence=None):
         parts = field.split('.')
         table, offset, start, end = '', 0, 0, 0
+        index, selected = -1, occurrence is None
         for line in self.text.splitlines(keepends=True):
             heading = re.match(r'[ \t]*\[\[?([^\]]+)\]\]?', line)
             if heading:
                 table = heading[1].strip()
-                if field == table or field.startswith(table + '.'):
+                if table == parts[0]:
+                    index += 1
+                selected = occurrence is None or (table == parts[0] and index == occurrence)
+                if selected and (field == table or field.startswith(table + '.')):
                     start, end = offset + heading.start(), offset + heading.end()
             key = re.match(r'[ \t]*([A-Za-z_][A-Za-z_0-9-]*)[ \t]*=', line)
-            if key and (table + '.' + key[1]).strip('.') in (field, '.'.join(parts[:2])):
+            if selected and key and (table + '.' + key[1]).strip('.') in (field, '.'.join(parts[:2])):
                 start, end = offset + key.start(1), offset + key.end(1)
                 break
             offset += len(line)
@@ -95,17 +99,17 @@ def read_manifest(path):
                          getattr(error, 'lineno', 1), getattr(error, 'colno', 1))) from error
     manifest = Manifest(path, text, data)
 
-    def table(value, allowed, field, required=()):
+    def table(value, allowed, field, required=(), *, occurrence=None):
         if not isinstance(value, dict):
-            manifest.fail(field, 'expected a table')
+            manifest.fail(field, 'expected a table', occurrence=occurrence)
         for key in value.keys() - set(allowed):
-            manifest.fail(f'{field}.{key}'.strip('.'), 'unknown field')
+            manifest.fail(f'{field}.{key}'.strip('.'), 'unknown field', occurrence=occurrence)
         for key in set(required) - value.keys():
-            manifest.fail(field, f'missing required field {key}')
+            manifest.fail(field, f'missing required field {key}', occurrence=occurrence)
 
-    def string(value, field, pattern=None):
+    def string(value, field, pattern=None, *, occurrence=None):
         if not isinstance(value, str) or not value or (pattern and not re.fullmatch(pattern, value)):
-            manifest.fail(field, 'invalid string value')
+            manifest.fail(field, 'invalid string value', occurrence=occurrence)
 
     def version(value, field, constraint=False):
         try:
@@ -162,19 +166,19 @@ def read_manifest(path):
         targets = data.get(kind, [])
         if not isinstance(targets, list) or (kind in data and 'package' not in data):
             manifest.fail(kind, 'target arrays require a package')
-        for target in targets:
+        for occurrence, target in enumerate(targets):
             entries = 'exports' if kind == 'embed' else 'entry'
-            table(target, ('name', entries, 'host'), kind, ('name', entries, 'host'))
-            string(target['name'], kind + '.name', IDENTIFIER)
-            string(target['host'], kind + '.host', QUALIFIED)
+            table(target, ('name', entries, 'host'), kind, ('name', entries, 'host'), occurrence=occurrence)
+            string(target['name'], kind + '.name', IDENTIFIER, occurrence=occurrence)
+            string(target['host'], kind + '.host', QUALIFIED, occurrence=occurrence)
             if target['name'] in names:
-                manifest.fail(kind + '.name', 'target names must be unique across target kinds')
+                manifest.fail(kind + '.name', 'target names must be unique across target kinds', occurrence=occurrence)
             names.add(target['name'])
             roots = target[entries] if kind == 'embed' else [target[entries]]
             if not isinstance(roots, list) or not roots:
-                manifest.fail(kind + '.' + entries, 'expected a nonempty list of exported functions')
+                manifest.fail(kind + '.' + entries, 'expected a nonempty list of exported functions', occurrence=occurrence)
             for entry in roots:
-                string(entry, kind + '.' + entries, QUALIFIED)
+                string(entry, kind + '.' + entries, QUALIFIED, occurrence=occurrence)
     for kind in ('dependencies', 'dev-dependencies'):
         dependencies = data.get(kind, {})
         if not isinstance(dependencies, dict) or (kind in data and 'package' not in data):

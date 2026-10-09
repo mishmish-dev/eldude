@@ -46,6 +46,22 @@ class ProjectModelTests(unittest.TestCase):
         with self.assertRaisesRegex(Diagnostic, 'source-dir'):
             read_manifest(path)
 
+    def test_second_target_validation_points_to_its_own_field(self):
+        from eldude.tooling.model import read_manifest
+        for kind in ('app', 'test', 'embed'):
+            entries = 'exports=["app::main"]' if kind == 'embed' else 'entry="app::main"'
+            for invalid, line in (('host="invalid"', 12), ('typo="bad"', 12),
+                                  ('name="same"', 10), ('', 9)):
+                name = 'same' if invalid.startswith('name=') else 'second'
+                second = f'name="{name}"\n{entries}\n' + (invalid if not invalid.startswith('name=') else 'host="python::experimental"')
+                root = self.package(extra=(
+                    f'[[{kind}]]\nname="same"\n{entries}\nhost="python::experimental"\n'
+                    f'[[{kind}]]\n{second}\n'))
+                with self.subTest(kind=kind, invalid=invalid):
+                    with self.assertRaises(Diagnostic) as caught:
+                        read_manifest(root / 'eldude.toml')
+                    self.assertEqual(caught.exception.span.line, line)
+
     def test_discovery_excludes_nested_packages_builds_and_symlink_directories(self):
         from eldude.tooling.model import read_manifest, source_files
         root = self.package()

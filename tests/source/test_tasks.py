@@ -21,6 +21,19 @@ def handle(body, *, returning=None, clause=None, family='Log'):
 
 
 class SourceTaskTests(unittest.TestCase):
+    def test_canonical_cleanup_masks_yields_and_preserves_pending_cancellation(self):
+        from pathlib import Path
+        from eldude.source.pipeline import compile_file
+        from eldude.source.syntax import grammar
+        directory = Path(__file__).resolve().parents[2] / 'examples/src/06_tasks'
+        for name in ('cleanup_mask', 'cleanup_mask_pending'):
+            path = directory / (name + '.eld')
+            with self.subTest(name=name):
+                self.assertTrue(grammar().accepts(path.read_text()))
+                result = run(compile_file(path).program)
+                self.assertEqual(result.value, 42)
+                self.assertEqual(result.events, (('suspend', False),) * 3)
+
     def compile(self, expression, **kwargs):
         return compile_program(expression, checker=FeatureChecker(**kwargs))
 

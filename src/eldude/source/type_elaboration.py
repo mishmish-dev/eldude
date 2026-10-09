@@ -11,6 +11,32 @@ from eldude.core.types import UNKNOWN, OTHER_PRIMITIVES, substitute, unwrapped
 
 
 class TypeElaborator(Elaborator):
+    def nominal_visibility(self, identity, node, module=None):
+        declaration = self.named.get(identity)
+        if declaration and (module or self.module) != self.owners[id(declaration)] and not declaration.items[0]:
+            self.error('visibility', 'Cannot access private type ' + identity, node)
+
+    def member_visibility(self, identity, member, node, module=None):
+        self.nominal_visibility(identity, node, module)
+        declaration = self.named[identity]
+        if (module or self.module) == self.owners[id(declaration)]:
+            return
+        if declaration.kind == 'struct':
+            fields = declaration.items[2]
+            if fields is None:
+                self.error('visibility', 'Cannot construct or decompose private representation of ' + identity, node)
+            for field in fields:
+                if (member is None or field[0].items[0] == member) and not (len(field) > 2 and field[2]):
+                    self.error('visibility', 'Cannot access private field ' + field[0].items[0], node)
+        else:
+            variant = next((v for v in declaration.items[2] if v.items[1].items[0] == member), None)
+            if variant and not variant.items[0]:
+                self.error('visibility', 'Cannot access private variant ' + member, node)
+            if variant and variant.items[3] == 'record':
+                for field in variant.items[2]:
+                    if not (len(field) > 2 and field[2]):
+                        self.error('visibility', 'Cannot access private field ' + field[0].items[0], node)
+
     def bind_generics(self, parameters):
         types, regions, effects, captures = {}, [], {}, {}
         self.generic_binders = []
@@ -249,6 +275,61 @@ class TypeElaborator(Elaborator):
         self.variants = {name: {tag: tuple(refresh(t) for t in fields) for tag, fields in variants.items()}
                          for name, variants in self.variants.items()}
 
+    def validate_recursive_storage(self):
+        payloads = self.variants
+
+        def children(t):
+            if isinstance(t, Fn):
+                return (*t.parameters, t.result)
+            if t.name.startswith('Record:'):
+                return tuple(f.args[0] for f in t.args)
+            return t.args
+
+        def dependencies(t):
+            names = {t.name} if isinstance(t, Ty) and t.name in payloads else set()
+            return names | set().union(*(dependencies(a) for a in children(t)))
+
+        graph = {name: set().union(*(dependencies(t) for fields in variants.values() for t in fields))
+                 for name, variants in payloads.items()}
+        reachable = {name: set(edges) for name, edges in graph.items()}
+        changed = True
+        while changed:
+            changed = False
+            for name, reached in reachable.items():
+                expanded = reached | set().union(*(reachable[n] for n in reached))
+                if expanded != reached:
+                    reachable[name] = expanded
+                    changed = True
+        profiles = {name: set(range(len(self.data_parameters[name]))) for name in payloads}
+
+        def positive(t, subjects, permitted=True):
+            if isinstance(t, Ty) and t.name in subjects and not permitted:
+                return False
+            if isinstance(t, Fn):
+                return all(positive(a, subjects, False) for a in children(t))
+            if t.name.startswith('Record:') or t.name in ('Tuple', 'Linear', 'Affine', 'Owned', 'List'):
+                return all(positive(a, subjects, permitted) for a in children(t))
+            positions = profiles.get(t.name, set())
+            return all(positive(a, subjects, permitted and i in positions) for i, a in enumerate(t.args))
+
+        changed = True
+        while changed:
+            changed = False
+            for name, positions in profiles.items():
+                for index in tuple(positions):
+                    parameter = '$' + self.data_parameters[name][index]
+                    if not all(positive(t, {parameter}) for fields in payloads[name].values() for t in fields):
+                        positions.remove(index)
+                        changed = True
+        for identity, declaration in self.enums.items():
+            nominal = unwrapped(self.types[identity]).name
+            group = {name for name in reachable[nominal] if nominal in reachable[name]}
+            for variant in declaration.items[2]:
+                for member, t in zip(variant.items[2], payloads[nominal][variant.items[1].items[0]]):
+                    if not positive(t, group):
+                        self.error('type', 'Recursive payload requires finite strictly positive storage',
+                                   member[1] if variant.items[3] == 'record' else member)
+
 
     def record_type(self, identity):
         if identity in self.types:
@@ -370,6 +451,7 @@ class TypeElaborator(Elaborator):
             if spelling == 'Self' and self.current_function in self.function_self:
                 return substitute(self.function_self[self.current_function][0], self.generic_types)
             name = self.canonical(spelling)
+            self.nominal_visibility(name, node)
             if name in self.named and self.named[name].kind == 'type_alias':
                 declaration = self.named[name]
                 if name in self.resolving_aliases:

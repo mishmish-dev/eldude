@@ -5,6 +5,8 @@ import unittest
 
 from eldude.source.syntax import Diagnostic, parse_source
 
+ROOT = Path(__file__).resolve().parents[2]
+
 
 class SourceModuleTests(unittest.TestCase):
     def setUp(self):
@@ -125,6 +127,28 @@ class SourceModuleTests(unittest.TestCase):
         graph = self.load('module app; import a::{answer};')
         self.assertIs(graph.exports['a']['answer'], graph.exports['a']['value'])
         self.assertEqual(graph.order, ('a', 'b', 'app'))
+
+    def test_nominal_members_respect_visibility_through_reexports(self):
+        from eldude.source.elaboration import SourceElaborator
+        from eldude.source.modules import load_modules
+        from eldude.source.pipeline import execute_file
+        examples = ROOT / 'examples'
+        for name in ('member_visibility_library', 'member_visibility_facade', 'member_visibility'):
+            with self.subTest(accepted=name):
+                self.assertEqual(execute_file(examples / f'src/01_values/{name}.eld').value, 42)
+        for path in sorted((examples / 'reject/semantics/member_visibility').glob('*.eld')):
+            ast = parse_source(path.read_text(), str(path))
+            graph = load_modules(ast, (examples / 'src',))
+            with self.subTest(rejected=path.stem):
+                with self.assertRaises(Diagnostic) as caught:
+                    SourceElaborator(ast, graph).compile()
+                if path.stem == 'private_enum_remainder':
+                    self.assertEqual(caught.exception.code, 'semantic')
+                    self.assertIn('Non-exhaustive match', caught.exception.message)
+                else:
+                    self.assertEqual(caught.exception.code, 'visibility')
+                    self.assertIn('private', caught.exception.message)
+                self.assertEqual(caught.exception.span.filename, str(path))
 
 
 if __name__ == '__main__':
