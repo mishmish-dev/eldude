@@ -51,13 +51,13 @@ Each task ends with its programs working, focused checks passing, updated suppor
 
 | File | Planned responsibility |
 | --- | --- |
-| `src/eldude/capture_rows.py` (new), `tests/test_capture_rows.py` (new) | Scoped capture terms, substitution, equality/inclusion constraints; keep separate from effect rows, whose algebra differs |
-| `src/eldude/trait_constraints.py` (new), `tests/test_trait_constraints.py` (new) | Canonical trait heads, evidence selection, prerequisite checks, associated-equation normalization |
-| `src/eldude/inference.py`, `src/eldude/source_pipeline.py` | Callable contracts, usage, region/capture instantiation, owner and grant checking |
-| `src/eldude/source_syntax.py`, `src/eldude/source_elaboration.py`, `src/eldude/source_declarations.py` | Preserve generic binder kinds/order, resolve source contracts, validate declarations and dynamic interfaces |
-| `src/eldude/source_features.py`, `src/eldude/handlers.py` | Checked package dictionaries, access projection, dynamic calls and runtime storage |
-| `tests/test_source_capture_contracts.py`, `tests/test_source_semantic_examples.py` | Execute acceptance files; assert metadata, events, and precise rejection diagnostics |
-| `tests/test_source_ownership_boundaries.py`, `tests/test_source_feature_regressions.py`, `tests/test_source_tasks.py` | Existing access, mutation, handler, and task regression coverage |
+| `src/eldude/core/captures.py` (new), `tests/core/test_captures.py` (new) | Scoped capture terms, substitution, equality/inclusion constraints; keep separate from effect rows, whose algebra differs |
+| `src/eldude/core/traits.py` (new), `tests/core/test_traits.py` (new) | Canonical trait heads, evidence selection, prerequisite checks, associated-equation normalization |
+| `src/eldude/core/inference.py`, `src/eldude/source/pipeline.py` | Callable contracts, usage, region/capture instantiation, owner and grant checking |
+| `src/eldude/source/syntax.py`, `src/eldude/source/elaboration.py`, `src/eldude/core/declarations.py` | Preserve generic binder kinds/order, resolve source contracts, validate declarations and dynamic interfaces |
+| `src/eldude/source/features.py`, `src/eldude/core/handlers.py` | Checked package dictionaries, access projection, dynamic calls and runtime storage |
+| `tests/source/test_capture_contracts.py`, `tests/source/test_semantic_examples.py` | Execute acceptance files; assert metadata, events, and precise rejection diagnostics |
+| `tests/source/test_ownership_boundaries.py`, `tests/source/test_feature_regressions.py`, `tests/source/test_tasks.py` | Existing access, mutation, handler, and task regression coverage |
 | `stdlib/collections/dyn_array.eld`, `stdlib/README.md`, `docs/standard-library.md` | Declare and document the minimum projection API used in tasks 7–8 |
 | `examples/`, `docs/implementation.md`, `docs/index.md` | Programs, expected results, supported-subset claims, and navigation |
 
@@ -65,7 +65,7 @@ Keep the new modules limited to those two shared semantic responsibilities. Do n
 
 ## Task 1: Parameter-dependent capture contracts
 
-**Files:** `capture_rows.py`, `inference.py`, `source_pipeline.py`, `source_elaboration.py`; their tests from the file map above.
+**Files:** `core/captures.py`, `core/inference.py`, `source/pipeline.py`, `source/elaboration.py`; their tests from the file map above.
 
 **Interface:** Represent a capture expression as a finite set of scoped provenance/argument/environment atoms. `substitute_captures(expr, substitutions)` replaces whole sources with whole capture expressions without capturing another function's binders. Keep callable-environment captures separate from `Fn.bound`, the whole-result upper bound.
 
@@ -78,7 +78,7 @@ Keep the new modules limited to those two shared semantic responsibilities. Do n
 
 ## Task 2: Capture-row polymorphism and usage bounds
 
-**Files:** task 1 files, `source_declarations.py`, `source_features.py`, `test_capture_rows.py`, `test_source_capture_contracts.py`.
+**Files:** task 1 files, `core/declarations.py`, `source/features.py`, `core/test_captures.py`, `source/test_capture_contracts.py`.
 
 **Interface:** Extend capture terms with declared row variables. `CaptureSolver.equal(left, right)` and `CaptureSolver.include(actual, allowed)` collect constraints; `solve()` returns substitutions and residual obligations. Generic-body variables remain rigid; each call gets fresh variables. Row usage obligations are checked separately from capture-set inclusion.
 
@@ -91,7 +91,7 @@ Keep the new modules limited to those two shared semantic responsibilities. Do n
 
 ## Task 3: Joint region inference and explicit generic arguments
 
-**Files:** `source_syntax.py`, `source_elaboration.py`, `inference.py`, `source_pipeline.py`; `test_source_extended_syntax.py`, `test_source_capture_contracts.py`.
+**Files:** `source/syntax.py`, `source/elaboration.py`, `core/inference.py`, `source/pipeline.py`; `source/test_extended_syntax.py`, `source/test_capture_contracts.py`.
 
 **Interface:** Preserve the ordered generic binder list and each binder's kind in callable contracts. Call instantiation combines explicit arguments with constraints from parameter/result types, effects, and capture expressions before solving remaining region variables.
 
@@ -104,7 +104,7 @@ Keep the new modules limited to those two shared semantic responsibilities. Do n
 
 ## Task 4: Shared trait constraints and associated equations
 
-**Files:** `trait_constraints.py`, `source_elaboration.py`, `source_declarations.py`, `inference.py`; `test_trait_constraints.py`, `test_source_semantic_examples.py`.
+**Files:** `core/traits.py`, `source/elaboration.py`, `core/declarations.py`, `core/inference.py`; `core/test_traits.py`, `source/test_semantic_examples.py`.
 
 **Interface:** `select_impl(goal, evidence)` selects a canonical full trait head (receiver plus trait arguments) and returns the substitution and required evidence. `normalize_type(type, evidence)` applies admitted associated equations and returns the normalized type with any obligations. Static and dynamic checking must use these same operations.
 
@@ -117,7 +117,7 @@ Keep the new modules limited to those two shared semantic responsibilities. Do n
 
 ## Task 5: Generic and associated-type existential interfaces
 
-**Files:** task 4 files, `source_pipeline.py`, `source_features.py`, `handlers.py`; `test_source_capture_contracts.py`.
+**Files:** task 4 files, `source/pipeline.py`, `source/features.py`, `core/handlers.py`; `source/test_capture_contracts.py`.
 
 **Interface:** Replace the trait-name-only package/cache identity with the canonical instantiated bound, associated bindings, and usage promises. Dynamic method contracts come from that visible interface; packaging stores checked implementation evidence and dispatch targets, without exposing the hidden type.
 
@@ -131,7 +131,7 @@ Keep the new modules limited to those two shared semantic responsibilities. Do n
 
 ## Task 6: Multiple ordinary traits in one package
 
-**Files:** `docs/language-spec/03-traits.md`, `source_elaboration.py`, `source_features.py`, `handlers.py`; `test_source_capture_contracts.py`, `test_source_semantic_examples.py`.
+**Files:** `docs/language-spec/03-traits.md`, `source/elaboration.py`, `source/features.py`, `core/handlers.py`; `source/test_capture_contracts.py`, `source/test_semantic_examples.py`.
 
 **Contract clarification:** The grammar already accepts multiple applied bounds, while §11 primarily describes one ordinary trait. Record this proposed clarification in §11 before implementation: every bound describes the same hidden value; dictionaries remain keyed by canonical trait and member; duplicate identical bounds normalize; conflicting equations and unqualified collisions between distinct trait members reject. Weakening may remove promises/bounds while preserving the remaining evidence and ownership obligations. Do not invent qualified-call syntax as part of this task.
 
@@ -142,7 +142,7 @@ Keep the new modules limited to those two shared semantic responsibilities. Do n
 
 ## Task 7: Mutable owners and call-scoped grants
 
-**Files:** `inference.py`, `source_pipeline.py`, `source_features.py`, `handlers.py`, `stdlib/collections/dyn_array.eld`; access tests and library docs from the file map.
+**Files:** `core/inference.py`, `source/pipeline.py`, `source/features.py`, `core/handlers.py`, `stdlib/collections/dyn_array.eld`; access tests and library docs from the file map.
 
 **Interface:** Attach intrinsic mutable-owner identity/region facts to checked values. A grant records the parent owner, authorized region, target path, access mode, and active call interval. Forwarding and projection derive authority from the supplied grant; runtime operations target the original storage.
 
@@ -156,7 +156,7 @@ Keep the new modules limited to those two shared semantic responsibilities. Do n
 
 ## Task 8: Dynamic mutable dispatch and integration
 
-**Files:** task 7 files, `source_elaboration.py`, `source_declarations.py`; capture/access/handler/task tests from the file map.
+**Files:** task 7 files, `source/elaboration.py`, `core/declarations.py`; capture/access/handler/task tests from the file map.
 
 **Interface:** A dynamic `mut self` call consumes a valid call-scoped grant to the package's original hidden storage. Owner facts, whole-value capture bounds, and dictionary contracts survive packaging, call returns, joins, and existing interface serialization.
 
@@ -173,9 +173,9 @@ Keep the new modules limited to those two shared semantic responsibilities. Do n
 Run a new positive program directly as it is developed:
 
 ```sh
-uv run python -m eldude.run_eldude examples/02_ownership/parameter_capture.eld
-uv run python -m unittest discover -s tests -p 'test_source_capture_contracts.py' -v
-uv run python -m unittest discover -s tests -p 'test_source_semantic_examples.py' -v
+uv run python -m eldude.tooling.run examples/02_ownership/parameter_capture.eld
+uv run python -m unittest discover -s tests -p 'test_capture_contracts.py' -v
+uv run python -m unittest discover -s tests -p 'test_semantic_examples.py' -v
 ```
 
 The positive command must print its manifest value. Semantic rejection tests must assert the expected diagnostic category/message and source location, not merely that compilation raised an exception. Use the existing source fixture adapter for rejection programs without an exported entry point. Host cleanup and handler events are asserted through the existing source execution API.
@@ -183,10 +183,10 @@ The positive command must print its manifest value. Semantic rejection tests mus
 At each task boundary, update example expectations, the code map if files were added, and supported-subset prose, then run the [root checks](../README.md#checks):
 
 ```sh
-uv run python -m eldude.check_docs
-uv run python -m eldude.check_grammar
+uv run python -m eldude.tooling.check_docs
+uv run python -m eldude.source.grammar
 uv run python -m unittest discover -s tests -p 'test_*.py'
-uv run python -m eldude.run_eldude --examples --strict
+uv run python -m eldude.tooling.run --examples --strict
 git diff --check
 ```
 

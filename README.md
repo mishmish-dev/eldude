@@ -126,8 +126,8 @@ checkout. Installed wheels include the grammar and standard library for running,
 checking, formatting, and building user programs.
 
 ```sh
-uv run python -m eldude.check_docs
-uv run python -m eldude.check_grammar
+uv run python -m eldude.tooling.check_docs
+uv run python -m eldude.source.grammar
 uv run python -m unittest discover -s tests -p 'test_*.py'
 uv run eldude-run --examples --strict
 git diff --check
@@ -135,7 +135,7 @@ git diff --check
 
 The documentation check verifies local links and fragment anchors, chapter/code map coverage, and example tables against [manifest.json](examples/manifest.json). The grammar check verifies syntax and generated publications. The tests check static diagnostics and execution; the strict corpus run executes every positive example. See the [example guide](examples/README.md) for expected values and rejection fixtures.
 
-After editing [eldude.ebnf](docs/eldude.ebnf) or the originating parsing/interface clauses, regenerate the Markdown and JSON grammar publications with `uv run python -m eldude.check_grammar --write`. The [editing guide](docs/index.md#editing-and-checking) identifies the source files.
+After editing [eldude.ebnf](docs/eldude.ebnf) or the originating parsing/interface clauses, regenerate the Markdown and JSON grammar publications with `uv run python -m eldude.source.grammar --write`. The [editing guide](docs/index.md#editing-and-checking) identifies the source files.
 
 ## Source-to-execution experiment
 

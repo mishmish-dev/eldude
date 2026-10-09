@@ -469,7 +469,7 @@ The implementation should keep responsibilities separate without creating a plug
 
 The backend is replaceable behind checked inputs and declared artifact outputs. The design does not choose LLVM, C emission, another native backend, or a production runtime strategy. Native support must demonstrate its advertised contracts before `build` claims to produce a supported executable.
 
-The [implementation file map](implementation.md#file-map) identifies the components to reuse. In particular, `source_modules.py` owns declared module identities, `source_pipeline.py` provides the current check/execute path, `source_syntax.py` supplies located syntax and diagnostics, and `format_eldude.py` already implements source preservation and safe writes. Their corresponding tests are part of any future implementation change.
+The [implementation file map](implementation.md#file-map) identifies the components to reuse. In particular, `source/modules.py` owns declared module identities, `source/pipeline.py` provides the current check/execute path, `source/syntax.py` supplies located syntax and diagnostics, and `tooling/format.py` already implements source preservation and safe writes. Their corresponding tests are part of any future implementation change.
 
 The current `compile_source`/`compile_file` APIs return checked programs for interpretation; their names do not imply native code generation. Existing interface serialization experiments do not establish a complete, validated canonical-interface cache. Host fixture support does not establish a production CLI host. Each capability remains explicitly labeled until its acceptance evidence exists.
 

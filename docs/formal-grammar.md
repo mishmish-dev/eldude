@@ -421,8 +421,8 @@ User-authored source need not be reordered solely to match this interface order;
 From the repository root:
 
 ```sh
-uv run python -m eldude.check_grammar --write
-uv run python -m eldude.check_grammar
+uv run python -m eldude.source.grammar --write
+uv run python -m eldude.source.grammar
 uv run python -m unittest discover -s tests -p 'test_grammar*.py'
 ```
 

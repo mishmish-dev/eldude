@@ -7,9 +7,9 @@ requires-python = ">=3.14.8"
 dependencies = []
 
 [project.scripts]
-eldude = "eldude.cli:main"
-eldude-run = "eldude.run_eldude:main"
-eldude-format = "eldude.format_eldude:main"
+eldude = "eldude.tooling.cli:main"
+eldude-run = "eldude.tooling.run:main"
+eldude-format = "eldude.tooling.format:main"
 
 [build-system]
 requires = ["hatchling>=1.27"]

@@ -1,3 +1,3 @@
-from eldude.cli import main
+from eldude.tooling.cli import main
 
 raise SystemExit(main())

@@ -9,7 +9,7 @@
 All **84 positive examples** execute through the source checker and interpreter. Each file is a separate program; the runner uses the documented [entry-point convention](../docs/implementation.md#entry-point-api-and-diagnostics).
 
 ```sh
-uv run python -m eldude.run_eldude --examples --strict
+uv run python -m eldude.tooling.run --examples --strict
 # 84 passed, 0 unsupported, 0 failed
 ```
 
@@ -108,12 +108,12 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 Run a fixture and the source tests from the repository root:
 
 ```sh
-uv run python -m eldude.run_eldude examples/07_source_pipeline/combined.eld
+uv run python -m eldude.tooling.run examples/07_source_pipeline/combined.eld
 # 42
-uv run python -m unittest discover -s tests -p 'test_source*.py' -v
+uv run python -m unittest discover -s tests/source -t tests -p 'test_*.py' -v
 ```
 
-These fixtures cover handler evidence, ownership, resumption, and cleanup through the [source pipeline](../docs/implementation.md#file-map). [test_source_handler_fixtures.py](../tests/test_source_handler_fixtures.py) asserts independent expected values and event ordering; [test_source_handlers.py](../tests/test_source_handlers.py) checks individual handler contracts.
+These fixtures cover handler evidence, ownership, resumption, and cleanup through the [source pipeline](../docs/implementation.md#file-map). [source/test_handler_fixtures.py](../tests/source/test_handler_fixtures.py) asserts independent expected values and event ordering; [source/test_handlers.py](../tests/source/test_handlers.py) checks individual handler contracts.
 
 | Program | Result | Checked execution |
 | --- | --- | --- |
@@ -187,7 +187,7 @@ Source annotations, operation arguments, forwarding, lexical resumption, and imp
 
 ## Rejection targets
 
-`reject/syntax` must fail the grammar recognizer. `reject/semantics` must parse and reach its intended static failure; [test_source_semantic_examples.py](../tests/test_source_semantic_examples.py) checks these diagnostics, including all three existential capture cases. [Handler counterexamples](#enforced-source-rejections) are enforced separately below.
+`reject/syntax` must fail the grammar recognizer. `reject/semantics` must parse and reach its intended static failure; [source/test_semantic_examples.py](../tests/source/test_semantic_examples.py) checks these diagnostics, including all three existential capture cases. [Handler counterexamples](#enforced-source-rejections) are enforced separately below.
 
 | Program | Required failure |
 | --- | --- |
@@ -252,7 +252,7 @@ In particular, [sibling residual](reject/semantics/multi_operations/sibling_resi
 For example:
 
 ```sh
-uv run python -m eldude.run_eldude examples/reject/semantics/source_pipeline/frame_transfer.eld
+uv run python -m eldude.tooling.run examples/reject/semantics/source_pipeline/frame_transfer.eld
 # .../frame_transfer.eld:9:19: semantic: file was already consumed
 # ...:5:9: note: Binding declared here
 # ...:8:13: note: Ownership transferred here

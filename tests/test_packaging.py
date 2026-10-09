@@ -10,8 +10,8 @@ class PackagingTests(unittest.TestCase):
     def test_artifact_execution_does_not_load_the_source_frontend(self):
         code = '''
 import sys
-from eldude.ir_artifact import decode_program
-from eldude.handlers import run
+from eldude.runtime.artifact import decode_program
+from eldude.core.handlers import run
 
 program = decode_program({
     'ir_version': 1,
@@ -23,10 +23,8 @@ program = decode_program({
                 'fields': {'labels': {'tuple': []}, 'tail': None}},
 })
 assert run(program).value == 42
-frontend = {'source_pipeline', 'source_elaboration', 'source_type_elaboration',
-            'source_checking', 'source_lowering', 'source_features',
-            'source_syntax', 'source_modules', 'check_grammar'}
-loaded = {'eldude.' + name for name in frontend} & sys.modules.keys()
+loaded = {name for name in sys.modules if name == 'eldude.source'
+          or name.startswith(('eldude.source.', 'eldude.tooling.'))}
 assert not loaded, sorted(loaded)
 '''
         with TemporaryDirectory() as directory:
@@ -47,7 +45,7 @@ assert not loaded, sorted(loaded)
             source.write_text('module app; import core::option::{Option}; '
                               'pub fn main()->Int { match Option::Some(42) { '
                               'case Option::Some(value) => value; case Option::None => 0; } }')
-            result = subprocess.run([sys.executable, '-I', '-m', 'eldude.run_eldude', str(source)],
+            result = subprocess.run([sys.executable, '-I', '-m', 'eldude.tooling.run', str(source)],
                                     cwd=directory, capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout, '42\n')

@@ -24,14 +24,14 @@ and the source formatter. No new language syntax or dependencies are needed.
 ## Tasks
 
 - [x] Add library checking and explicit module discovery inputs in
-  `source_pipeline.py`, `source_elaboration.py`, and `source_modules.py`.
+  `source/pipeline.py`, `source/elaboration.py`, and `source/modules.py`.
   Verify no-main libraries, unused/generic errors, and nonexecuting initializers
   through source tests, plus the existing executable and rejection corpus.
-- [x] Add `project_model.py` and temporary-project tests for strict manifests,
+- [x] Add `tooling/model.py` and temporary-project tests for strict manifests,
   versions, workspace selection, source discovery, and package boundaries.
-- [x] Add `project_resolver.py` and tests for direct dependency environments,
+- [x] Add `tooling/resolver.py` and tests for direct dependency environments,
   path constraints, cycles/origins, deterministic atomic locks, and locked/offline behavior.
-- [x] Add `eldude` / `src/eldude/cli.py` for new/init, check, fmt, metadata,
+- [x] Add `eldude` / `src/eldude/tooling/cli.py` for new/init, check, fmt, metadata,
   lock/update, clean, and explicit unsupported commands. Test source diagnostics,
   JSON events, target scope, safe creation, formatting preflight, and symlinks.
 - [x] Update the implementation map and user commands, review the diff, and run
