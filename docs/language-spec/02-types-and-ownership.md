@@ -39,7 +39,7 @@ Float32 Float64
 
 `Nat` is an arbitrary-precision non-negative integer. `Never` is uninhabited. Null is not a value.
 
-All primitive values have `Dup + Discard` and are capture-free. `Int` is an alias of `Int64`, `UInt` of `UInt64`, and `Byte` of `UInt8`, on every target. For width `w`, `Intw` has range `[-2^(w-1), 2^(w-1)-1]` and `UIntw` has range `[0, 2^w-1]`. Native pointer widths do not alter these aliases. `Char` is one Unicode scalar value (U+0000–U+10FFFF excluding surrogates); `Bool` has exactly `false` and `true`.
+All primitive types satisfy `Dup + Discard + CaptureFree` ([§9.6](#96-capture-free-types)). `Int` is an alias of `Int64`, `UInt` of `UInt64`, and `Byte` of `UInt8`, on every target. For width `w`, `Intw` has range `[-2^(w-1), 2^(w-1)-1]` and `UIntw` has range `[0, 2^w-1]`. Native pointer widths do not alter these aliases. `Char` is one Unicode scalar value (U+0000–U+10FFFF excluding surrogates); `Bool` has exactly `false` and `true`.
 
 Integer overflow is never undefined behavior. Ordinary arithmetic is checked as specified below; wrapping, saturating, widening, and recoverable checked-result operations are separate explicit APIs.
 
@@ -299,7 +299,7 @@ For example, `enum Chain<T> { End, Link(T, Chain<T>) }` is admitted. A recursive
 
 ### 9.1 Fundamental predicates
 
-Eldude recognizes two compiler-governed predicates:
+Eldude recognizes two compiler-governed usage predicates:
 
 ```text
 Dup       may semantically duplicate
@@ -373,6 +373,23 @@ means that `T` denotes a non-duplicable owner of mutable identity in region `@r`
 Mutable-owner status is not a user-implementable trait and does not participate in trait resolution. It is an intrinsic semantic fact of designated nominal state abstractions and is exported in canonical interfaces when clients need to form root `mut` grants. `DynArray<T,@r>` is the canonical standard example. Scoped projection ([§15](04-captures-and-access.md#15-scoped-access-projection)) may derive a `mut T` grant to an arbitrary subvalue from an already active parent-owner grant; the derived grant retains the parent owner identity/projection path and does not require `T` itself to satisfy `MutableOwner`. The core does not define a general user-extensible mechanism for minting new root mutable-owner identities; abstractions that require new identity mechanisms are built from existing state primitives or audited unsafe/runtime facilities until such a mechanism is independently justified.
 
 Root-grant formation accounts for `state<@r>` under [§14.3](04-captures-and-access.md#143-mut). The grant carries that accounted state authority through forwarding and projection; the target type of a projected grant need not name the parent region.
+
+### 9.6 Capture-free types
+
+`CaptureFree : Type -> Constraint` is a compiler-derived structural property. `T: CaptureFree` guarantees that every value of `T` has no tracked captures or fixed scoped dependencies under [§13](04-captures-and-access.md#13-captures). It is not a user-implementable trait, a usage permission, or a relative lifetime/outlives constraint.
+
+Generic code uses ordinary constraint syntax:
+
+```eldude
+where T: CaptureFree
+where T: CaptureFree + Discard
+```
+
+The compiler derives the property from complete structural types or published compiler-derived/audited profiles. Ordinary scalars and immutable tuples, records, enums, and collections qualify when all their possible stored contents are `CaptureFree` and they have no additional hidden provenance or ownership obligations. All enum alternatives must satisfy the rule. A function type must establish that its permitted environments have no tracked captures and that its complete contract has no fixed scoped dependencies.
+
+A generic type parameter needs the bound or sufficient evidence after instantiation. An opaque type, unknown container, or erased package needs published evidence sufficient to establish the property for every value of its type; opacity alone supplies none. An empty container or one value's empty capture summary does not establish `CaptureFree` for a type that can also hold scoped values.
+
+Scoped references, task handles, and closures retaining scoped state do not satisfy `CaptureFree`. In particular, `Ref<Int,@r>` is `Dup + Discard` but retains `@r`, so those permissions do not imply `CaptureFree`. `CaptureFree` grants neither usage permission; APIs such as aliasable cells require `Discard` separately.
 
 ---
 

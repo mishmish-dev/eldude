@@ -227,7 +227,8 @@ def lower_feature(expr, names, lower, checker):
         case ('bindpat', pattern, initial, body):
             return E('bindpat', pattern, lower(initial, names), lower(body, names))
         case ('match', subject, arms):
-            return E('match', lower(subject, names), tuple((p, lower(b, names)) for p, b in arms))
+            retained = E('access', 'view', subject[1]) if id(expr) in checker.borrowed_matches else lower(subject, names)
+            return E('match', retained, tuple((p, lower(b, names)) for p, b in arms))
         case ('exit_scope', key, expected, body, wrap):
             return E('exit_scope', key, expected, lower(body, names), wrap)
         case ('early' | 'propagate' as kind, key, operand):
@@ -247,7 +248,7 @@ def lower_feature(expr, names, lower, checker):
         case ('primitive_method', method, receiver, arguments, mode):
             return E('primitive_method', method, lower(receiver, names), tuple(lower(a, names) for a in arguments), mode)
         case ('for_each', pattern, iterable, body):
-            return E('for_each', pattern, lower(iterable, names), lower(body, names))
+            return E('for_each', pattern, lower(iterable, names), lower(body, names), checker.iteration_steps[id(expr)])
         case ('taskgroup', key, body):
             return E('taskgroup', key, lower(body, names))
         case ('spawn' | 'await' as kind, operand):

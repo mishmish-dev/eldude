@@ -29,12 +29,12 @@ Use the chapter's local contents and section links for a precise lookup. Chapter
 | Topic / search terms | Chapter | Sections |
 | --- | --- | --- |
 | Parsing, evaluation order, functions, modules | [1. Foundations](language-spec/01-foundations.md) | §§1–5 |
-| Types, generics, records, enums, patterns, `Dup`, `Discard` | [2. Types and ownership](language-spec/02-types-and-ownership.md) | §§6–9 |
+| Types, generics, records, enums, patterns, `Dup`, `Discard`, `CaptureFree` | [2. Types and ownership](language-spec/02-types-and-ownership.md) | §§6–9 |
 | Traits, coherence, associated types, `any` | [3. Traits](language-spec/03-traits.md) | §§10–11 |
 | Closures, provenance, retention, `view`, `mut` | [4. Captures and access](language-spec/04-captures-and-access.md) | §§12–15 |
 | Effect rows, `diverge`, termination, defects, `Result`, `?`, `try` | [5. Effects and failure](language-spec/05-effects-and-failure.md) | §§16–22 |
 | `handle`, `resume`, `tail`, `once`, `affine`, forwarding | [6. Handlers](language-spec/06-handlers.md) | §§23–26 |
-| Regions, `Ref`, mutable owners, linear resources, `using` | [7. State and cleanup](language-spec/07-state-and-cleanup.md) | §§27–31 |
+| Regions, `Ref` payload restrictions, mutable owners, linear resources, `using` | [7. State and cleanup](language-spec/07-state-and-cleanup.md) | §§27–31 |
 | Sequences, indexing, consuming operations, `for`, finite iteration | [8. Collections](language-spec/08-collections.md) | §§32–37 |
 | `taskgroup`, `spawn`, `await`, cancellation, inherited handlers | [9. Concurrency](language-spec/09-concurrency.md) | §§38–47 |
 | Host contracts, `unsafe`, pointers, native storage, callbacks | [10. Host and FFI](language-spec/10-host-and-ffi.md) | §§48–57 |

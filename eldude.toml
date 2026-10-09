@@ -934,3 +934,243 @@ host = "python::experimental"
 name = "test_tasks_cleanup_mask_pending"
 entry = "examples::tasks::cleanup_mask_pending::verify"
 host = "python::experimental"
+
+[[app]]
+name = "ownership_library_borrow_match"
+entry = "examples::ownership::library_borrow_match::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_library_borrow_match"
+entry = "examples::ownership::library_borrow_match::verify"
+host = "python::experimental"
+
+[[app]]
+name = "results_library_combinators"
+entry = "library_combinators::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_results_library_combinators"
+entry = "library_combinators::verify"
+host = "python::experimental"
+
+[[app]]
+name = "results_library_owned_combinators"
+entry = "library_owned_combinators::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_results_library_owned_combinators"
+entry = "library_owned_combinators::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_capture_free_cell"
+entry = "capture_free_cell::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_capture_free_cell"
+entry = "capture_free_cell::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_capture_free_erasure"
+entry = "capture_free_erasure::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_capture_free_erasure"
+entry = "capture_free_erasure::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_capture_free_generic_wrapper"
+entry = "examples::collections::capture_free_generic_wrapper::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_capture_free_generic_wrapper"
+entry = "examples::collections::capture_free_generic_wrapper::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_library_iteration_custom"
+entry = "examples::collections::library_iteration_custom::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_library_iteration_custom"
+entry = "examples::collections::library_iteration_custom::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_library_iteration_linked_list"
+entry = "examples::collections::library_iteration_linked_list::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_library_iteration_linked_list"
+entry = "examples::collections::library_iteration_linked_list::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_list_api_empty"
+entry = "list_api_empty::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_list_api_empty"
+entry = "list_api_empty::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_list_api_generic_with"
+entry = "list_api_generic_with::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_list_api_generic_with"
+entry = "list_api_generic_with::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_list_api_inspection"
+entry = "list_api_inspection::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_list_api_inspection"
+entry = "list_api_inspection::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_list_api_literal_hooks"
+entry = "list_api_literal_hooks::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_list_api_literal_hooks"
+entry = "list_api_literal_hooks::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_list_api_next"
+entry = "list_api_next::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_list_api_next"
+entry = "list_api_next::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_list_api_partition_owned"
+entry = "list_api_partition_owned::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_list_api_partition_owned"
+entry = "list_api_partition_owned::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_list_api_replace_owned"
+entry = "list_api_replace_owned::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_list_api_replace_owned"
+entry = "list_api_replace_owned::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_list_api_values"
+entry = "list_api_values::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_list_api_values"
+entry = "list_api_values::verify"
+host = "python::experimental"
+
+[[app]]
+name = "tasks_library_cancel"
+entry = "library_cancel::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_tasks_library_cancel"
+entry = "library_cancel::verify"
+host = "python::experimental"
+
+[[app]]
+name = "tasks_library_resources"
+entry = "library_resources::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_tasks_library_resources"
+entry = "library_resources::verify"
+host = "python::experimental"
+
+[[app]]
+name = "tasks_library_spawn_region_outer"
+entry = "library_spawn_region_outer::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_tasks_library_spawn_region_outer"
+entry = "library_spawn_region_outer::verify"
+host = "python::experimental"
+
+[[app]]
+name = "tasks_library_spawn_handler_baseline"
+entry = "library_spawn_handler_baseline::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_tasks_library_spawn_handler_baseline"
+entry = "library_spawn_handler_baseline::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_list_storage_growth"
+entry = "list_storage_growth::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_list_storage_growth"
+entry = "list_storage_growth::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_list_storage_snapshots"
+entry = "list_storage_snapshots::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_list_storage_snapshots"
+entry = "list_storage_snapshots::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_list_storage_owned"
+entry = "list_storage_owned::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_list_storage_owned"
+entry = "list_storage_owned::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_list_iteration_control"
+entry = "list_iteration_control::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_list_iteration_control"
+entry = "list_iteration_control::verify"
+host = "python::experimental"

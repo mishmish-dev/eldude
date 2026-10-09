@@ -12,7 +12,7 @@ This is an informative checklist. Each entry points to the authoritative clauses
 | 4 | Retained obligations and result-capture bounds | [§§13.1](04-captures-and-access.md#131-purpose), [13.4](04-captures-and-access.md#134-conservative-result-capture-bounds), and [13.6](04-captures-and-access.md#136-canonical-interfaces-and-conservative-mutation) |
 | 5 | Call-scoped access and root state accounting | [§§14](04-captures-and-access.md#14-call-scoped-access) and [59.3](11-formal-semantics.md#593-access-modes) |
 | 6 | Mutable-owner status and projected access | [§§9.5](02-types-and-ownership.md#95-mutable-owner-status) and [15.2](04-captures-and-access.md#152-projection-rule) |
-| 7 | Aliasable cells and payload retention horizons | [§§28.3](07-state-and-cleanup.md#283-aliasable-shared-cells)–[28.4](07-state-and-cleanup.md#284-ref-operations) and [13.5](04-captures-and-access.md#135-retention-horizons) |
+| 7 | Aliasable cells require `CaptureFree + Discard` payload types; handles retain their region | [§§9.6](02-types-and-ownership.md#96-capture-free-types), [28.3](07-state-and-cleanup.md#283-aliasable-shared-cells)–[28.4](07-state-and-cleanup.md#284-ref-operations), and [13.5](04-captures-and-access.md#135-retention-horizons) |
 | 8 | Region-state elimination | [§§27.3](07-state-and-cleanup.md#273-region-state-effect) and [61.1](11-formal-semantics.md#611-region-elimination) |
 | 9 | Explicit cleanup and discharge-only control | [§§30](07-state-and-cleanup.md#30-cleanup)–[31](07-state-and-cleanup.md#31-using) |
 | 10 | Handler-frame ownership and complete residual effects | [§§23.3](06-handlers.md#233-active-handler-frame-obligations), [26.5](06-handlers.md#265-residual-row), and [64.2](11-formal-semantics.md#642-lexical-handler-application) |

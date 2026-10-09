@@ -211,7 +211,7 @@ let t = taskgroup {
 };
 ```
 
-and prevents hiding the handle in an outer `Ref`, closure, `any` package, or container that outlives the group.
+and prevents hiding the handle in a closure, `any` package, or container that outlives the group. A task handle is not `CaptureFree` and cannot be a `Ref` payload at all, regardless of the cell's region lifetime ([§13.5](04-captures-and-access.md#135-retention-horizons)).
 
 ### 41.3 Discarding a handle
 

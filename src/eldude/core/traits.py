@@ -179,7 +179,7 @@ class TraitSolver:
                 raise ValueError('Implementation prerequisites must be projection-free')
             if any(v > variables(head)[k] for k, v in variables(prerequisite).items()):
                 raise ValueError('Implementation prerequisite introduces uncovered variables')
-            if prerequisite.name not in ('Trait:Dup', 'Trait:Discard', 'Trait:NonAbandoning', 'Equality') and size(prerequisite) >= size(head):
+            if prerequisite.name not in ('Trait:Dup', 'Trait:Discard', 'Trait:CaptureFree', 'Trait:NonAbandoning', 'Equality') and size(prerequisite) >= size(head):
                 raise ValueError('Implementation prerequisites must strictly decrease')
         for equation in implementation.equations.values():
             if variables(equation).keys() - variables(head).keys():
@@ -198,14 +198,18 @@ class TraitSolver:
         self.implementations.append(implementation)
 
     def select_impl(self, goal, evidence=()):
-        from eldude.core.inference import permissions
+        from eldude.core.inference import permissions, capture_free
         def identity(t):
             from eldude.core.inference import Fn
             if isinstance(t, Fn):
                 return replace(t, parameters=tuple(identity(a) for a in t.parameters), result=identity(t.result))
-            return replace(t, args=tuple(identity(a) for a in t.args if not (t.name.startswith('$') and getattr(a, 'name', None) in ('Dup', 'Discard'))))
+            return replace(t, args=tuple(identity(a) for a in t.args if not (t.name.startswith('$') and getattr(a, 'name', None) in ('Dup', 'Discard', 'CaptureFree'))))
         if any(identity(goal) == identity(e) for e in evidence):
             return None, {}, {}
+        if goal.name == 'Trait:CaptureFree':
+            if capture_free(goal.args[0]):
+                return None, {}, {}
+            raise ValueError('Missing trait evidence for CaptureFree')
         if goal.name in ('Trait:Dup', 'Trait:Discard'):
             if permissions(goal.args[0])[goal.name == 'Trait:Discard']:
                 return None, {}, {}

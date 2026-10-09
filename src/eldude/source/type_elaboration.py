@@ -4,7 +4,7 @@ from dataclasses import replace
 from eldude.core.rows import Row, Var, Solver
 from eldude.core.captures import Argument, Variable
 from eldude.core.handlers import Operation, operation_type
-from eldude.core.inference import Fn, Ty, permissions, state, capture_free, required_captures
+from eldude.core.inference import Fn, Ty, permissions, state, capture_free, required_captures, check_ref_payload, InferenceError
 from eldude.source.lowering import Elaborator
 from eldude.core.model import Node
 from eldude.core.types import UNKNOWN, OTHER_PRIMITIVES, substitute, unwrapped
@@ -78,7 +78,7 @@ class TypeElaborator(Elaborator):
                 target = self.argument_term(subject) if row_subject else Ty('Effects', (Ty('$!' + subject.items[0]),)) if effect_subject else self.type(subject)
                 for bound in bounds:
                     identity = self.canonical(bound.items[0])
-                    if identity not in self.traits and identity not in ('Dup', 'Discard', 'NonAbandoning'):
+                    if identity not in self.traits and identity not in ('Dup', 'Discard', 'CaptureFree', 'NonAbandoning'):
                         self.error('name', 'Unknown trait constraint ' + identity, bound)
                     arguments = self.trait_arguments(self.traits[identity], bound.items[1] if bound.kind == 'applied_type' else ()) if identity in self.traits else ()
                     if (row_subject and identity not in ('Dup', 'Discard') or effect_subject and identity != 'NonAbandoning'
@@ -275,6 +275,78 @@ class TypeElaborator(Elaborator):
         self.variants = {name: {tag: tuple(refresh(t) for t in fields) for tag, fields in variants.items()}
                          for name, variants in self.variants.items()}
 
+    def infer_enum_capture_free(self):
+        admitted = {name for name in self.variants if name.startswith('Enum:')}
+
+        def proof(t):
+            if isinstance(t, Fn):
+                return capture_free(t)
+            if t.name.startswith('$'):
+                return True
+            if t.name in self.variants:
+                return (t.name in admitted or t.name in ('Option', 'Result')) and all(proof(a) for a in t.args)
+            if t.name.startswith('Record:'):
+                return all(proof(f.args[0]) for f in t.args)
+            if t.name in ('Tuple', 'List'):
+                return all(proof(a) for a in t.args)
+            return capture_free(t)
+
+        while True:
+            removed = {name for name in admitted if not all(proof(t)
+                       for fields in self.variants[name].values() for t in fields)}
+            if not removed:
+                break
+            admitted -= removed
+
+        def refresh(t):
+            if isinstance(t, Fn):
+                return replace(t, parameters=tuple(refresh(p) for p in t.parameters), result=refresh(t.result))
+            return replace(t, args=tuple(refresh(a) for a in t.args), capture_free=t.name in admitted)
+        self.types = {name: refresh(t) for name, t in self.types.items()}
+        self.variants = {name: {tag: tuple(refresh(t) for t in fields) for tag, fields in variants.items()}
+                         for name, variants in self.variants.items()}
+
+    def validate_ref_declarations(self):
+        keys = ('module', 'generic_types', 'generic_regions', 'generic_effects', 'generic_captures', 'generic_binders')
+        previous = {key: getattr(self, key) for key in keys}
+
+        def validate(t, node):
+            parts = (*t.parameters, t.result) if isinstance(t, Fn) else t.args
+            for part in parts:
+                validate(part, node)
+            if isinstance(t, Ty) and t.name == 'Ref':
+                try:
+                    check_ref_payload(t.args[0])
+                except InferenceError as error:
+                    self.error(error.code, str(error), node)
+
+        try:
+            for identity, declaration in (self.records | self.enums).items():
+                if declaration.items[2] is None:
+                    continue
+                self.module = self.owners[id(declaration)]
+                name = declaration.items[1]
+                self.bind_generics(self.generics(name))
+                constraints = self.constraints(name.items[2] if len(name.items) > 2 else ())
+                for constraint in constraints:
+                    subject = constraint.args[0]
+                    if constraint.name in ('Trait:Dup', 'Trait:Discard', 'Trait:CaptureFree') and subject.name.startswith('$'):
+                        key = subject.name[1:]
+                        if key in self.generic_types:
+                            t = self.generic_types[key]
+                            self.generic_types[key] = replace(t, args=t.args + (Ty(constraint.name[6:]),))
+                t = unwrapped(self.types[identity])
+                if declaration.kind == 'struct':
+                    members = [(field.args[0], source[1]) for field, source in zip(t.args, declaration.items[2])]
+                else:
+                    members = [(field, source[1] if variant.items[3] == 'record' else source)
+                               for variant in declaration.items[2]
+                               for field, source in zip(self.variants[t.name][variant.items[1].items[0]], variant.items[2])]
+                for field, source in members:
+                    validate(substitute(field, self.generic_types), source)
+        finally:
+            self.__dict__.update(previous)
+
     def validate_recursive_storage(self):
         payloads = self.variants
 
@@ -356,7 +428,7 @@ class TypeElaborator(Elaborator):
             if name.items[0] in {f.name for f in fields}:
                 self.error('name', 'Duplicate record field', name)
             fields.append(Ty(name.items[0], (self.type(annotation),)))
-        result = Ty('Record:' + self.nominal(identity), tuple(fields))
+        result = Ty(('Opaque:' if declaration.items[2] is None else 'Record:') + self.nominal(identity), tuple(fields))
         if len(declaration.items) > 3:
             result = Ty(declaration.items[3].title(), (result,))
         self.types[identity] = result
@@ -548,7 +620,7 @@ class TypeElaborator(Elaborator):
 
     def existential_type(self, node):
         bounds = node.items[0]
-        ordinary = [b for b in bounds if b.items[0] not in ('Dup', 'Discard')]
+        ordinary = [b for b in bounds if b.items[0] not in ('Dup', 'Discard', 'CaptureFree')]
         if not ordinary:
             self.error('type', 'Existential package requires an ordinary trait', node)
         resolved = {}
@@ -578,7 +650,7 @@ class TypeElaborator(Elaborator):
             key = trait_name, terms, tuple(sorted(bindings.items()))
             resolved[key] = trait, arguments, bindings
         canonical = tuple(sorted(resolved, key=repr))
-        usage = tuple(Ty(b.items[0]) for b in bounds if b.items[0] in ('Dup', 'Discard'))
+        usage = tuple(Ty(b.items[0]) for b in bounds if b.items[0] in ('Dup', 'Discard', 'CaptureFree'))
         interfaces = tuple(Ty('Interface:' + name, terms + tuple(Ty('Associated:' + n, (v,)) for n, v in bindings))
                            for name, terms, bindings in canonical)
         t = Ty('Any:' + '+'.join(sorted({name for name, _, _ in canonical})),
@@ -588,7 +660,7 @@ class TypeElaborator(Elaborator):
         self.interfaces[t] = canonical
         self.interface_variables[t] = (tuple(v.name[1:] for v in self.generic_types.values() if v.name.startswith('$')), self.generic_regions)
         evidence = tuple(Ty('Trait:' + name, (t, *terms)) for name, terms, _ in canonical)
-        evidence += tuple(Ty('Trait:' + name, (t,)) for name in ('Dup', 'Discard') if Ty(name) in t.args)
+        evidence += tuple(Ty('Trait:' + name, (t,)) for name in ('Dup', 'Discard', 'CaptureFree') if Ty(name) in t.args)
         evidence += self.constraint_evidence
         methods = {}
         def raw_self(part):

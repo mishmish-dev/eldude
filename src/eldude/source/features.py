@@ -26,6 +26,8 @@ class FeatureChecker(HandlerChecker):
         self.exit_temporaries = {}
         self.baselines = {}
         self.borrowed_values = {}
+        self.borrowed_matches = set()
+        self.iteration_steps = {}
         self.cleanup_methods = {}
         self.cleanup_targets = {}
         self.results = {}
@@ -67,7 +69,7 @@ class FeatureChecker(HandlerChecker):
             elif kind == 'bind':
                 if borrowed and not permissions(original)[0]:
                     raise InferenceError('Inspection pattern binding requires Dup')
-                bound[p[1]] = Binding(replace(retained, type=original, effects=Row()) if whole
+                bound[p[1]] = Binding(replace(retained, type=original, effects=Row(), grant=None) if whole
                                      else value(original, captures=retained.captures))
             elif kind == 'tuple_pat':
                 if t.name != 'Tuple' or len(t.args) != len(p) - 1:
@@ -181,6 +183,8 @@ class FeatureChecker(HandlerChecker):
                 wanted, actual = permissions(t), permissions(retained.type)
                 if any(w and not a for w, a in zip(wanted, actual)):
                     raise InferenceError('Existential usage promises require Dup/Discard of the hidden value', code='type')
+                if capture_free(t) and not capture_free(retained.type):
+                    raise InferenceError('Existential CaptureFree promise requires evidence for the hidden type', code='type')
                 if isinstance(retained.type, Ty) and retained.type.name.startswith('Any:'):
                     if not set(self.interfaces[t]) <= set(self.interfaces[retained.type]):
                         raise InferenceError('Existential weakening requires every remaining trait bound', code='type')
@@ -325,7 +329,14 @@ class FeatureChecker(HandlerChecker):
                 del context.live[start:]
                 return replace(result, effects=ambient(retained.effects, result.effects))
             case ('match', subject, arms):
-                retained = self._infer(subject, context)
+                binding = context.bindings.get(subject[1]) if subject[0] == 'var' else None
+                borrowed = bool(binding and binding.mode)
+                if borrowed:
+                    retained = self._infer(E('access', 'view', subject[1]), context)
+                    retained = replace(retained, type=binding.value.type)
+                    self.borrowed_matches.add(id(expression))
+                else:
+                    retained = self._infer(subject, context)
                 if not self.exhaustive([p for p, _ in arms], retained.type):
                     raise InferenceError('Non-exhaustive match')
                 bindings = set(context.bindings.values()) | {b for _, b in context.live}
@@ -338,7 +349,7 @@ class FeatureChecker(HandlerChecker):
                         binding.consumed = consumed
                     if resume:
                         resume.used = used
-                    bound = self.bind_pattern(pattern, retained, context)
+                    bound = self.bind_pattern(pattern, retained, context, borrowed=borrowed)
                     previous, start = context.bindings, len(context.live)
                     context.bindings = previous | bound
                     context.live.extend(bound.items())
@@ -352,13 +363,14 @@ class FeatureChecker(HandlerChecker):
                     if result.type != NEVER:
                         states.append({b: b.consumed for b in bindings})
                         resumed.append(resume.used if resume else False)
-                if states and any(s != states[0] for s in states[1:]):
+                if states and any(s[b] != states[0][b] and not permissions(b.value.type)[1]
+                                  for s in states[1:] for b in bindings):
                     raise InferenceError('Match arms must agree on ownership consumption')
                 if resumed and any(s != resumed[0] for s in resumed[1:]):
                     raise InferenceError('Match arms must agree on resumption use')
                 if states:
-                    for b, consumed in states[0].items():
-                        b.consumed = consumed
+                    for b in bindings:
+                        b.consumed = any(s[b] for s in states)
                     if resume:
                         resume.used = resumed[0]
                 t = NEVER
@@ -377,12 +389,24 @@ class FeatureChecker(HandlerChecker):
                     inferred = Ty('Result', (expected.args[0] if expected else UNKNOWN, result.type))
                 else:
                     inferred = result.type
-                t = join_type(expected, inferred) if expected else inferred
                 captures = result.captures
                 exits = self.exit_values.pop(key)
-                for exited in exits:
-                    t = join_type(t, exited.type)
-                    captures |= exited.captures
+                if isinstance(expected, Fn) and expected.captures is None:
+                    alternatives = [returned for returned in (result, *exits) if returned.type != NEVER]
+                    for returned in alternatives:
+                        self._apply(value(Fn((expected,), UNIT, Row())), [returned], context)
+                    signatures = [returned.type for returned in alternatives]
+                    t = replace(expected, bound=frozenset().union(*(s.bound for s in signatures)))
+                    # Legacy contracts leave environments unknown; keep precise
+                    # inferred summaries when the remaining callable shape agrees.
+                    if all(s.captures is not None and s.parameters == expected.parameters and s.result == expected.result
+                           for s in signatures):
+                        t = replace(t, captures=frozenset().union(*(s.captures for s in signatures)))
+                else:
+                    t = join_type(expected, inferred) if expected else inferred
+                    for exited in exits:
+                        t = join_type(t, exited.type)
+                captures |= frozenset().union(*(exited.captures for exited in exits))
                 del self.exit_active[key]
                 del self.exit_outside[key]
                 del self.exit_temporaries[key]
@@ -390,11 +414,13 @@ class FeatureChecker(HandlerChecker):
             case ('early', key, argument):
                 result = self._infer(argument, context)
                 expected = self.exit_contracts[key]
-                if expected and not compatible(expected, result.type):
+                if isinstance(expected, Fn) and expected.captures is None:
+                    self._apply(value(Fn((expected,), UNIT, Row())), [result], context)
+                elif expected and not compatible(expected, result.type):
                     raise InferenceError('Early return type mismatch', code='type')
                 for name, binding in context.live:
                     if (binding not in self.exit_outside[key] and not binding.consumed
-                            and not binding.managed and not permissions(binding.value.type)[1]):
+                            and not binding.managed and not binding.mode and not permissions(binding.value.type)[1]):
                         raise InferenceError(f'Early return would abandon {name}', subject=name)
                 if any(not permissions(v.type)[1] for v in context.temporaries[self.exit_temporaries[key]:]):
                     raise InferenceError('Early return would abandon an owned argument temporary')
@@ -409,7 +435,7 @@ class FeatureChecker(HandlerChecker):
                     raise InferenceError('Propagation error type mismatch', code='type')
                 for name, binding in context.live:
                     if (binding not in self.exit_outside[key] and not binding.consumed
-                            and not binding.managed and not permissions(binding.value.type)[1]):
+                            and not binding.managed and not binding.mode and not permissions(binding.value.type)[1]):
                         raise InferenceError(f'Propagation would abandon {name}', subject=name)
                 if any(not permissions(v.type)[1] for v in context.temporaries[self.exit_temporaries[key]:]):
                     raise InferenceError('Propagation would abandon an owned argument temporary')
@@ -458,7 +484,7 @@ class FeatureChecker(HandlerChecker):
                     values.append(retained)
                     context.temporaries.append(retained)
                 del context.temporaries[start:]
-                t = declared or (values[0].type if values else UNKNOWN)
+                t = substitute(declared, regions=context.regions, effect_variables=context.effect_variables) if declared else (values[0].type if values else UNKNOWN)
                 for item in values:
                     t = join_type(t, item.type)
                 return value(Ty('List', (t,)), ambient(*(v.effects for v in values)), frozenset().union(*(v.captures for v in values)))
@@ -472,12 +498,30 @@ class FeatureChecker(HandlerChecker):
                 return self.primitive_method(expression, method, receiver, arguments, mode, context)
             case ('for_each', pattern, iterable, body):
                 source = self._infer(iterable, context)
-                if source.type.name != 'List':
-                    raise InferenceError('for requires a finite List in this profile', code='type')
+                t = unwrapped(source.type)
+                if t.name == 'List':
+                    step, item, finite, target = source, t.args[0], True, None
+                else:
+                    try:
+                        self.trait_solver.check(Ty('Trait:core::iter::Iterator', (source.type,)), context.evidence)
+                    except ValueError as error:
+                        raise InferenceError('for requires an Iterator implementation', code='type') from error
+                    target, signature = self.methods.get((t.name, 'next'), (None, None))
+                    if signature is None:
+                        raise InferenceError('for requires an unambiguous Iterator::next', code='type')
+                    step = self._apply(value(signature), [source], context)
+                    result_type = unwrapped(step.type)
+                    if (result_type.name != 'Enum:core::iter::Next' or len(result_type.args) != 2
+                            or result_type.args[0] != source.type):
+                        raise InferenceError('Iterator::next must return Next<Self, Item>', code='type')
+                    item = result_type.args[1]
+                    finite = target in getattr(self.elaborator, 'finite_iterators', ())
+                self.iteration_steps[id(expression)] = target
                 before = {b: b.consumed for b in context.bindings.values()}
-                bound = self.bind_pattern(pattern, value(source.type.args[0], captures=source.captures), context)
+                bound = self.bind_pattern(pattern, value(item, captures=step.captures), context)
                 previous, start = context.bindings, len(context.live)
                 context.bindings = previous | bound
+                context.live.append(('iterator remainder', Binding(value(source.type, captures=step.captures))))
                 context.live.extend(bound.items())
                 result = self._infer(body, context)
                 if result.type != UNIT:
@@ -489,29 +533,38 @@ class FeatureChecker(HandlerChecker):
                     raise InferenceError('Repeated loop body cannot consume an outside owner')
                 context.bindings = previous
                 del context.live[start:]
-                return value(UNIT, ambient(source.effects, result.effects))
+                return value(UNIT, ambient(source.effects, step.effects, result.effects,
+                                          Row() if finite else Row(('diverge',))))
             case ('taskgroup', key, body):
                 old = context.group
-                context.group = (key, context.handlers)
+                children = []
+                context.group = (key, context.handlers, children, context.active | {key})
                 context.active |= {key}
                 result = self._infer(body, context)
                 context.group = old
                 context.active -= {key}
                 if key in result.captures:
                     raise InferenceError('Task handle would escape its taskgroup')
-                return replace(result, effects=ambient(result.effects, Row(('suspend',))))
+                effects = ambient(result.effects, *children, Row(('suspend',)))
+                self._control(Row(('suspend',)), replace(context, temporaries=context.temporaries + [result]))
+                return replace(result, effects=effects)
             case ('spawn', closure):
                 if context.group is None:
                     raise InferenceError('spawn requires an immediate lexical taskgroup')
                 function = self._infer(closure, context)
+                local_scopes = context.active - context.group[3]
+                if (function.captures | required_captures(function.type)) & local_scopes:
+                    raise InferenceError('Child captures a region or capability that does not enclose the taskgroup')
                 if not permissions(function.type.result)[1]:
                     raise InferenceError('Spawned result must satisfy Discard')
-                effects = self._resolve(function.type.effects, context)
+                child = replace(context, handlers=context.group[1], live=[], temporaries=[], suspended=(), resumption=None)
+                effects = self._resolve(function.type.effects, child)
                 for family, key in context.group[1]:
                     if key in effects.labels and not self.baselines.get(key, False):
                         raise InferenceError('Inherited handler must be duplicable and preserve arbitrary child results')
-                result = self._apply(function, [], context)
-                return value(Ty('Task', (result.type,)), effects, result.captures | {context.group[0]})
+                result = self._apply(function, [], child)
+                context.group[2].append(result.effects)
+                return value(Ty('Task', (result.type,)), function.effects, result.captures | {context.group[0]})
             case ('await', task):
                 retained = self._infer(task, context)
                 if retained.type.name != 'Task':
@@ -536,11 +589,16 @@ class FeatureChecker(HandlerChecker):
         return result.effects
 
     def primitive_method(self, expression, method, receiver, arguments, mode, context, retained=None):
-        required_mode = {'length': 'view', 'push': 'mut', 'pop': 'mut', 'withMut': 'mut'}.get(method, '')
-        if mode != required_mode:
-            raise InferenceError(f'{method} requires {required_mode or "consuming"} access')
         inspected = receiver[0] == 'var' and receiver[1] in context.bindings
         binding = context.bindings.get(receiver[1]) if inspected else None
+        if binding is None and retained is None:
+            retained = self._infer(receiver, context)
+        t = unwrapped(binding.value.type if binding else retained.type)
+        access = {'length': 'view', 'get': 'view', 'with': 'view'} if t.name == 'List' else {
+            'length': 'view', 'push': 'mut', 'pop': 'mut', 'withMut': 'mut'}
+        required_mode = access.get(method, '')
+        if mode != required_mode:
+            raise InferenceError(f'{method} requires {required_mode or "consuming"} access')
         borrowed = mode in ('view', 'mut')
         if borrowed and binding:
             if binding.consumed:
@@ -566,11 +624,12 @@ class FeatureChecker(HandlerChecker):
             if not permissions(t.args[0])[0]:
                 raise InferenceError('Reading Ref requires Dup')
             result = t.args[0]
-        elif method in ('replace', 'set') and t.name == 'Ref' and len(values) == 1:
+        elif method == 'replace' and t.name == 'Ref' and len(values) == 1:
             if not compatible(t.args[0], values[0].type):
                 raise InferenceError('Ref write type mismatch', code='type')
-            self._horizon(t.region, values[0].captures)
-            result = t.args[0] if method == 'replace' else UNIT
+            from eldude.core.inference import check_ref_payload
+            check_ref_payload(t.args[0])
+            result = t.args[0]
         elif method == 'length' and t.name in ('List', 'DynArray') and not values:
             if mode != 'view':
                 raise InferenceError('length requires view access')
@@ -603,17 +662,58 @@ class FeatureChecker(HandlerChecker):
             result = Ty('List', t.args)
             if capture_free(t.args[0]):
                 captures = frozenset()
-        elif method == 'remove' and t.name == 'List' and len(values) == 1:
-            if values[0].type != INT:
-                raise InferenceError('List index must be Int', code='type')
-            result = Ty('Result', (Ty('Tuple', (Ty('BoundsError'), t)), Ty('Tuple', (t.args[0], t))))
-        elif method == 'map' and t.name in ('Option', 'Result') and len(values) == 1:
-            callback = values[0]
-            if not isinstance(callback.type, Fn) or not callback.type.discard:
-                raise InferenceError('Optional callback must satisfy Discard')
-            mapped = self._apply(callback, [value(t.args[-1], captures=retained.captures)], context)
-            result = replace(t, args=t.args[:-1] + (mapped.type,))
-            rows.append(mapped.effects)
+        elif t.name == 'List':
+            element = t.args[0]
+            library_types = getattr(getattr(self, 'elaborator', None), 'types', {})
+            if method == 'push' and len(values) == 1:
+                if not compatible(element, values[0].type):
+                    raise InferenceError('List element type mismatch', code='type')
+                result = Ty('List', (join_type(element, values[0].type),))
+            elif method in ('get', 'remove', 'replace') and len(values) == (2 if method == 'replace' else 1):
+                if values[0].type != INT:
+                    raise InferenceError('List index must be Int', code='type')
+                if method == 'get':
+                    if not permissions(element)[0]:
+                        raise InferenceError('Reading List requires Dup')
+                    result = Ty('Option', (element,))
+                else:
+                    if method == 'replace' and not compatible(element, values[1].type):
+                        raise InferenceError('List element type mismatch', code='type')
+                    if method == 'replace':
+                        element = join_type(element, values[1].type)
+                        t = replace(t, args=(element,))
+                    error = library_types.get('collections::list::BoundsError',
+                        Ty('Record:collections::list::BoundsError', (Ty('index', (INT,)), Ty('length', (NAT,)))))
+                    failure = (error, t, element) if method == 'replace' else (error, t)
+                    result = Ty('Result', (Ty('Tuple', failure), Ty('Tuple', (element, t))))
+            elif method in ('with', 'filter', 'partition') and len(values) == (2 if method == 'with' else 1):
+                callback = values[-1]
+                if method == 'with' and values[0].type != INT:
+                    raise InferenceError('List index must be Int', code='type')
+                if method == 'filter' and not permissions(element)[1]:
+                    raise InferenceError('List filter requires Discard elements')
+                if not isinstance(callback.type, Fn) or not callback.type.discard:
+                    raise InferenceError('List callback must satisfy Discard')
+                if method != 'with' and not callback.type.dup:
+                    raise InferenceError('Repeated List callback must satisfy Dup')
+                parent = retained.grant
+                grant = Grant(parent.owner if parent else Owner(None), 'view',
+                              (parent.path if parent else ()) + ('element',), parent)
+                argument = value(Ty('View', (element,)), captures=retained.captures, grant=grant)
+                mapped = self._apply(callback, [argument], context)
+                if method == 'with':
+                    result = Ty('Option', (mapped.type,))
+                    rows.append(mapped.effects)
+                    captures |= mapped.captures
+                else:
+                    if mapped.type != BOOL or mapped.effects != Row():
+                        raise InferenceError('List predicate must be pure and return Bool', code='type')
+                    result = t if method == 'filter' else Ty('Tuple', (t, t))
+            elif method == 'next' and not values:
+                result = replace(library_types.get('core::iter::Next', Ty('Enum:core::iter::Next')),
+                                 args=(t, element))
+            else:
+                raise InferenceError(f'Unknown method {method} for List', code='type')
         elif method == 'cancel' and t.name == 'Task' and not values:
             result = UNIT
         else:

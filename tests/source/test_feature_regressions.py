@@ -56,6 +56,21 @@ class SourceFeatureRegressionTests(unittest.TestCase):
         with self.assertRaisesRegex(InferenceError, 'region.*escape|escape.*region'):
             self.compile(escaping)
 
+    def test_early_return_keeps_inferred_closed_callable_captures(self):
+        signature = Fn((), INT, Row())
+        expression = E('exit_scope', 'return', signature,
+                       E('early', 'return', E('lambda', (), E('int', 42))), False)
+        result = FeatureChecker().infer(expression)
+        self.assertEqual(result.type.captures, frozenset())
+
+    def test_early_return_honors_an_explicit_capture_promise(self):
+        signature = Fn((), INT, Row(), captures=frozenset())
+        captured = E('lambda', (), E('seq', E('var', 'cell'), E('int', 42)))
+        expression = E('region', 'r', E('let', 'cell', E('ref_new', 'r', E('int', 1)),
+                       E('exit_scope', 'return', signature, E('early', 'return', captured), False)))
+        with self.assertRaisesRegex(InferenceError, 'type mismatch|capture'):
+            self.compile(expression)
+
     def test_early_return_runs_managed_cleanup(self):
         expression = E('exit_scope', 'return', INT,
                        E('using', 'resource', E('acquire', 'File'), E('early', 'return', E('int', 42))), False)
@@ -100,13 +115,11 @@ class SourceFeatureRegressionTests(unittest.TestCase):
             self.compile(expression)
 
     def test_primitive_temporary_receiver_is_inferred_once(self):
-        owned = Ty('Owned', (Ty('File'),))
-        option = Ty('Option', (owned,))
         expression = E('let', 'resource', E('acquire', 'File'),
-                       E('method_call', 'map', E('variant', option, 'Some', (E('var', 'resource'),)),
-                         (E('lambda', (('x', owned),), E('call', 'close', E('var', 'x'))),), ''))
+                       E('method_call', 'push', E('seq', E('call', 'close', E('var', 'resource')),
+                         E('list_values', INT, ())), (E('int', 42),), ''))
         result = run(self.compile(expression))
-        self.assertEqual(result.value.tag, 'Some')
+        self.assertEqual(list(result.value), [42])
         self.assertEqual(result.events, (('acquire', 'File', 1), ('close', 1, 'explicit')))
 
     def test_missing_recursive_constructor_is_a_nonexhaustive_error(self):

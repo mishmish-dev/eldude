@@ -74,6 +74,8 @@ def decode_program(data):
         if 'ref' in value:
             return records[value['ref']]
         cls = RECORDS[value['record']]
+        if cls is Ty and 'capture_free' not in value['fields']:
+            value = value | {'fields': value['fields'] | {'capture_free': False}}
         result = cls(**{f.name: decode(value['fields'][f.name]) for f in fields(cls)})
         records[value['id']] = result
         return result

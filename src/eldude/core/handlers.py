@@ -150,7 +150,7 @@ class HandlerChecker(Checker):
     def _obligations(self, context):
         # Snapshot identities as well as values: later straight-line consumption
         # must not retroactively discharge an earlier suspended segment.
-        entries = [(name, b.value, b.managed, id(b)) for name, b in context.live if not b.consumed]
+        entries = [(name, b.value, b.managed, id(b)) for name, b in context.live if not b.consumed and not b.mode]
         entries.extend(('argument temporary', v, False, id(v)) for v in context.temporaries)
         entries.extend(('active access', value(Ty(g.mode.title(), (UNIT,)), grant=g), False, id(g)) for g in context.grants)
         entries.extend(context.suspended)
@@ -445,6 +445,7 @@ def compile_program(expression, *, operations=None, checker=None, origins=None):
     inferred = checker.infer(expression)
     serial = 0
     hidden = {target[0] for target in getattr(checker, 'method_calls', {}).values()}
+    hidden.update(target for target in getattr(checker, 'iteration_steps', {}).values() if target is not None)
     hidden.update(getattr(checker, 'cleanup_targets', {}).values())
     hidden.update(name for methods in getattr(checker, 'packages', {}).values()
                   if methods for name in methods.values())
@@ -596,12 +597,14 @@ class Execution:
 
 
 def _dup(retained):
-    from eldude.runtime.features import Variant, Record, Cell, Buffer, Package
+    from eldude.runtime.features import Variant, Record, Cell, Buffer, Package, ListValue
     from eldude.runtime.tasks import TaskHandle
     if isinstance(retained, (Buffer, TaskHandle)):
         return False
     if isinstance(retained, Cell):
         return True
+    if isinstance(retained, ListValue):
+        return retained.duplicable
     if isinstance(retained, Package):
         return permissions(retained.type)[0]
     if isinstance(retained, Record):
@@ -762,12 +765,19 @@ class _Machine:
         return _protect_call(lambda: _bind(evaluate_clause(), completed), abandon)
 
     def evaluate_arguments(self, arguments, environment, evidence, resume, then):
-        def argument(index, values):
-            if index == len(arguments):
-                return then(values)
-            return _bind(self.evaluate(arguments[index], environment, evidence, resume),
-                         lambda retained: argument(index + 1, values + [retained]))
-        return argument(0, [])
+        values = []
+        def argument(index):
+            while index < len(arguments):
+                result = self.evaluate(arguments[index], environment, evidence, resume)
+                if isinstance(result, _Request):
+                    def accept(retained):
+                        values.append(retained)
+                        return argument(index + 1)
+                    return _bind(result, accept)
+                values.append(result)
+                index += 1
+            return then(values)
+        return argument(0)
 
     def evaluate(self, term, environment, evidence, resume=None):
         # ponytail: recursive continuation closures suffice for these finite

@@ -147,14 +147,14 @@ The implementation may mutate in place because the source semantics establish ex
 It is available only when:
 
 ```eldude
-T: Discard
+T: CaptureFree + Discard
 ```
 
-This restriction ensures that region destruction and cell replacement cannot strand an undiscardable payload merely because multiple aliases exist.
+`Discard` ensures that region destruction and cell replacement cannot strand an undiscardable payload merely because multiple aliases exist.
 
-Because aliases may already exist when a payload is changed, `Ref<T,@r>` also has the fixed retention-horizon rule from [§13.5](04-captures-and-access.md#135-retention-horizons): every tracked provenance captured by an installed payload must remain valid for at least the lifetime of `@r`. This condition is checked at construction and on every payload-replacing operation.
+`CaptureFree` establishes that every possible payload has no tracked captures or fixed scoped dependencies ([§§9.6](02-types-and-ownership.md#96-capture-free-types), [13.5](04-captures-and-access.md#135-retention-horizons)). This type-level condition is checked at construction and on every payload-replacing operation; an individual value's empty capture summary or a longer-lived scope does not suffice.
 
-A `Ref<T,@r>` handle is `Dup + Discard` and may therefore be freely aliased within the region's lifetime.
+A `Ref<T,@r>` handle is `Dup + Discard` and may therefore be freely aliased within the region's lifetime. The handle retains `@r` and is not `CaptureFree`.
 
 ### 28.4 `Ref` operations
 
@@ -162,23 +162,26 @@ Representative operations are:
 
 ```eldude
 fn new<T, @r>(value: T) ->{state<@r>} Ref<T, @r>
-where T: Discard;
+where T: CaptureFree + Discard;
 
 fn get<T, @r>(cell: Ref<T, @r>) ->{state<@r>} T
-where T: Dup;
+where T: CaptureFree + Discard + Dup;
 
 fn replace<T, @r>(
     cell: Ref<T, @r>,
     value: T,
 ) ->{state<@r>} T
-where T: Discard;
+where T: CaptureFree + Discard;
+
+fn set<T, @r>(cell: Ref<T, @r>, value: T) ->{state<@r>} Unit
+where T: CaptureFree + Discard;
 ```
 
-`new` creates aliasable mutable identity in `@r` and therefore necessarily carries `state<@r>`; this also prevents local polymorphic generalization from manufacturing a polymorphic mutable cell. `replace` transfers ownership of the previous payload to the caller and installs the new value. The new value must satisfy the fixed retention-horizon check for `@r`; a shorter-lived taskgroup, region, effect-instance, or foreign/runtime provenance cannot be hidden in an outer cell.
+`new` creates aliasable mutable identity in `@r` and therefore necessarily carries `state<@r>`; this also prevents local polymorphic generalization from manufacturing a polymorphic mutable cell. `replace` transfers ownership of the previous payload to the caller and installs the new value. `new`, `replace`, and `set` enforce the same `CaptureFree + Discard` payload-type bound. `get` additionally requires `Dup` to copy the payload while leaving the cell intact.
 
-An API that discards the previous payload may rely on the `Ref` construction requirement `T: Discard`.
+`set` discards the previous payload using `T: Discard`. Generic wrappers use these ordinary bounds without inferred lifetime preconditions.
 
-There is no safe `Ref<File,@r>` when `File` is linear/non-discardable.
+There is no safe `Ref<File,@r>` when `File` is linear/non-discardable, nor `Ref<Ref<Int,@s>,@r>` for any ordering of `@r` and `@s`. Scoped mutable contents use non-duplicable owners and `mut` under [§28.2](#282-non-duplicable-mutable-owners).
 
 ### 28.5 `view` and aliasable state
 
@@ -198,7 +201,7 @@ region r {
 }
 ```
 
-`Int: Dup + Discard`, so it is permitted as a `Ref` payload and may be read by value.
+`Int: CaptureFree + Discard + Dup`, so it is permitted as a `Ref` payload and may be read by value.
 
 ## 29. Resource usage
 

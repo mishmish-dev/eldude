@@ -12,11 +12,14 @@ The current design excludes:
 
 - general safe `&T` / `&mut T` references;
 - source lifetime parameters/outlives constraints;
+- inferred callable lifetime preconditions or a general outlives solver;
 - general borrow expressions;
 - first-class borrowed slices into mutable owners;
 - Rust-style borrow inference.
 
 Temporary access uses `view`/`mut`; retained mutable identity uses region-indexed nominal abstractions; interior inspection uses scoped projection.
+
+Aliasable cells require the ordinary intrinsic payload bound `CaptureFree + Discard` ([§13.5](04-captures-and-access.md#135-retention-horizons)); `CaptureFree` describes every value of a type, independently of scope ordering. Mutable storage with scoped contents uses exclusive ownership and conservative whole-owner capture accounting. Existing lexical validity and non-escape checks remain part of the language.
 
 ## A.2 Concurrency/parallelism machinery
 

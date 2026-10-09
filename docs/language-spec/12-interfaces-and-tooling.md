@@ -78,6 +78,7 @@ Canonical interfaces contain, as applicable:
 - constraints on effect-row parameters, including intrinsic `NonAbandoning` constraints;
 - callable-environment captures, result-capture bounds, and capture-row parameters;
 - intrinsic `Dup` and `Discard` guarantees;
+- intrinsic `CaptureFree` bounds and published structural/audited evidence, including any conditions on public generic parameters;
 - intrinsic mutable-owner status where applicable;
 - finite-completion facts for concrete iterator implementations;
 - region parameters and provenance relations;
@@ -99,6 +100,7 @@ The interface must nevertheless export client-relevant semantic properties such 
 ```text
 Dup?
 Discard?
+CaptureFree evidence and its conditions when exported
 implemented traits
 Cleanup?
 method effects
@@ -109,6 +111,8 @@ mutable-owner status when exported
 ```
 
 These facts are contracts, not implementation details.
+
+An opaque type establishes `CaptureFree` only from published compiler-derived or audited evidence sufficient for every value of that type ([§9.6](02-types-and-ownership.md#96-capture-free-types)). Clients cannot infer it from `Dup + Discard`, an individual value's empty summary, or an unavailable representation. Generic requirements use ordinary bounds such as `where T: CaptureFree + Discard`; these are separate from usage permissions and do not introduce callable lifetime preconditions. A missing guarantee conservatively prevents use where `CaptureFree` is required.
 
 ### 72.4 Trait implementation index
 
@@ -383,6 +387,7 @@ region escape
 capture/provenance escape
 Dup requirement not satisfied
 Discard requirement not satisfied
+CaptureFree requirement not satisfied
 linear obligation not consumed
 callable consumed more than once
 access conflict
@@ -393,7 +398,7 @@ illegal affine continuation abandonment
 opaque effect row may abandon live obligation
 effect row does not satisfy NonAbandoning
 result capture/provenance relationship violation
-retained value outlives storage horizon
+stored value retains provenance beyond its valid scope
 temporary foreign view escapes marshalling scope
 suspension crosses synchronous foreign-control barrier
 algebraic handler lies beyond synchronous foreign-control barrier

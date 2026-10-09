@@ -2,7 +2,7 @@
 from dataclasses import replace
 
 from eldude.core.rows import Row, Solver
-from eldude.core.inference import Context, Fn, UNIT, Ty, InferenceError, permissions, value, required_captures
+from eldude.core.inference import Context, Fn, UNIT, Ty, InferenceError, permissions, value, required_captures, check_ref_payload
 from eldude.source.features import FeatureChecker
 from eldude.core.model import Symbol, Node
 from eldude.core.types import ASYNC_FILE, substitute, unwrapped
@@ -167,6 +167,8 @@ class SourceChecker(FeatureChecker):
                     t = self.trait_solver.normalize_type(t, context.evidence)
                 except ValueError as error:
                     raise InferenceError(str(error)) from error
+            if t.name == 'Ref':
+                check_ref_payload(t.args[0])
             return t
         captures, dup, discard = set(), t.dup, t.discard
         for source in t.captures or ():

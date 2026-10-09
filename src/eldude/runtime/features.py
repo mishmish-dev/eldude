@@ -11,6 +11,49 @@ class Variant:
     fields: tuple = ()
 
 
+@dataclass(frozen=True, slots=True, eq=False)
+class ListValue:
+    items: list
+    start: int
+    end: int
+    duplicable: bool
+
+    @classmethod
+    def from_items(cls, items):
+        from eldude.core.handlers import _dup
+        return cls(items, 0, len(items), all(_dup(item) for item in items))
+
+    def __len__(self):
+        return self.end - self.start
+
+    def __iter__(self):
+        return (self.items[index] for index in range(self.start, self.end))
+
+    def __getitem__(self, index):
+        if not 0 <= index < len(self):
+            raise IndexError(index)
+        return self.items[self.start + index]
+
+    def push(self, item):
+        from eldude.core.handlers import _dup
+        # Fixed bounds keep earlier values unchanged when their storage grows.
+        if self.end != len(self.items):
+            return ListValue.from_items([*self, item])
+        self.items.append(item)
+        return ListValue(self.items, self.start, self.end + 1, self.duplicable and _dup(item))
+
+    def tail(self):
+        if len(self) == 1:
+            return ListValue.from_items([])
+        # shortcut: nonempty tails retain storage; compact if long-lived tails need reclamation.
+        # The unchanged element type permits a conservative cached Dup result.
+        return ListValue(self.items, self.start + 1, self.end, self.duplicable)
+
+
+def list_next(retained):
+    return Variant(None, 'Item', (retained[0], retained.tail())) if retained else Variant(None, 'Done')
+
+
 @dataclass
 class Record:
     type: object
@@ -148,7 +191,7 @@ def evaluate_feature(machine, term, environment, evidence, resume):
         case ('access', _, name):
             return inspect(name)
         case ('list_values', _, items):
-            return machine.evaluate_arguments(items, environment, evidence, resume, tuple)
+            return machine.evaluate_arguments(items, environment, evidence, resume, ListValue.from_items)
         case ('ref_new', _, initial):
             return _bind(evaluate(initial), Cell)
         case ('buffer_new', _, _):
@@ -158,11 +201,37 @@ def evaluate_feature(machine, term, environment, evidence, resume):
             first = inspect(receiver[1]) if inspected else evaluate(receiver)
             def invoke(retained):
                 def apply(args):
+                    if isinstance(retained, ListValue):
+                        if method == 'push':
+                            return retained.push(args[0])
+                        if method in ('get', 'with'):
+                            index = args[0]
+                            if not 0 <= index < len(retained):
+                                return Variant(None, 'None')
+                            if method == 'get':
+                                return Variant(None, 'Some', (retained[index],))
+                            return _bind(machine.invoke(args[1], evidence, [retained[index]]),
+                                         lambda result: Variant(None, 'Some', (result,)))
+                        if method in ('remove', 'replace'):
+                            index = args[0]
+                            if not 0 <= index < len(retained):
+                                failure = ({'index': index, 'length': len(retained)}, retained, *args[1:])
+                                return Variant(None, 'Err', (failure,))
+                            rest = list(retained)
+                            rest[index:index+1] = args[1:]
+                            return Variant(None, 'Ok', ((retained[index], ListValue.from_items(rest)),))
+                        if method in ('filter', 'partition'):
+                            selected, rejected = [], []
+                            for item in retained:
+                                (selected if machine.invoke(args[0], evidence, [item]) else rejected).append(item)
+                            return ListValue.from_items(selected) if method == 'filter' else (ListValue.from_items(selected), ListValue.from_items(rejected))
+                        if method == 'next':
+                            return list_next(retained)
                     if method == 'get':
                         return retained.value
-                    if method in ('replace', 'set'):
+                    if method == 'replace':
                         previous, retained.value = retained.value, args[0]
-                        return previous if method == 'replace' else None
+                        return previous
                     if method == 'length':
                         return len(retained.values if isinstance(retained, Buffer) else retained)
                     if method == 'push':
@@ -177,33 +246,38 @@ def evaluate_feature(machine, term, environment, evidence, resume):
                         return _bind(machine.invoke(callback, evidence, [retained.values[index]]),
                                      lambda result: Variant(None, 'Some', (result,)))
                     if method == 'freeze':
-                        return tuple(retained.values)
-                    if method == 'remove':
-                        index = args[0]
-                        if 0 <= index < len(retained):
-                            return Variant(None, 'Ok', ((retained[index], retained[:index] + retained[index+1:]),))
-                        return Variant(None, 'Err', (({'index': index, 'length': len(retained)}, retained),))
-                    if method == 'map':
-                        if retained.tag in ('None', 'Err'):
-                            return retained
-                        return _bind(machine.invoke(args[0], evidence, [retained.fields[0]]), lambda result: Variant(retained.type, retained.tag, (result,)))
+                        return ListValue.from_items(retained.values)
                     if method == 'cancel':
                         machine.tasks.cancel(retained)
                         return None
                     raise RuntimeError('Unknown primitive method ' + method)
                 return machine.evaluate_arguments(arguments, environment, evidence, resume, apply)
             return _bind(first, invoke)
-        case ('for_each', pattern, iterable, body):
-            def loop(items, index=0):
-                if index == len(items):
-                    return None
+        case ('for_each', pattern, iterable, body, step):
+            def run_body(result):
                 bindings = {}
-                if not match_value(pattern, items[index], bindings):
+                if not match_value(pattern, result.fields[0], bindings):
                     raise Defect('Nonmatching iteration pattern', term)
-                return _bind(evaluate(body, environment | bindings), lambda _: loop(items, index+1))
+                return evaluate(body, environment | bindings)
+            def accept(result):
+                if result.tag == 'Done':
+                    return None
+                return _bind(run_body(result), lambda _: loop(result.fields[1]))
+            def loop(iterator):
+                while True:
+                    result = machine.invoke(_read(step, environment), evidence, [iterator]) if step else list_next(iterator)
+                    if isinstance(result, _Request):
+                        return _bind(result, accept)
+                    if result.tag == 'Done':
+                        return None
+                    body_result = run_body(result)
+                    iterator = result.fields[1]
+                    if isinstance(body_result, _Request):
+                        return _bind(body_result, lambda _: loop(iterator))
             return _bind(evaluate(iterable), loop)
         case ('taskgroup', _, body):
             group = machine.tasks.enter()
+            group.handler_evidence = dict(evidence)
             def finish(result):
                 machine.tasks.leave(group)
                 return result
@@ -213,8 +287,9 @@ def evaluate_feature(machine, term, environment, evidence, resume):
             return _protect_call(lambda: _bind(evaluate(body), finish), shutdown)
         case ('spawn', closure):
             def spawn(function):
+                baseline = machine.tasks.current_group.handler_evidence
                 def child():
-                    result = machine.invoke(function, evidence, [])
+                    result = machine.invoke(function, baseline, [])
                     while isinstance(result, _Request):
                         result = machine.handle(result.target, result)
                     return result

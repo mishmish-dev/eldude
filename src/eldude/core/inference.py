@@ -27,6 +27,7 @@ class Ty:
     name: str
     args: tuple = ()
     region: str | None = None
+    capture_free: bool = False
 
 
 INT, UNIT, BOOL = Ty('Int'), Ty('Unit'), Ty('Bool')
@@ -54,7 +55,8 @@ class Fn:
     def dumps(self):
         def encode(t):
             if isinstance(t, Ty):
-                return {'type': t.name, 'args': [encode(a) for a in t.args], 'region': t.region}
+                return {'type': t.name, 'args': [encode(a) for a in t.args], 'region': t.region,
+                        'capture_free': t.capture_free}
             return {'parameters': [encode(p) for p in t.parameters], 'result': encode(t.result),
                     'effects': list(t.effects.labels),
                     'tail': t.effects.tail.name if t.effects.tail else None,
@@ -70,7 +72,8 @@ class Fn:
     def loads(wire):
         def decode(data, variables):
             if 'type' in data:
-                return Ty(data['type'], tuple(decode(a, variables) for a in data['args']), data['region'])
+                return Ty(data['type'], tuple(decode(a, variables) for a in data['args']), data['region'],
+                          data.get('capture_free', False))
             if 'bound' not in data:
                 raise InferenceError('Imported callable is missing its capture bound')
             quantified = tuple(Var(name, rigid=True) for name in data['effect_vars'])
@@ -197,10 +200,24 @@ def permissions(t):
 
 
 def capture_free(t):
-    # Unknown callable environments/opaque types are deliberately conservative.
-    return isinstance(t, Ty) and (t.name in ('Int', 'Unit', 'Bool', 'Nat', 'Never') or
+    if isinstance(t, Fn):
+        return t.captures == frozenset() and not required_captures(t)
+    if t.region is not None:
+        return False
+    if t.name.startswith(('$', 'Any:')):
+        return Ty('CaptureFree') in t.args and not required_captures(t)
+    # Nominal enum evidence is derived from every constructor, never a value.
+    return (t.name in ('Int', 'Unit', 'Bool', 'Nat', 'Never') or
         (t.name in ('List', 'Tuple', 'Option', 'Result') and all(capture_free(a) for a in t.args)) or
+        (t.name.startswith('Enum:') and t.capture_free and all(capture_free(a) for a in t.args)) or
         (t.name.startswith('Record:') and all(capture_free(a.args[0]) for a in t.args)))
+
+
+def check_ref_payload(t):
+    if not capture_free(t):
+        raise InferenceError('Ref payload type must satisfy CaptureFree')
+    if not permissions(t)[1]:
+        raise InferenceError('Ref payload must be discardable')
 
 
 def required_captures(t):
@@ -209,6 +226,8 @@ def required_captures(t):
             return {replace(c, depth=c.depth - 1) if isinstance(c, Argument) else c
                     for c in captures if not isinstance(c, Argument) or c.depth > 0}
         result = enclosing(required_captures(t.result)) | set(t.captures or ())
+        result.update(enclosing(c for c in t.bound if not (
+            isinstance(c, str) and (c == 'env' or c.startswith('arg:')))))
         for p in t.parameters:
             result.update(enclosing(required_captures(p)))
         for label in t.effects.labels:
@@ -321,7 +340,6 @@ class Checker:
         self.modes = {'Log': 'tail', 'Abort': 'affine'}
         self.handler_ids = {}
         self.dispatches, self.cleanups, self.handled_rows = [], [], {}
-        self.scope_depth = {}
         self.counter = 0
         self.capture_sources = {}
         self.current_expression = None
@@ -426,7 +444,7 @@ class Checker:
         if not self._abandoning(row) or self.non_abandoning(row, context.evidence):
             return
         for name, binding in context.live:
-            if not binding.consumed and not binding.managed and not permissions(binding.value.type)[1]:
+            if not binding.consumed and not binding.managed and not binding.mode and not permissions(binding.value.type)[1]:
                 raise InferenceError(f'Effects may abandon live resource {name}')
         if any(not permissions(v.type)[1] for v in context.temporaries):
             raise InferenceError('Effects may abandon an owned argument temporary')
@@ -509,7 +527,7 @@ class Checker:
             return replace(t, args=tuple(export(a, depth) for a in t.args))
         signature = Fn(tuple(t for _, t in parameters), export(result.type), result.effects,
                        frozenset(bound), dup=all(permissions(t)[0] for t in captured_types),
-                       discard=all(permissions(t)[1] for t in captured_types))
+                       discard=all(permissions(t)[1] for t in captured_types), captures=frozenset(captures))
         if result.owner:
             origin = next((i for i, (_, b) in enumerate(parameter_bindings) if b.value.owner == result.owner), None)
             signature = replace(signature, result_owner='region:' + result.owner.region if result.owner.region is not None
@@ -689,7 +707,7 @@ class Checker:
                                captures=None if retained is None else captures(retained))
             if t.name.startswith('$') and t.name[1:] in types:
                 return types[t.name[1:]]
-            return Ty(t.name, tuple(substitute(a, depth) for a in t.args), regions.get(t.region, t.region))
+            return replace(t, args=tuple(substitute(a, depth) for a in t.args), region=regions.get(t.region, t.region))
 
         retained = set()
         for source in signature.bound:
@@ -824,7 +842,8 @@ class Checker:
                 second = self._infer(otherwise, context)
                 from eldude.core.types import join_type, NEVER
                 result_type = join_type(first.type, second.type)
-                if first.type != NEVER and second.type != NEVER and any(b.consumed != consumed for b, consumed in outgoing.items()):
+                if first.type != NEVER and second.type != NEVER and any(
+                        b.consumed != consumed and not permissions(b.value.type)[1] for b, consumed in outgoing.items()):
                     raise InferenceError('Branches must agree on ownership consumption')
                 if first.type != NEVER and second.type != NEVER and resumption and resumption.used != resumed:
                     raise InferenceError('Branches must agree on resumption use')
@@ -833,6 +852,9 @@ class Checker:
                         b.consumed = consumed
                     if resumption:
                         resumption.used = resumed
+                elif first.type != NEVER and second.type != NEVER:
+                    for b, consumed in outgoing.items():
+                        b.consumed |= consumed
                 return value(result_type, ambient(test.effects, first.effects, second.effects),
                              first.captures | second.captures, owner=joined_owner(first, second))
             case ('var', name):
@@ -997,7 +1019,6 @@ class Checker:
             case ('region', name, body):
                 key = self.fresh(name)
                 old_regions, old_active = context.regions, context.active
-                self.scope_depth[key] = len(context.active)
                 context.regions = context.regions | {name: key}
                 context.active |= {key}
                 result = self._infer(body, context)
@@ -1008,11 +1029,11 @@ class Checker:
                 return replace(result, effects=effects)
             case ('ref' | 'buffer' as kind, region, initializer):
                 initial = self._infer(initializer, context)
+                if region not in context.regions:
+                    raise InferenceError('Unknown region ' + region, code='name')
                 scope = context.regions[region]
                 if kind == 'ref':
-                    if not permissions(initial.type)[1]:
-                        raise InferenceError('Ref payload must be discardable')
-                    self._horizon(scope, initial.captures)
+                    check_ref_payload(initial.type)
                     t = Ty('Ref', (initial.type,), scope)
                 else:
                     if not isinstance(initial.type, Ty) or initial.type.name != 'List':
@@ -1028,7 +1049,7 @@ class Checker:
                 ref, new = self._infer(reference, context), self._infer(payload, context)
                 if not isinstance(ref.type, Ty) or ref.type.name != 'Ref' or ref.type.args[0] != new.type:
                     raise InferenceError('Ref write type mismatch')
-                self._horizon(ref.type.region, new.captures)
+                check_ref_payload(new.type)
                 return value(UNIT, ambient(ref.effects, new.effects, Row((state(ref.type.region),))))
             case ('list', *items) if items:
                 values = []
@@ -1046,8 +1067,3 @@ class Checker:
                 return value(Ty('Owned', (Ty(name),)), captures={self.fresh('owned:' + name)})
             case _:
                 raise InferenceError(f'Unsupported expression: {expression!r}')
-
-    def _horizon(self, region, captures):
-        for capture in captures:
-            if capture not in self.scope_depth or self.scope_depth[capture] > self.scope_depth.get(region, -1):
-                raise InferenceError('Stored capture violates the cell retention horizon')

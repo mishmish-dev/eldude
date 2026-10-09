@@ -6,7 +6,7 @@ from eldude.core.rows import Row
 from eldude.core.captures import Argument
 from eldude.core.traits import TraitSolver, Implementation
 from eldude.core.handlers import compile_program
-from eldude.core.inference import E, Fn, Ty, INT, UNIT, BOOL, InferenceError, permissions
+from eldude.core.inference import E, Fn, Ty, INT, UNIT, BOOL, InferenceError, permissions, capture_free
 from eldude.core.types import NAT, UNKNOWN, HOST_TYPES, substitute, unwrapped
 from eldude.source.modules import load_modules, STDLIB
 from eldude.source.checking import SourceChecker
@@ -14,6 +14,15 @@ from eldude.source.lowering import Host, HOST_FUNCTIONS
 from eldude.source.type_elaboration import TypeElaborator
 from eldude.core.model import SourceProgram
 from eldude.source.syntax import Node, Diagnostic
+
+
+RUNTIME_FUNCTIONS = {'task::yield': 'yield'}
+RUNTIME_METHODS = {
+    ('state::ref', 'Ref'): {'new', 'get', 'replace'},
+    ('collections::list', 'List'): {'new', 'length', 'push', 'get', 'remove', 'replace', 'with', 'filter', 'partition', 'next'},
+    ('collections::dyn_array', 'DynArray'): {'new', 'length', 'push', 'pop', 'withMut', 'freeze'},
+    ('task', 'Task'): {'cancel'},
+}
 
 
 class SourceElaborator(TypeElaborator):
@@ -94,7 +103,7 @@ class SourceElaborator(TypeElaborator):
                 if name.kind not in ('name', 'generic_name'):
                     self.limit('module initialization currently requires a named binding', name)
                 spelling = name.items[0]
-                if spelling in self.aliases[module] or spelling in ('Int', 'Int64', 'Bool', 'Unit', 'Nat'):
+                if spelling in self.aliases[module] or spelling in ('Int', 'Int64', 'Bool', 'Unit', 'Nat', 'CaptureFree'):
                     self.error('name', 'Duplicate declaration ' + spelling, name)
                 identity = self.identity(module, spelling)
                 self.aliases[module][spelling] = identity
@@ -110,8 +119,11 @@ class SourceElaborator(TypeElaborator):
                 elif kind == 'trait':
                     self.traits[identity] = declaration
                 elif kind in ('function', 'let', 'public_let'):
-                    if self.is_library(module) and kind == 'function':
-                        self.scopes[module][spelling] = Host(module + '::' + spelling)
+                    if self.is_library(module) and kind == 'function' and declaration.items[-1] is None:
+                        binding = RUNTIME_FUNCTIONS.get(module + '::' + spelling)
+                        if binding is None:
+                            self.limit('bodyless library function has no runtime binding', declaration)
+                        self.scopes[module][spelling] = Host(binding)
                         continue
                     symbol = self.symbol(name)
                     self.scopes[module][spelling] = symbol
@@ -175,6 +187,8 @@ class SourceElaborator(TypeElaborator):
             self.record_type(identity)
         self.validate_recursive_storage()
         self.infer_enum_usage()
+        self.infer_enum_capture_free()
+        self.validate_ref_declarations()
         self.nominal_identities = {unwrapped(self.types[name]).name: name for name in self.records | self.enums}
         for identity, declaration in tuple(self.effects.items()):
             if not self.generics(declaration.items[1]):
@@ -182,8 +196,6 @@ class SourceElaborator(TypeElaborator):
         # Source impl bodies become ordinary named functions; opaque library methods
         # use the explicit primitive contracts in FeatureChecker.
         for module in self.graph.order:
-            if self.is_library(module):
-                continue
             self.module = module
             for implementation in self.graph.modules[module].items[1]:
                 if implementation.kind != 'impl':
@@ -254,6 +266,10 @@ class SourceElaborator(TypeElaborator):
                         self.error('semantic', str(error), implementation)
                 for method in members:
                     if method.kind != 'function':
+                        continue
+                    if self.is_library(module) and method.items[-1] is None:
+                        if method.items[1].items[0] not in RUNTIME_METHODS.get((module, unwrapped(target).name), ()):
+                            self.limit('bodyless library method has no runtime binding', method)
                         continue
                     symbol = self.symbol(method.items[1])
                     self.definitions[symbol] = method
@@ -344,7 +360,7 @@ class SourceElaborator(TypeElaborator):
             if constraint.name in ('Trait:Dup', 'Trait:Discard') and constraint.args[0].name.startswith('$..'):
                 self.capture_usage.setdefault(constraint.args[0].name[3:], set()).add(constraint.name[6:])
         for constraint in constraints:
-            if constraint.name in ('Trait:Dup', 'Trait:Discard') and constraint.args[0].name.startswith('$'):
+            if constraint.name in ('Trait:Dup', 'Trait:Discard', 'Trait:CaptureFree') and constraint.args[0].name.startswith('$'):
                 subject = constraint.args[0]
                 key = next((n for n, t in self.generic_types.items() if t.name == subject.name), None)
                 if key:
@@ -385,6 +401,7 @@ class SourceElaborator(TypeElaborator):
         expression = self.ir(node, 'lambda', tuple(typed), lowered)
         if contract:
             signature = Fn(tuple(t for _, t in typed), expected, effects,
+                           bound=frozenset() if capture_free(expected) else frozenset({'env', *(f'arg:{i}' for i in range(len(typed)))}),
                            type_vars=tuple(t.name[1:] for t in self.generic_types.values() if t.name.startswith('$')) if node.kind == 'function' else (),
                            regions=self.generic_regions if node.kind == 'function' else (),
                            effect_vars=tuple(self.generic_effects.values()) if node.kind == 'function' else (),
@@ -647,10 +664,11 @@ class SourceElaborator(TypeElaborator):
                     if t.name == 'Ref':
                         if len(arguments) != 1:
                             self.error('type', 'Ref::new expects one argument', node)
-                        region = t.region or (self.region_stack[-1] if self.region_stack else None)
+                        region = expected.region if expected else (self.region_stack[-1] if self.region_stack else None)
                         if region is None:
                             self.error('type', 'Ref::new needs a region', node)
-                        return self.ir(node, 'ref_new', region, self.expression(arguments[0], environment, handlers, t.args[0]))
+                        return self.ir(node, 'ref_new', region, self.expression(arguments[0], environment, handlers,
+                                                                               t.args[0] if expected else None))
                     if t.name == 'DynArray':
                         if arguments:
                             self.error('type', 'DynArray::new expects no arguments', node)
@@ -660,19 +678,6 @@ class SourceElaborator(TypeElaborator):
                         if arguments:
                             self.error('type', 'List::new expects no arguments', node)
                         return self.ir(node, 'list_values', t.args[0], ())
-                symbol = environment.get(callee.items[0])
-                if isinstance(symbol, Host) and symbol.name == 'task::join2':
-                    if len(arguments) != 2:
-                        self.error('type', 'join2 expects two callables', node)
-                    left, right = (self.symbol(Node('name', node.span, (n,))) for n in ('left', 'right'))
-                    a, b = (self.symbol(Node('name', node.span, (n,))) for n in ('first', 'second'))
-                    key = 'taskgroup:' + str(self.serial)
-                    body = self.ir(node, 'tuple', self.ir(node, 'await', self.ir(node, 'var', a)), self.ir(node, 'await', self.ir(node, 'var', b)))
-                    body = self.ir(node, 'let', b, self.ir(node, 'spawn', self.ir(node, 'var', right)), body)
-                    body = self.ir(node, 'let', a, self.ir(node, 'spawn', self.ir(node, 'var', left)), body)
-                    body = self.ir(node, 'taskgroup', key, body)
-                    body = self.ir(node, 'let', right, self.expression(arguments[1], environment, handlers), body)
-                    return self.ir(node, 'let', left, self.expression(arguments[0], environment, handlers), body)
         return super().expression(node, environment, handlers)
 
     def method(self, node, mode, receiver, method, arguments, environment, handlers):
@@ -702,6 +707,9 @@ class SourceElaborator(TypeElaborator):
             self.check_trait_signature(symbol, declaration)
             if self.structurally_recursive(expression, symbol):
                 self.recursive_allowed.add(symbol)
+        self.finite_iterators = {symbol for (_, member), (symbol, _) in self.methods.items()
+                                 if member == 'next' and symbol in expressions
+                                 and self.finite_iterator(expressions[symbol])}
         for key, (symbol, _) in tuple(self.methods.items()):
             if symbol is None:
                 continue
@@ -796,7 +804,7 @@ class SourceElaborator(TypeElaborator):
         functions = {str(s): checker.results[id(body)].type for s, body in expressions.items()}
         return SourceProgram(self.ast, expression, program, functions, {str(n): r for n, r in checker.handled_rows.items()})
 
-    def structurally_recursive(self, expression, function):
+    def structurally_recursive(self, expression, function, methods=None):
         # Prove descent on one fixed parameter; all other parameters must be
         # unchanged. IR symbols make this independent of source-name shadowing.
         parameters = tuple(name for name, _ in expression[1])
@@ -824,9 +832,12 @@ class SourceElaborator(TypeElaborator):
             kind = term[0]
             if kind == 'var' and term[1] == function:
                 invalid = True  # Higher-order recursion needs another proof.
-            elif kind == 'call' and term[1] == function:
+            elif kind == 'for_each' and methods and methods.get(id(term), (None,))[0] == function:
+                invalid = True
+            elif (kind == 'call' and term[1] == function or
+                  kind == 'method_call' and methods and methods.get(id(term), (None,))[0] == function):
                 possible = set()
-                arguments = term[2:]
+                arguments = (term[2], *term[3]) if kind == 'method_call' else term[2:]
                 if len(arguments) == len(parameters):
                     for index, argument in enumerate(arguments):
                         if (argument[0] == 'var' and origins.get(argument[1]) == (index, True)
@@ -862,3 +873,52 @@ class SourceElaborator(TypeElaborator):
                     walk(child, origins)
         walk(expression[2], {name: (index, False) for index, name in enumerate(parameters)})
         return bool(candidates) and not invalid and bool(set.intersection(*candidates))
+
+    def finite_iterator(self, expression):
+        """Certify only steps whose Item successor is a stored input subterm."""
+        if len(expression[1]) != 1:
+            return False
+
+        def bind(pattern, origin, known, nested=False):
+            if origin is None:
+                return
+            if pattern[0] == 'bind':
+                known[pattern[1]] = origin or nested
+            else:
+                parts = pattern[3:] if pattern[0] in ('variant_pat', 'record_pat') else pattern[1:]
+                for part in parts:
+                    if isinstance(part, tuple):
+                        bind(part, origin, known, True)
+
+        def returns(term, known):
+            kind = term[0]
+            if kind == 'variant' and unwrapped(term[1]).name == 'Enum:core::iter::Next':
+                if term[2] == 'Done':
+                    return True
+                return (term[2] == 'Item' and len(term[3]) == 2 and term[3][1][0] == 'var'
+                        and known.get(term[3][1][1], False))
+            if kind == 'match':
+                subject, arms = term[1:]
+                origin = known.get(subject[1]) if subject[0] == 'var' else None
+                for pattern, body in arms:
+                    local = dict(known)
+                    bind(pattern, origin, local)
+                    if not returns(body, local):
+                        return False
+                return True
+            if kind == 'let':
+                name, initial, body = term[1:]
+                local = dict(known)
+                if initial[0] == 'var' and initial[1] in known:
+                    local[name] = known[initial[1]]
+                return returns(body, local)
+            if kind == 'bindpat':
+                pattern, initial, body = term[1:]
+                local = dict(known)
+                bind(pattern, known.get(initial[1]) if initial[0] == 'var' else None, local)
+                return returns(body, local)
+            if kind == 'seq':
+                return returns(term[-1], known)
+            return False
+
+        return returns(expression[2], {expression[1][0][0]: False})

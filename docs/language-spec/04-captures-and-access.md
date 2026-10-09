@@ -171,17 +171,21 @@ The compiler may infer which whole sources a body can retain. Retaining any part
 
 For an access-mode argument, the source describes the accessed value, not the grant or its authority. Legally copying a duplicable field ([§8.1](02-types-and-ownership.md#81-products)) can return an ordinary value, but its published bound uses the whole accessed-value summary. Returning an erased field retaining `@r` through `view holder` therefore preserves `@r` even when the holder itself is non-`Dup`. Grant authority cannot escape.
 
-A result whose instantiated type is provably capture-free has an empty summary. This fact must follow from complete structural types or an audited builtin profile: ordinary scalar data and immutable containers of capture-free values qualify only when they have no additional intrinsic scope or affine/linear obligation. A type variable, an unknown opaque representation, or `Dup + Discard` alone does not establish it. In particular, `Ref<Int,@r>` and `DynArray<Int,@r>` retain `@r`. A function type must account for both its retained environment and fixed scoped dependencies. Otherwise use the whole published bound without selectively deleting atoms based on the result's apparent fields. Bounds are retention upper bounds, not ownership transfers: they never create, duplicate, discard, or revive a resource obligation.
+A result whose instantiated type satisfies `CaptureFree` ([§9.6](02-types-and-ownership.md#96-capture-free-types)) has an empty summary. The evidence must follow from complete structural types, an ordinary `CaptureFree` bound, or a published compiler-derived/audited profile. An unconstrained type variable, an unknown opaque representation, or `Dup + Discard` alone does not establish it. In particular, `Ref<Int,@r>` and `DynArray<Int,@r>` retain `@r`. Otherwise use the whole published bound without selectively deleting atoms based on the result's apparent fields. Bounds are retention upper bounds, not ownership transfers: they never create, duplicate, discard, or revive a resource obligation.
 
 This conservative rule intentionally rejects some safe escapes. A function returning the first member of an opaque-value pair publishes the whole pair's captures, so a scope dependency in the unused second member can prevent the result from escaping. No source lifetime language is introduced.
 
-### 13.5 Retention horizons
+<a id="135-retention-horizons"></a>
+
+### 13.5 Aliasable cell payloads
 
 Every lexical provenance atom has an internal validity horizon determined by lexical scope, even though no outlives syntax is exposed. A retaining owner may safely retain a provenance atom only while that atom remains valid.
 
-Freely aliasable mutable storage requires a fixed horizon because existing aliases cannot have their static capture summaries retroactively changed. For `Ref<T,@r>`, construction and every payload-replacing write MUST therefore reject a value whose tracked region, taskgroup, lexical effect-instance, foreign, or runtime provenance can end before `@r`. Equivalently, every provenance retained by the payload must outlive or equal the cell's region horizon.
+Freely aliasable mutable storage cannot retroactively change existing aliases' capture summaries. `Ref<T,@r>` therefore requires `T: CaptureFree + Discard`: construction and every payload-replacing write MUST establish this payload-type restriction. The guarantee covers every value of `T`, including future writes. The handle itself retains `@r` and is not `CaptureFree`.
 
-This rejects storing a task handle from an inner taskgroup or a value tied to an inner region in an outer `Ref`, while allowing an inner cell to retain values whose provenance is valid for longer than the cell. It is an internal scope-order check, not region subtyping or a user-visible lifetime relation.
+Scoped references, task handles, and closures retaining scoped state cannot be cell payloads, even when their provenance remains valid longer than the cell. A generic setter uses the ordinary `T: CaptureFree + Discard` bound; checking it introduces no inferred callable lifetime preconditions or outlives solver.
+
+Mutable storage that retains scoped contents uses exclusive ownership and `mut`, with the conservative whole-owner capture accounting of [§13.6](#136-canonical-interfaces-and-conservative-mutation). Ordinary lexical validity and non-escape checks continue to apply to those owners and all other scoped values.
 
 ### 13.6 Canonical interfaces and conservative mutation
 
@@ -199,7 +203,7 @@ Intrinsic task metadata still distinguishes a task's owning group from its child
 
 Every call with exclusive `mut` access conservatively grows each surviving accessed owner's whole summary by the pre-call summaries of all arguments and the callable environment, including other accessed values and intrinsic owner identities. If the types or audited builtin profile prove the writable storage can hold only capture-free values, no additional retained captures are introduced; the owner's existing summary is still preserved. Otherwise the union rule applies even when the call returns `Unit` or its body is available. Forwarded and projected grants update the containing owner. Removing or replacing a value does not shrink this bound.
 
-The mutation rule applies on every normal or continuing structural exit where the owner survives, including recoverable failures and handler-mediated exits. A callee must also check every write and reject locally introduced provenance that would outlive its horizon; a caller-side union cannot excuse such an escape. Freely aliasable cells retain [§13.5](#135-retention-horizons)'s fixed-horizon rule rather than retroactively changing existing aliases. Ownership and grant-authority checks remain independent.
+The mutation rule applies on every normal or continuing structural exit where the owner survives, including recoverable failures and handler-mediated exits. A callee must also check every write and reject retention of locally introduced provenance beyond its valid scope; a caller-side union cannot excuse such an escape. Freely aliasable cells enforce [§13.5](#135-retention-horizons)'s `CaptureFree + Discard` payload-type restriction, so their writes cannot add captures to existing aliases. Ownership and grant-authority checks remain independent.
 
 `DynArray<T,@r>::freeze` consumes the mutable owner and preserves element order. If `T` is provably capture-free, its `List<T>` result is capture-free and may leave `@r`. Otherwise the result conservatively retains the whole source summary, including `@r`, even if its elements actually depend only on outer scopes. The same rule applies through wrappers and generic instantiation. Freezing never subtracts a region from a mixed capture set; allocation reuse is permitted only when the resulting storage lifetime is valid.
 

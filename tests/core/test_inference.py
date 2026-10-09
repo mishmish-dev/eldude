@@ -115,12 +115,12 @@ class InferenceTests(unittest.TestCase):
                 E('let', 'cell', E('ref', 'inner', E('int', 1)),
                   E('set', E('var', 'slot'),
                     E('lambda', (), E('seq', E('var', 'cell'), E('unit'))))))))
-        with self.assertRaisesRegex(InferenceError, 'retention horizon'):
+        with self.assertRaisesRegex(InferenceError, 'CaptureFree|write type mismatch'):
             Checker().infer(program)
 
     def test_mutable_reference_preserves_its_callback_effect_contract(self):
         checker = Checker()
-        effectful = Fn((), UNIT, Row(('Log',)))
+        effectful = Fn((), UNIT, Row(('Log',)), captures=frozenset())
         checker.define('install', (('slot', Ty('Ref', (effectful,), 'r')),),
             E('set', E('var', 'slot'), E('lambda', (), E('perform', 'Log'))),
             regions=('r',))

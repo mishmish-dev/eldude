@@ -6,7 +6,7 @@
 
 [Positive programs](#positive-programs) · [Source fixtures](#executable-source-fixtures) · [Test host](#fixture-host-profile) · [Rejections](#rejection-targets) · [Handler counterexamples](#enforced-source-rejections)
 
-All **93 positive examples** execute through the source checker and interpreter. The repository root is the Eldude project, with positive programs under [src/](src) and application/test targets declared in [eldude.toml](../eldude.toml). Its `source-dir = "examples/src"` keeps the programs here; build output goes to the repository's `build/` directory.
+All **117 positive examples** execute through the source checker and interpreter. The repository root is the Eldude project, with positive programs under [src/](src) and application/test targets declared in [eldude.toml](../eldude.toml). Its `source-dir = "examples/src"` keeps the programs here; build output goes to the repository's `build/` directory.
 
 From the repository root:
 
@@ -36,7 +36,7 @@ The fixture runner still prints individual `main` results:
 
 ```sh
 uv run python -m eldude.tooling.run --examples --strict
-# 93 passed, 0 unsupported, 0 failed
+# 117 passed, 0 unsupported, 0 failed
 ```
 
 [manifest.json](manifest.json) records independently specified expected values for every positive file. Corpus execution fails for wrong values, unexpected diagnostics, missing manifest entries, or regressions. `--strict` also rejects pending implementation limits; there are currently none in this corpus. Rejection fixtures are checked separately by the test suite.
@@ -44,11 +44,11 @@ uv run python -m eldude.tooling.run --examples --strict
 | Stage | Runnable | Capabilities exercised |
 | --- | ---: | --- |
 | [1. Values](src/01_values) | 14 / 14 | Arithmetic, closures, generics, records, tuples, enums and startup |
-| [2. Ownership](src/02_ownership) | 25 / 25 | Linear nominal types, capture contracts, inspection, recursion and trait erasure |
-| [3. Results](src/03_results) | 4 / 4 | Library imports, matching, `?` and `try` |
+| [2. Ownership](src/02_ownership) | 26 / 26 | Linear nominal types, capture contracts, inspection, recursion and trait erasure |
+| [3. Results](src/03_results) | 6 / 6 | Library imports, matching, `?` and `try` |
 | [4. Effects](src/04_effects) | 6 / 6 | Generic instances, handlers, forwarding and `Result` payloads |
-| [5. State and collections](src/05_state_and_collections) | 17 / 17 | Regions, captured callbacks, collection primitives, iteration and cleanup traits |
-| [6. Tasks](src/06_tasks) | 7 / 7 | Cooperative scheduling, task groups, spawn/await and library join |
+| [5. State and collections](src/05_state_and_collections) | 34 / 34 | Regions, captured callbacks, collection primitives, iteration and cleanup traits |
+| [6. Tasks](src/06_tasks) | 11 / 11 | Cooperative scheduling, task groups, spawn/await and library join |
 | [7. Source pipeline](src/07_source_pipeline) | 17 / 17 | Handler evidence, ownership, resumption and cleanup regressions |
 | [8. Formatting](src/08_formatting) | 1 / 1 | Source formatting preserves field evaluation order, handlers and precedence |
 | [9. Project tooling](src/09_tooling) | 2 / 2 | Explicit application entries and process-status test runners |
@@ -137,6 +137,32 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 | 8 | [formatter semantics](src/08_formatting/semantics.eld) | `42` | Formatting retains field evaluation order, handler forwarding and precedence |
 | 9 | [application entry](src/09_tooling/application.eld) | `7` | An explicitly named application entry returns its exit status |
 | 9 | [test runner](src/09_tooling/test_runner.eld) | `0` | An ordinary function reports success through process status |
+
+| 2 | [library borrow match](src/02_ownership/library_borrow_match.eld) | `42` | Borrowed matching, return, and propagation preserve linear owners |
+| 3 | [library combinators](src/03_results/library_combinators.eld) | `42` | Bundled Option/Result callbacks, effects, and skipped branches |
+| 3 | [library owned combinators](src/03_results/library_owned_combinators.eld) | `42` | Source combinators preserve linear payloads; three closes |
+| 5 | [capture free cell](src/05_state_and_collections/capture_free_cell.eld) | `42` | Generic source setter, aliases, structural payloads, and closed callbacks |
+| 5 | [capture free erasure](src/05_state_and_collections/capture_free_erasure.eld) | `42` | Explicit CaptureFree existential evidence survives cell storage |
+| 5 | [capture free generic wrapper](src/05_state_and_collections/capture_free_generic_wrapper.eld) | `42` | Cell formation in bounded generic record and enum declarations |
+| 5 | [library iteration custom](src/05_state_and_collections/library_iteration_custom.eld) | `42` | Finite source iterator successor proof |
+| 5 | [library iteration linked list](src/05_state_and_collections/library_iteration_linked_list.eld) | `42` | Bundled prepend, consuming length, next, and for |
+| 5 | [list api empty](src/05_state_and_collections/list_api_empty.eld) | `42` | Empty operations skip callbacks and retain failed replacement inputs |
+| 5 | [list api generic with](src/05_state_and_collections/list_api_generic_with.eld) | `42` | Generic borrowed callback forwarding |
+| 5 | [list api inspection](src/05_state_and_collections/list_api_inspection.eld) | `42` | Borrowed inspection and ordered filtering |
+| 5 | [list api literal hooks](src/05_state_and_collections/list_api_literal_hooks.eld) | `42` | Primitive methods on list literals without imports |
+| 5 | [list api next](src/05_state_and_collections/list_api_next.eld) | `42` | Consuming Iterator next and empty termination |
+| 5 | [list api partition owned](src/05_state_and_collections/list_api_partition_owned.eld) | `42` | Partition preserves all linear elements |
+| 5 | [list api replace owned](src/05_state_and_collections/list_api_replace_owned.eld) | `42` | Bounds failure returns source and incoming owner |
+| 5 | [list api values](src/05_state_and_collections/list_api_values.eld) | `42` | List push, lookup, replacement, and bounds metadata |
+| 5 | [list storage growth](src/05_state_and_collections/list_storage_growth.eld) | `2096128` | Append 2048 elements and traverse a retained snapshot without recursive loop frames |
+| 5 | [list storage snapshots](src/05_state_and_collections/list_storage_snapshots.eld) | `42` | Appending, branching, and updating shared list ranges preserve earlier values |
+| 5 | [list storage owned](src/05_state_and_collections/list_storage_owned.eld) | `42` | Freeze, append, and next transfer every resource exactly once |
+| 5 | [list iteration control](src/05_state_and_collections/list_iteration_control.eld) | `42` | List arguments and loop bodies preserve effects, early return, and cleanup |
+| 6 | [library cancel](src/06_tasks/library_cancel.eld) | `42` | Cancellation drains join2 children and closes both captured files |
+| 6 | [library resources](src/06_tasks/library_resources.eld) | `42` | join2 transfers captures; task::yield and cleanup execute |
+| 6 | [library spawn region outer](src/06_tasks/library_spawn_region_outer.eld) | `42` | Discarded child completes inside its enclosing region |
+
+| 6 | [library spawn handler baseline](src/06_tasks/library_spawn_handler_baseline.eld) | `42` | Children retain the taskgroup handler environment across transient parent handlers |
 
 ## Executable source fixtures
 
@@ -264,6 +290,49 @@ rejections by [value tests](../tests/source/test_values.py).
 | [while without diverge](reject/semantics/while_without_diverge.eld) | Every `while` requires `diverge` in the initial core |
 
 Run the [repository checks](../README.md#checks) to verify syntax failures, enforced semantic failures, and the documented implementation limits. The positive corpus command does not run rejection fixtures.
+
+| [capture free empty list](reject/semantics/capture_free_empty_list.eld) | Cell payload needs type-level CaptureFree and Discard evidence; erasure cannot manufacture it |
+| [capture free enum alternative](reject/semantics/capture_free_enum_alternative.eld) | Cell payload needs type-level CaptureFree and Discard evidence; erasure cannot manufacture it |
+| [capture free erased](reject/semantics/capture_free_erased.eld) | Cell payload needs type-level CaptureFree and Discard evidence; erasure cannot manufacture it |
+| [capture free fixed region](reject/semantics/capture_free_fixed_region.eld) | Cell payload needs type-level CaptureFree and Discard evidence; erasure cannot manufacture it |
+| [capture free forged erasure](reject/semantics/capture_free_forged_erasure.eld) | Cell payload needs type-level CaptureFree and Discard evidence; erasure cannot manufacture it |
+| [capture free generic](reject/semantics/capture_free_generic.eld) | Cell payload needs type-level CaptureFree and Discard evidence; erasure cannot manufacture it |
+| [capture free missing discard](reject/semantics/capture_free_missing_discard.eld) | Cell payload needs type-level CaptureFree and Discard evidence; erasure cannot manufacture it |
+| [capture free nested cell](reject/semantics/capture_free_nested_cell.eld) | Cell payload needs type-level CaptureFree and Discard evidence; erasure cannot manufacture it |
+| [capture free spoof](reject/semantics/capture_free_spoof.eld) | Cell payload needs type-level CaptureFree and Discard evidence; erasure cannot manufacture it |
+| [capture free unused enum](reject/semantics/capture_free_unused_enum.eld) | Cell payload needs type-level CaptureFree and Discard evidence; erasure cannot manufacture it |
+| [capture free unused generic](reject/semantics/capture_free_unused_generic.eld) | Cell payload needs type-level CaptureFree and Discard evidence; erasure cannot manufacture it |
+| [capture free unused record](reject/semantics/capture_free_unused_record.eld) | Cell payload needs type-level CaptureFree and Discard evidence; erasure cannot manufacture it |
+| [library borrow capture](reject/semantics/library_borrow_capture.eld) | Borrowed matching cannot transfer or retain access to a linear owner |
+| [library borrow move](reject/semantics/library_borrow_move.eld) | Borrowed matching cannot transfer or retain access to a linear owner |
+| [library iteration indirect recursion](reject/semantics/library_iteration_indirect_recursion.eld) | Iteration preserves remaining ownership and requires a valid termination proof or diverge |
+| [library iteration linear effect](reject/semantics/library_iteration_linear_effect.eld) | Iteration preserves remaining ownership and requires a valid termination proof or diverge |
+| [library iteration linear length](reject/semantics/library_iteration_linear_length.eld) | Iteration preserves remaining ownership and requires a valid termination proof or diverge |
+| [library iteration linear return](reject/semantics/library_iteration_linear_return.eld) | Iteration preserves remaining ownership and requires a valid termination proof or diverge |
+| [library iteration recursive method](reject/semantics/library_iteration_recursive_method.eld) | Iteration preserves remaining ownership and requires a valid termination proof or diverge |
+| [library iteration recursive step](reject/semantics/library_iteration_recursive_step.eld) | Iteration preserves remaining ownership and requires a valid termination proof or diverge |
+| [library iteration unbounded](reject/semantics/library_iteration_unbounded.eld) | Iteration preserves remaining ownership and requires a valid termination proof or diverge |
+| [library map escape](reject/semantics/library_map_escape.eld) | Optional callbacks preserve captures and must be discardable |
+| [library map linear callback](reject/semantics/library_map_linear_callback.eld) | Optional callbacks preserve captures and must be discardable |
+| [library spawn region discarded](reject/semantics/library_spawn_region_discarded.eld) | Child capture scope must enclose its complete taskgroup |
+| [library spawn region handle](reject/semantics/library_spawn_region_handle.eld) | Child capture scope must enclose its complete taskgroup |
+| [list api filter effect](reject/semantics/list_api_filter_effect.eld) | List access, callback effects, usage, element types, and owned failure inputs obey the declared contract |
+| [list api filter owned](reject/semantics/list_api_filter_owned.eld) | List access, callback effects, usage, element types, and owned failure inputs obey the declared contract |
+| [list api get index](reject/semantics/list_api_get_index.eld) | List access, callback effects, usage, element types, and owned failure inputs obey the declared contract |
+| [list api get owned](reject/semantics/list_api_get_owned.eld) | List access, callback effects, usage, element types, and owned failure inputs obey the declared contract |
+| [list api partition affine callback](reject/semantics/list_api_partition_affine_callback.eld) | List access, callback effects, usage, element types, and owned failure inputs obey the declared contract |
+| [list api push view](reject/semantics/list_api_push_view.eld) | List access, callback effects, usage, element types, and owned failure inputs obey the declared contract |
+| [list api replace empty owned](reject/semantics/list_api_replace_empty_owned.eld) | List access, callback effects, usage, element types, and owned failure inputs obey the declared contract |
+| [list api replace type](reject/semantics/list_api_replace_type.eld) | List access, callback effects, usage, element types, and owned failure inputs obey the declared contract |
+| [list api with abandonment](reject/semantics/list_api_with_abandonment.eld) | List access, callback effects, usage, element types, and owned failure inputs obey the declared contract |
+| [list api with escape](reject/semantics/list_api_with_escape.eld) | List access, callback effects, usage, element types, and owned failure inputs obey the declared contract |
+| [list api with linear callback](reject/semantics/list_api_with_linear_callback.eld) | List access, callback effects, usage, element types, and owned failure inputs obey the declared contract |
+| [list api with owned result](reject/semantics/list_api_with_owned_result.eld) | List access, callback effects, usage, element types, and owned failure inputs obey the declared contract |
+| [list storage reuse owned](reject/semantics/list_storage_reuse_owned.eld) | A consumed List of owned elements cannot be traversed again |
+
+| [unknown cell region](reject/semantics/capture_free_unknown_region.eld) | Cell creation requires a declared region |
+
+The library rejection cases are checked by the [body and cell tests](../tests/source/test_library_bodies.py), [declaration tests](../tests/source/test_ref_declarations.py), [iteration tests](../tests/source/test_library_iteration.py), [List tests](../tests/source/test_list_api.py), and [task capture tests](../tests/source/test_library_tasks.py).
 
 ## Enforced source rejections
 

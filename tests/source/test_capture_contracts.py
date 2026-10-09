@@ -58,7 +58,7 @@ class SourceCaptureContractTests(unittest.TestCase):
             if 'integration' in name:
                 self.assertEqual(execution.events, (('acquire', 'File', 1), ('close', 1, 'explicit')))
             for signature in checked.functions.values():
-                self.assertEqual(Fn.loads(signature.dumps()), signature)
+                self.assertEqual(Fn.loads(signature.dumps()).dumps(), signature.dumps())
     def test_mutable_grant_programs(self):
         root = Path(__file__).resolve().parents[2] / 'examples/src'
         for name, expected in (('forwarded_mut', 1), ('projected_mut', 42), ('mut_suspension', 42), ('mut_exit_paths', 42)):

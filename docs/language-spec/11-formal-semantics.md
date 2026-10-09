@@ -141,7 +141,7 @@ Packaging a concrete value `value: ConcreteType` as `PackageInterface` additiona
 
 - `ConcreteType` satisfies the trait implementation represented by `PackageInterface`;
 - the concrete implementation's associated types agree with every equality advertised by `PackageInterface`;
-- all advertised `Dup`/`Discard` guarantees hold;
+- all advertised `Dup`/`Discard`/`CaptureFree` guarantees hold;
 - the package preserves the value's tracked capture/provenance and any mutable-owner status required by the erased interface.
 
 A dynamic method invocation uses the already-substituted public method contract from `PackageInterface`, including its effect row and result-capture bound. It does not inspect the hidden implementation body or reopen dynamic-compatibility checking at the call site.
@@ -221,7 +221,7 @@ If the binding/value is `Dup`, the checker may semantically duplicate it so the 
 Arguments are evaluated left-to-right before establishing call-scoped access grants. The result capture summary is computed from the semantic contract:
 
 ```text
-ResultCaptures = {}                                      if CallResultType is provably capture-free
+ResultCaptures = {}                                      if StaticEnvironment ⊢ CallResultType : CaptureFree
               = captures required by CallResultType
                 union substituted CallableResultCaptureBound   otherwise
 ```
@@ -281,11 +281,19 @@ The checker may overapproximate. It may not omit an obligation whose omission wo
 - escaped lexical effect instance;
 - invalid FFI/runtime retention.
 
+The distinct type-level judgment is:
+
+```text
+StaticEnvironment ⊢ TypeExpression : CaptureFree
+```
+
+It establishes the absence of tracked captures and fixed scoped dependencies for every value of the type, using [§9.6](02-types-and-ownership.md#96-capture-free-types)'s structural rules, ordinary bounds, or published compiler-derived/audited profiles. It is not derived from a single value's empty summary, `Dup + Discard`, or an outlives relation.
+
 ### 60.2 Erasure and containers
 
 Nominal containers and `any Trait` packages preserve capture/provenance transitively. Type abstraction cannot erase lifetime/resource provenance required for soundness. Function/method application substitutes whole-value sources in the callable's `ResultCaptureBound`; erasure does not reset that summary.
 
-Freely aliasable region storage additionally obeys the fixed retention-horizon rule: a write into `Ref<T,@r>` is rejected when the stored value retains any provenance whose validity can end before `@r`.
+Freely aliasable region storage requires `T: CaptureFree + Discard` for `Ref<T,@r>` formation and every payload-replacing write. A payload type that can retain provenance is rejected even when that provenance remains valid longer than `@r`.
 
 ### 60.3 Scoped foreign provenance
 
@@ -299,7 +307,7 @@ MarshalProvenance not retained by any escaping child/result/runtime registration
 TypingEnvironment ; ... ⊢ scopedForeign(callback) : ResultType ! Effects ▷ (Captures \ {MarshalProvenance})
 ```
 
-Every safe temporary token/view created by that scope carries `MarshalProvenance` in its provenance closure. Ordinary wrapping, dynamic erasure, closure capture, task-result provenance, and aliasable-storage horizon checks preserve it. The scope may end only after all structurally nested work retaining `MarshalProvenance` has resolved and no safe escaping value retains it.
+Every safe temporary token/view created by that scope carries `MarshalProvenance` in its provenance closure. Ordinary wrapping, dynamic erasure, closure capture, task-result provenance, and exclusive mutable-owner capture accounting preserve it. Such types fail `CaptureFree` and cannot be `Ref` payloads. The scope may end only after all structurally nested work retaining `MarshalProvenance` has resolved and no safe escaping value retains it.
 
 This rule is a use of the existing capture/provenance system. It introduces no source-visible lifetime variable, outlives relation, or pinning property.
 
@@ -325,9 +333,9 @@ If the body does not use region state, elimination applies trivially.
 
 ### 61.2 `Ref`
 
-Construction of `Ref<T,@r>` requires `T: Discard` and requires every provenance atom retained by the initial payload to outlive or equal the horizon of `@r`.
+Formation of `Ref<T,@r>` requires the ordinary intrinsic bounds `T: CaptureFree + Discard`. `new`, `replace`, and `set` enforce those same bounds on the payload type; they do not compare payload and cell lifetimes or infer callable lifetime preconditions.
 
-Reading by value from a still-existing cell requires `T: Dup`. Replacement transfers the old payload and therefore need not duplicate it, but the newly installed payload must satisfy the same retention-horizon condition.
+Reading by value from a still-existing cell additionally requires `T: Dup`. Replacement transfers the old payload without duplicating it; `set` discards it using `Discard`. The payload results of `get` and `replace` have empty capture summaries because `T: CaptureFree`. The `Ref` handle remains `Dup + Discard`, retains `@r`, and is not `CaptureFree`.
 
 ## 62. Usage and control exits
 

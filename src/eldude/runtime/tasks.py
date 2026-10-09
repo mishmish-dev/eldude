@@ -27,6 +27,7 @@ class Group:
     failure: BaseException | None = None
     closed: bool = False
     closing: bool = False
+    handler_evidence: dict = field(default_factory=dict)
 
 
 @dataclass(eq=False)
