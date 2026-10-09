@@ -21,8 +21,8 @@ precedence without depending on the checker's supported subset.
 
 The existing executable AST is unsuitable for lossless printing: it drops
 comments, parentheses, and literal spelling. A separate hand-written parser would
-duplicate the language grammar. Instead, extend the existing grammar recognizer
-to optionally retain a concrete derivation, with the recognition-only API intact.
+duplicate the language grammar. The existing grammar recognizer optionally
+retains a concrete derivation, with the recognition-only API intact.
 The formatter assigns layout using grammar rules and prints the original tokens.
 
 ## Surface conventions

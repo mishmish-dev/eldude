@@ -87,8 +87,7 @@ semantic interfaces; those require resolved semantic identities under §77.
 
 The [project commands](../README.md#project-cli) implement the foundation of the
 [tooling design](tooling-design.md), plus the explicitly experimental
-`python::experimental` application/test host. The [implementation plan](tooling-implementation-plan.md)
-records the delivered scope. `cli::standard`, native hosts, embeddings, cross
+`python::experimental` application/test host. `cli::standard`, native hosts, embeddings, cross
 compilation, remote dependency resolution, full semantic interfaces, and interface
 cache invalidation remain separate delivery work and are not implied by these commands.
 

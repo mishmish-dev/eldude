@@ -2,7 +2,7 @@
 
 [Documentation map](index.md) · [Language tooling contracts](language-spec/12-interfaces-and-tooling.md) · [Existing formatter](formatter.md)
 
-**Status:** Proposed design, 9 October 2026. The command name `eldude` and explicit host declarations for application and embedding targets are settled decisions. The remaining choices below form the proposed tooling contract.
+**Status:** Partially implemented tooling contract. The project foundation, source formatter, and experimental Python builds and test runners are delivered. Production hosts, native builds, remote resolution, complete canonical interfaces, and semantic incremental checking remain proposals. The [implementation guide](implementation.md#project-tooling) records the supported subset.
 
 Eldude should provide one standard command for creating, checking, building, running, testing, and formatting projects. Ordinary projects use a declarative `eldude.toml`, a generated `eldude.lock`, and conventional source directories. Libraries remain host-independent; each executable or embedding configuration declares exactly one host.
 
@@ -109,7 +109,7 @@ The root owns `eldude.lock`, `[toolchain]`, and `build/`. A member cannot silent
 
 ### Application manifest
 
-The example versions below illustrate the proposed schema; they do not claim that such toolchain releases or hosts are available today.
+The example versions below illustrate the manifest schema. The production `cli::standard` host remains proposed; runnable Python applications use `python::experimental` as documented in the [project CLI guide](../README.md#experimental-python-builds).
 
 ```toml
 manifest-version = 1
@@ -386,7 +386,7 @@ Build records include the effective toolchain, graph identity, hosts, machine ta
 
 ### Source contract and style
 
-The existing [formatter design](formatter.md) remains the authority for source layout and preservation. The new CLI reuses that formatter rather than implementing a competing printer. The normative requirement remains [§77](language-spec/12-interfaces-and-tooling.md#77-formatting-and-source-stability).
+The [formatter guide](formatter.md) records source layout and preservation. The project CLI reuses that formatter. The normative requirement remains [§77](language-spec/12-interfaces-and-tooling.md#77-formatting-and-source-stability).
 
 Formatting uses syntax alone. It accepts the full ordinary source grammar, including constructs beyond the interpreter subset and code whose imports or types are invalid. It does not resolve dependencies, execute source, infer contracts, or require a lockfile. Project invocations validate the project selection and toolchain pin. Explicit paths check any owning project's pin; stdin checks the invoking project's pin when present. Both modes remain available without a manifest and then use the running formatter.
 
@@ -411,7 +411,7 @@ No-argument formatting requires a discoverable project; it does not silently swi
 
 Automatic and directory selections exclude nested package boundaries, dependency caches, generated build directories, and symlinked directories. Formatting an owning workspace includes its members through their declared source directories. An explicit symlinked file is rejected for write mode. Repeated file identities are deduplicated and results are reported in stable path order.
 
-The existing Python formatter prints to stdout by default. The proposed project CLI deliberately uses write-by-default behavior for files, while retaining explicit stdin/stdout operation. The old command and API keep their documented behavior during migration.
+`eldude-format` prints to stdout by default. The project CLI's `eldude fmt` writes files by default and supports explicit stdin/stdout operation. Both commands and the source API retain their documented behavior.
 
 ### Write guarantees
 
@@ -475,7 +475,7 @@ The current `compile_source`/`compile_file` APIs return checked programs for int
 
 ## Acceptance criteria
 
-Acceptance is defined by observable behavior and independent expected results. These scenarios are requirements for future implementation, not claims of passing tests today.
+Acceptance is defined by observable behavior and independent expected results. These scenarios cover the full tooling contract. The project, path resolver, formatter, static checking, and experimental Python build/test subset have [implementation tests](implementation.md#file-map); production hosts, native execution, remote source verification, and semantic caching still require acceptance evidence.
 
 | Area | Required evidence |
 | --- | --- |
@@ -506,12 +506,11 @@ Use the [repository verification commands](../README.md#checks) for implementati
 
 ## Delivery sequence and deferred work
 
-The delivery order follows dependencies between capabilities:
+The project foundation is delivered, including library checking without an execution root, structured diagnostics, and experimental Python artifacts and isolated test runners. Remaining work follows dependencies between capabilities:
 
-1. **Project foundation:** manifest parsing, package/workspace selection, path dependencies, explicit root metadata, and the unified CLI. Reuse the formatter and expose honest checking limits. Continue documenting the existing interpreter separately.
-2. **Semantic boundaries:** complete canonical-interface validation/rendering, library checking without an execution root, explicit root-conformance checks, structured diagnostics, and correct semantic invalidation.
-3. **Native applications:** one production `cli::standard` host and one supported machine target, development/release artifacts, argument/exit handling, and isolated executable test runners. Native acceptance establishes `build` and `run` support.
-4. **Broader integrations:** custom host descriptors and embeddings, additional machine targets, registry/Git sources with verified locks, and editor integration using the established project model.
+1. **Semantic boundaries:** complete canonical-interface validation/rendering, production host root-conformance checks, and correct semantic invalidation.
+2. **Native applications:** one production `cli::standard` host and one supported machine target, development/release artifacts, argument/exit handling, and isolated executable test runners. Native acceptance establishes native `build` and `run` support.
+3. **Broader integrations:** custom host descriptors and embeddings, additional machine targets, registry/Git sources with verified locks, and editor integration using the established project model.
 
 A release advertises the capabilities it implements and rejects unsupported ones explicitly. Parsing a target or dependency field is not evidence that its runtime, backend, or resolver works. No stage relaxes the language's semantic contracts to obtain apparent feature coverage.
 

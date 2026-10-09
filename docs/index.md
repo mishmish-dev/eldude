@@ -16,7 +16,7 @@ Choose a task below, then read the linked chapter or component. The language spe
 | Understand the design goals | [Manifesto](#the-eldude-manifesto); [precedents](language-spec/precedents.md) for background |
 | Look up a language rule | [Topic map below](#language-topics); [specification index](language-specification.md) for conventions and a full reading order |
 | Find implemented behavior or a compiler component | [Implementation guide and code/test map](implementation.md) |
-| Find capture and existential acceptance coverage | [Completed implementation plan](capture-and-existential-plan.md), with executable acceptance programs and verified results for each step |
+| Find capture and existential acceptance coverage | [Positive programs](../examples/README.md#positive-programs), [rejection targets](../examples/README.md#rejection-targets), and [capture contract tests](../tests/source/test_capture_contracts.py) |
 | Find a small program or expected diagnostic | [Executable examples](../examples/README.md); [illustrative spec snippets](language-spec/examples.md) |
 | Check library APIs, ownership, or cost contracts | [Module/API map](../stdlib/README.md); [library profile](standard-library.md) |
 | Work on syntax or grammar consumers | [Normative EBNF](eldude.ebnf); generated [grammar reference](formal-grammar.md) and [JSON export](eldude-grammar.json) |
@@ -53,10 +53,8 @@ Use the chapter's local contents and section links for a precise lookup. Chapter
 | [stdlib/](../stdlib/README.md) | `.eld` declarations and source bodies, grouped by module; the README maps APIs and implementation status |
 | [pyproject.toml](../pyproject.toml), [.python-version](../.python-version), [uv.lock](../uv.lock) | Project metadata, Python version, and locked environment |
 | [.gitignore](../.gitignore) | Local environment and Python cache exclusions |
-| [Capture and existential implementation plan](capture-and-existential-plan.md) | Implementation work order, dependencies, and program-based acceptance criteria for capture and existential support |
-| [implementation-plan.md](implementation-plan.md) | Completed example-coverage milestone; historical context, not a current backlog |
 | [Formatter design](formatter.md) | Source formatting guarantees, canonical layout, API, and verification |
-| [Tooling design](tooling-design.md) | CLI, projects/workspaces, explicit hosts, compilation, locking, and formatting contract; [implementation plan](tooling-implementation-plan.md) distinguishes the Python delivery from later stages |
+| [Tooling design](tooling-design.md) | CLI, projects/workspaces, explicit hosts, compilation, locking, and formatting contract; [implementation guide](implementation.md#project-tooling) records the delivered Python subset |
 
 ## Editing and checking
 
