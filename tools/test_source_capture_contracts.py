@@ -74,12 +74,15 @@ class SourceCaptureContractTests(unittest.TestCase):
         for name in ('arguments', 'associated', 'constraints', 'traits'):
             path = root / ('existential_' + name + '.eld')
             source = path.read_text()
-            self.assertEqual(run(compile_source(source, str(path)).program).value, 42)
+            checked = compile_source(source, str(path))
+            self.assertEqual(run(checked.program).value, 42)
             if name == 'arguments':
-                lines = source.splitlines()
-                first, second = [i for i, line in enumerate(lines) if line.startswith('impl Read')]
-                lines[first], lines[second] = lines[second], lines[first]
-                self.assertEqual(run(compile_source('\n'.join(lines), str(path)).program).value, 42)
+                first, second = [node.span for node in checked.ast.items[1]
+                                 if node.kind == 'impl' and node.items[1] and node.items[1].items[0] == 'Read']
+                reordered = (source[:first.start] + source[second.start:second.end]
+                             + source[first.end:second.start] + source[first.start:first.end]
+                             + source[second.end:])
+                self.assertEqual(run(compile_source(reordered, str(path)).program).value, 42)
 
     def test_region_arguments_and_inference_programs(self):
         root = Path(__file__).resolve().parents[1] / 'examples'

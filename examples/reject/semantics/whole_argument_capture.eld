@@ -11,7 +11,9 @@ struct Value {
 }
 
 impl Read for Value {
-    fn read(view self) -> Int { self.number }
+    fn read(view self) -> Int {
+        self.number
+    }
 }
 
 fn first<@r>(pair: (any Read + Discard, Ref<Int, @r>)) -> any Read + Discard {

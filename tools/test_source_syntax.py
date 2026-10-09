@@ -5,6 +5,16 @@ from check_grammar import GRAMMAR, Grammar
 
 
 class SourceSyntaxTests(unittest.TestCase):
+    def test_positioned_lexer_can_retain_comments_without_parsing_literal_text(self):
+        grammar = Grammar(GRAMMAR.read_text(encoding='utf-8'))
+        source = '// header\r\nmodule m; /* gap */ let x="// not a comment";'
+        tokens = grammar.lex_spanned(source, comments=True)
+        self.assertEqual([t.value for t in tokens if t.kind.endswith('_COMMENT')],
+                         ['// header', '/* gap */'])
+        self.assertEqual([(t.kind, t.value) for t in tokens if not t.kind.endswith('_COMMENT')],
+                         grammar.lex(source, 'source_file'))
+        self.assertTrue(all(source[t.start:t.end] == t.value for t in tokens))
+
     def test_positioned_lexer_preserves_legacy_tokens(self):
         grammar = Grammar(GRAMMAR.read_text(encoding='utf-8'))
         text = '// trivia\nmodule m; /* gap */\npub fn main()->Int { 42 }'

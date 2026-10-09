@@ -13,8 +13,9 @@ Read the component and its tests for the task at hand. All tools use the Python 
 | File | Responsibility | Tests |
 | --- | --- | --- |
 | [run_eldude.py](run_eldude.py) | CLI, result display, corpus manifest validation | [Corpus runner](test_run_examples.py) |
+| [format_eldude.py](format_eldude.py) | Syntax-directed source formatting, comment retention, check/write CLI | [Formatting, semantic round trips, and CLI](test_format_eldude.py) |
 | [check_docs.py](check_docs.py) | Local Markdown links/anchors, chapter/code map coverage, example table results | [Documentation checks](test_check_docs.py) |
-| [check_grammar.py](check_grammar.py) | EBNF lexer/recognizer and Markdown/JSON generation | [Syntax](test_grammar.py), [publications](test_grammar_artifacts.py), [program/API corpus](test_grammar_programs.py) |
+| [check_grammar.py](check_grammar.py) | EBNF lexer, recognizer/concrete trees, and Markdown/JSON generation | [Syntax](test_grammar.py), [publications](test_grammar_artifacts.py), [program/API corpus](test_grammar_programs.py) |
 | [source_syntax.py](source_syntax.py) | Located AST, syntax errors, executable-subset parsing | [Core syntax](test_source_syntax.py), [extended syntax](test_source_extended_syntax.py) |
 | [source_modules.py](source_modules.py) | Declared module identities, imports, dependency order | [Modules](test_source_modules.py) |
 | [source_pipeline.py](source_pipeline.py) | Public compile/execute API, source diagnostics, shared handler lowering, annotation adapter | [Source pipeline and handler traces](test_source_pipeline.py), [capture contracts and erasure](test_source_capture_contracts.py) |
@@ -29,6 +30,15 @@ Read the component and its tests for the task at hand. All tools use the Python 
 | [task_runtime.py](task_runtime.py) | Per-execution cooperative scheduling, cancellation, group draining | [Scheduler](test_task_runtime.py), [source integration](test_source_tasks.py) |
 
 The source path is `run_eldude` → `source_pipeline` → parsing/module loading → `source_elaboration` → checked expression IR → `handlers.run`. The checker layers are `SourceChecker` → `FeatureChecker` → `HandlerChecker` → `Checker`; source features and declarations also extend lowering and execution. The row solver operates on resolved labels and does not select handlers or check ownership.
+
+The formatter takes a separate path through the normative grammar's concrete
+tree, preserving source details the executable AST discards. With `tools` on the
+Python import path, `format_eldude.format_source(text, filename='<source>')` returns
+formatted source or raises a located `Diagnostic`. It accepts the full ordinary
+source grammar, keeps author-written contracts unchanged, and verifies token and
+comment preservation before returning. See the [design and style rules](../docs/formatter.md)
+and [CLI commands](../README.md#format-source). It does not canonicalize generated
+semantic interfaces; those require resolved semantic identities under §77.
 
 ## Source-to-execution experiment
 

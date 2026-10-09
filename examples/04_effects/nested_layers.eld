@@ -1,6 +1,8 @@
 module examples::effects::nested_layers;
 
-effect Read { tail value() -> Int; }
+effect Read {
+    tail value() -> Int;
+}
 
 pub fn main() -> Int {
     handle {

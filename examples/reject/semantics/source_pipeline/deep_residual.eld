@@ -1,10 +1,21 @@
 module reject::source_pipeline::deep_residual;
+
 import eldude::fixture::{acquire, close};
-effect Step { once step() -> Unit; }
-effect Stop { affine stop() -> Unit; }
+
+effect Step {
+    once step() -> Unit;
+}
+
+effect Stop {
+    affine stop() -> Unit;
+}
+
 pub fn main() -> Unit {
     handle {
-        handle { !Step::step(); !Step::step() } with handler Step {
+        handle {
+            !Step::step();
+            !Step::step()
+        } with handler Step {
             step() => {
                 let local = acquire();
                 resume(());
@@ -12,5 +23,7 @@ pub fn main() -> Unit {
                 !stop::stop()
             };
         }
-    } with stop = handler Stop { stop() => (); }
+    } with stop = handler Stop {
+        stop() => ();
+    }
 }

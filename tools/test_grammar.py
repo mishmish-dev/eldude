@@ -41,6 +41,36 @@ class GrammarTests(unittest.TestCase):
             with self.subTest(source=source):
                 self.assertTrue(self.grammar.accepts(source), source)
 
+    def test_concrete_tree_retains_tokens_and_distinguishes_braces(self):
+        self.assertTrue(hasattr(self.grammar, 'parse_tokens'), 'concrete grammar parsing is missing')
+        tokens = self.grammar.lex('module m; fn f()->{Log | e} Int { (1 + 2) }', 'source_file')
+        tree, failure = self.grammar.parse_tokens(tokens)
+        self.assertIsNone(failure)
+        leaves, rules = [], []
+
+        def visit(node):
+            if isinstance(node, int):
+                leaves.append(node)
+            else:
+                rules.append(node.name)
+                for child in node.children:
+                    visit(child)
+
+        visit(tree)
+        self.assertEqual(leaves, list(range(len(tokens))))
+        self.assertEqual((tree.name, tree.start, tree.end), ('source_file', 0, len(tokens)))
+        self.assertIn('effect_row', rules)
+        self.assertIn('block', rules)
+        self.assertIn('tuple_expr', rules)
+
+    def test_concrete_tree_reports_the_same_syntax_failure(self):
+        self.assertTrue(hasattr(self.grammar, 'parse_tokens'), 'concrete grammar parsing is missing')
+        for source in ('module m; fn f()->Int { 1 + }', 'module m; fn f()->Int {'):
+            tokens = self.grammar.lex(source, 'source_file')
+            tree, failure = self.grammar.parse_tokens(tokens)
+            self.assertIsNone(tree)
+            self.assertEqual(failure, self.grammar.syntax_failure(tokens))
+
     def test_rejected_source_forms(self):
         for source in [
             'let x=1;',

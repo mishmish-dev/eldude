@@ -1,6 +1,10 @@
 module examples::source_pipeline::tail_cleanup;
+
 import eldude::fixture::{acquire, close};
-effect Read { tail value() -> Int; }
+
+effect Read {
+    tail value() -> Int;
+}
 
 pub fn main() -> Int {
     handle {
@@ -9,6 +13,8 @@ pub fn main() -> Int {
         close(file);
         answer
     } with read = handler Read {
-        value() => using (temporary = acquire()) { 40 };
+        value() => using (temporary = acquire()) {
+            40
+        };
     }
 }

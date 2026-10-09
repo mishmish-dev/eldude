@@ -12,12 +12,12 @@ struct Value {
 }
 
 impl Read for Value {
-    fn read(view self) -> Int { self.number }
+    fn read(view self) -> Int {
+        self.number
+    }
 }
 
-fn first<@r>(
-    pair: (Task<any Read + Discard>, Ref<Int, @r>),
-) -> Task<any Read + Discard> {
+fn first<@r>(pair: (Task<any Read + Discard>, Ref<Int, @r>),) -> Task<any Read + Discard> {
     let (task, _) = pair;
     task
 }

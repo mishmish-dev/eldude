@@ -12,13 +12,14 @@ struct Holder<@r> {
 }
 
 impl<@r> Read for Holder<@r> {
-    fn read(view self) -> Int { 42 }
+    fn read(view self) -> Int {
+        42
+    }
 }
 
-fn append<@r>(
-    mut buffer: DynArray<any Read + Discard, @r>,
-    value: any Read + Discard,
-) ->{state<@r>} Unit {
+fn append<
+    @r
+>(mut buffer: DynArray<any Read + Discard, @r>, value: any Read + Discard,) ->{state<@r>} Unit {
     mut buffer.push(value);
 }
 

@@ -3,7 +3,9 @@ module examples::state_and_collections::tail_cleanup;
 import core::cleanup::{Cleanup};
 import state::ref::{Ref};
 
-linear struct Guard<@r> { counter: Ref<Int, @r> }
+linear struct Guard<@r> {
+    counter: Ref<Int, @r>
+}
 
 impl<@r> Cleanup<{state<@r>}> for Guard<@r> {
     fn cleanup(self) ->{state<@r>} Unit {
@@ -12,7 +14,9 @@ impl<@r> Cleanup<{state<@r>}> for Guard<@r> {
     }
 }
 
-effect Read { tail value() -> Int; }
+effect Read {
+    tail value() -> Int;
+}
 
 pub fn main() -> Int {
     region local {

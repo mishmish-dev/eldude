@@ -1,6 +1,9 @@
 module examples::values::enums;
 
-enum Choice { Left(Int), Right(Int) }
+enum Choice {
+    Left(Int),
+    Right(Int)
+}
 
 fn value(choice: Choice) -> Int {
     match choice {

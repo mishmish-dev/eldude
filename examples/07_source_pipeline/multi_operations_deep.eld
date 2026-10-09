@@ -1,4 +1,5 @@
 module examples::source_pipeline::multi_operations_deep;
+
 import eldude::fixture::{acquire, close};
 
 effect Multi {
@@ -6,7 +7,11 @@ effect Multi {
     once step() -> Unit;
     affine stop(answer: Int) -> Unit;
 }
-effect Mark { tail mark() -> Unit; }
+
+effect Mark {
+    tail mark() -> Unit;
+}
+
 effect Empty {}
 
 pub fn main() -> Int {
@@ -27,14 +32,26 @@ pub fn main() -> Int {
                 !Mark::mark();
                 frame
             };
-            step() => handle { () } with handler Empty {
+            step() => handle {
+                ()
+            } with handler Empty {
                 return ignored => {
                     let answer = resume(());
-                    using (after = acquire()) { answer }
+                    using (after = acquire()) {
+                        answer
+                    }
                 };
             };
-            stop(answer) => { close(frame); answer };
-            return answer => { close(frame); answer };
+            stop(answer) => {
+                close(frame);
+                answer
+            };
+            return answer => {
+                close(frame);
+                answer
+            };
         }
-    } with mark = handler Mark { mark() => (); }
+    } with mark = handler Mark {
+        mark() => ();
+    }
 }

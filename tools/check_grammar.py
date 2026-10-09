@@ -25,6 +25,14 @@ class Token:
     end: int
 
 
+@dataclass(frozen=True)
+class SyntaxNode:
+    name: str
+    start: int
+    end: int
+    children: tuple
+
+
 class LexError(ValueError):
     def __init__(self, message, offset):
         super().__init__(message)
@@ -216,13 +224,17 @@ class Grammar:
         """Legacy token-pair API, also used by exported-grammar consumers."""
         return [(t.kind, t.value) for t in self.lex_spanned(text, start)]
 
-    def lex_spanned(self, text, start='source_file'):
+    def lex_spanned(self, text, start='source_file', *, comments=False):
         punctuation = self.vocabulary(start)
         result, pos = [], 0
         while pos < len(text):
-            skipped = next((m for regex in self.skips.values() if (m := regex.match(text, pos))), None)
+            skipped = next(((name, m) for name, regex in self.skips.items()
+                            if (m := regex.match(text, pos))), None)
             if skipped:
-                pos = skipped.end()
+                name, match = skipped
+                if comments and name != 'SPACE':
+                    result.append(Token(name, match[0], pos, match.end()))
+                pos = match.end()
                 continue
             candidates = [(len(m[0]), name, m[0]) for name, regex in self.patterns.items()
                           if (m := regex.match(text, pos))]
@@ -255,30 +267,50 @@ class Grammar:
 
     def syntax_failure(self, tokens, start='source_file'):
         """Recognize token pairs; return the failing token index, or None."""
-        chart = [set() for _ in range(len(tokens)+1)]
+        return self._recognize(tokens, start, False)[1]
+
+    def parse_tokens(self, tokens, start='source_file'):
+        """Return (concrete tree, failure index) for token pairs, with one None.
+
+        Children are named-rule nodes or indexes into tokens. EBNF repetition
+        helpers are flattened; declaration order breaks ambiguous derivation ties.
+        """
+        return self._recognize(tokens, start, True)
+
+    def _recognize(self, tokens, start, build_tree):
+        if start not in self.bnf:
+            raise ValueError(f'Unknown grammar entry point: {start}')
+        chart = [{} for _ in range(len(tokens)+1)]
         initial = ('@start', (start,), 0, 0)
-        chart[0].add(initial)
+        chart[0][initial] = ()
         for index in range(len(chart)):
             changed = True
             while changed:
                 before = len(chart[index])
-                for lhs, rhs, dot, origin in tuple(chart[index]):
+                for (lhs, rhs, dot, origin), children in tuple(chart[index].items()):
                     if dot == len(rhs):
-                        for outer_lhs, outer_rhs, outer_dot, outer_origin in tuple(chart[origin]):
+                        completed = ()
+                        if build_tree:
+                            completed = children if lhs.startswith('@') else (SyntaxNode(lhs, origin, index, children),)
+                        for (outer_lhs, outer_rhs, outer_dot, outer_origin), prefix in tuple(chart[origin].items()):
                             if outer_dot < len(outer_rhs) and outer_rhs[outer_dot] == lhs:
-                                chart[index].add((outer_lhs, outer_rhs, outer_dot+1, outer_origin))
+                                chart[index].setdefault((outer_lhs, outer_rhs, outer_dot+1, outer_origin),
+                                                        prefix + completed)
                     else:
                         symbol = rhs[dot]
                         if isinstance(symbol, str):
-                            chart[index].update((symbol, option, 0, index) for option in self.bnf[symbol])
+                            for option in self.bnf[symbol]:
+                                chart[index].setdefault((symbol, option, 0, index), ())
                         elif index < len(tokens):
                             kind, value = tokens[index]
                             if (symbol[0] == 'token' and kind == symbol[1]) or (symbol[0] == 'literal' and value == symbol[1]):
-                                chart[index+1].add((lhs, rhs, dot+1, origin))
+                                chart[index+1].setdefault((lhs, rhs, dot+1, origin),
+                                                          children + (index,) if build_tree else ())
                 changed = len(chart[index]) != before
         if ('@start', (start,), 1, 0) in chart[-1]:
-            return None
-        return max(i for i, states in enumerate(chart) if states)
+            tree = chart[-1][('@start', (start,), 1, 0)][0] if build_tree else None
+            return tree, None
+        return None, max(i for i, states in enumerate(chart) if states)
 
 def section(source, number):
     spec = source.read_text(encoding='utf-8')

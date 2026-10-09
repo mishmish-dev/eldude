@@ -2,7 +2,9 @@ module examples::results::try_scope;
 
 import core::result::{Result};
 
-enum InputError { Missing }
+enum InputError {
+    Missing
+}
 
 pub fn main() -> Int {
     let result: Result<InputError, Int> = try {

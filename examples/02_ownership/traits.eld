@@ -5,7 +5,9 @@ trait Value {
     fn value(self) -> Self::Output;
 }
 
-struct Box<T> { item: T }
+struct Box<T> {
+    item: T
+}
 
 impl<T> Value for Box<T> {
     type Output = T;
@@ -15,4 +17,6 @@ impl<T> Value for Box<T> {
     }
 }
 
-pub fn main() -> Int { Box { item: 42 }.value() }
+pub fn main() -> Int {
+    Box { item: 42 }.value()
+}

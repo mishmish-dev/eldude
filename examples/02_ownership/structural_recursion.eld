@@ -1,6 +1,9 @@
 module examples::ownership::structural_recursion;
 
-enum Chain { End, Link(Int, Chain) }
+enum Chain {
+    End,
+    Link(Int, Chain)
+}
 
 fn sum(chain: Chain) -> Int {
     match chain {

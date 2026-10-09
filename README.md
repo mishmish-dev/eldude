@@ -16,6 +16,24 @@ uv run python tools/run_eldude.py examples/07_source_pipeline/combined.eld
 # 42
 ```
 
+## Format source
+
+The [semantic source formatter](docs/formatter.md) uses the normative grammar to
+format blocks, signatures, rows, and expressions. It preserves comments, literal
+spelling, contracts, and evaluation order, including code outside the interpreter's
+supported subset. It does not require imports to resolve or type checking to pass.
+
+```sh
+uv run python tools/format_eldude.py examples/08_formatting/semantics.eld
+uv run python tools/format_eldude.py --check path/to/file.eld
+uv run python tools/format_eldude.py --write path/to/file.eld
+```
+
+Without flags it prints one formatted file to stdout; omit the filename or use `-`
+to read stdin. `--check` and `--write` accept multiple files. Check mode exits 1 for
+formatting differences; errors exit 2. Write mode validates all inputs before
+editing, replaces changed files atomically, and refuses symlinks.
+
 ## Checks
 
 ```sh

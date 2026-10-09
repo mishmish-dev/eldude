@@ -80,7 +80,8 @@
     "07_source_pipeline/once_deep.eld": 99,
     "07_source_pipeline/operation_arguments.eld": 42,
     "07_source_pipeline/tail_cleanup.eld": 40,
-    "07_source_pipeline/tail_output.eld": null
+    "07_source_pipeline/tail_output.eld": null,
+    "08_formatting/semantics.eld": 42
   },
   "pending": {}
 }

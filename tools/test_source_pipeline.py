@@ -685,6 +685,8 @@ class SourceFixtureTests(unittest.TestCase):
                 self.assertEqual(diagnostic.code, code, str(diagnostic))
                 self.assertRegex(diagnostic.message, message)
                 offset = source.index('/*error*/') + len('/*error*/')
+                while source[offset].isspace():
+                    offset += 1
                 self.assertEqual((diagnostic.span.filename, diagnostic.span.start,
                                   diagnostic.span.line, diagnostic.span.column),
                                  (str(path), offset, source.count('\n', 0, offset) + 1,
@@ -814,25 +816,25 @@ class SourceFixtureTests(unittest.TestCase):
         from source_pipeline import compile_file
         from source_syntax import grammar
         cases = {
-            'wrong_operation_result': ('operation result', 5, 20),
-            'tail_resume': ('Explicit resume.*tail', 5, 20),
-            'missing_resume': ('once clause must resume exactly once', 5, 19),
-            'repeated_resume': ('more than once', 7, 13),
-            'escaping_resume': ('resume.*only inside an operation clause', 6, 33),
-            'frame_transfer': ('file was already consumed', 9, 19),
-            'clause_local': ('Unconsumed resource local', 7, 13),
-            'unsafe_affine': ('abandon live resource file', 7, 9),
-            'skipped_outer_resume': ('skip an enclosing resume', 7, 13),
-            'skipped_consumption': ('skip consumption of file', 7, 9),
-            'outward_pending': ('abandon live resource file', 12, 25),
-            'deep_residual': ('abandon live resource local', 10, 17),
-            'post_resume': ('abandon live resource file', 9, 37),
-            'same_family': ('unqualified same-family', 5, 20),
-            'nested_return_affine_skip': ('skip an enclosing resume', 10, 30),
-            'nested_return_repeated': ('more than once', 12, 13),
-            'nested_return_frame_transfer': ('frame was already consumed', 15, 19),
-            'nested_return_outward': ('abandon live resource outside', 15, 21),
-            'nested_return_residual': ('abandon live resource local', 15, 21),
+            'wrong_operation_result': ('operation result', 11, 20),
+            'tail_resume': ('Explicit resume.*tail', 11, 20),
+            'missing_resume': ('once clause must resume exactly once', 11, 19),
+            'repeated_resume': ('more than once', 13, 13),
+            'escaping_resume': ('resume.*only inside an operation clause', 12, 33),
+            'frame_transfer': ('file was already consumed', 16, 19),
+            'clause_local': ('Unconsumed resource local', 14, 13),
+            'unsafe_affine': ('abandon live resource file', 12, 9),
+            'skipped_outer_resume': ('skip an enclosing resume', 16, 13),
+            'skipped_consumption': ('skip consumption of file', 12, 9),
+            'outward_pending': ('abandon live resource file', 21, 17),
+            'deep_residual': ('abandon live resource local', 21, 17),
+            'post_resume': ('abandon live resource file', 21, 17),
+            'same_family': ('unqualified same-family', 11, 20),
+            'nested_return_affine_skip': ('skip an enclosing resume', 20, 30),
+            'nested_return_repeated': ('more than once', 22, 13),
+            'nested_return_frame_transfer': ('frame was already consumed', 26, 19),
+            'nested_return_outward': ('abandon live resource outside', 29, 21),
+            'nested_return_residual': ('abandon live resource local', 30, 21),
         }
         self.assertEqual(set(cases), {p.stem for p in REJECT.glob('*.eld')})
         for name, (message, line, column) in cases.items():
@@ -851,19 +853,19 @@ class SourceFixtureTests(unittest.TestCase):
                             'nested_return_frame_transfer', 'nested_return_outward', 'nested_return_residual'):
                     self.assertTrue(diagnostic.related)
                 if name == 'frame_transfer':
-                    self.assertEqual([span.line for _, span in diagnostic.related], [5, 8])
+                    self.assertEqual([span.line for _, span in diagnostic.related], [10, 15])
                 if name == 'nested_return_frame_transfer':
-                    self.assertEqual([span.line for _, span in diagnostic.related], [7, 13])
+                    self.assertEqual([span.line for _, span in diagnostic.related], [14, 24])
 
     def test_operation_argument_failures_are_static_located_rejections(self):
         from source_pipeline import compile_file
         from source_syntax import grammar
         directory = ROOT / 'examples/reject/semantics/operation_arguments'
         cases = {
-            'type': ('type', 'Type mismatch', 4, 14),
-            'arity': ('type', 'Operation arity mismatch', 4, 14),
-            'clause_arity': ('type', 'Operation clause arity mismatch', 5, 9),
-            'abandonment': ('semantic', 'abandon live resource file', 7, 43),
+            'type': ('type', 'Type mismatch', 9, 9),
+            'arity': ('type', 'Operation arity mismatch', 9, 9),
+            'clause_arity': ('type', 'Operation clause arity mismatch', 11, 9),
+            'abandonment': ('semantic', 'abandon live resource file', 12, 25),
         }
         self.assertEqual(set(cases), {p.stem for p in directory.glob('*.eld')})
         for name, (code, message, line, column) in cases.items():
@@ -878,7 +880,7 @@ class SourceFixtureTests(unittest.TestCase):
                 self.assertEqual((diagnostic.span.filename, diagnostic.span.line, diagnostic.span.column),
                                  (str(path), line, column))
                 if name == 'abandonment':
-                    self.assertEqual(diagnostic.related[0][1].line, 6)
+                    self.assertEqual(diagnostic.related[0][1].line, 10)
 
     def test_cli_success_syntax_semantic_and_unsupported_failure(self):
         cases = (

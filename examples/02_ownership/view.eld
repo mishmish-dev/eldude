@@ -1,8 +1,12 @@
 module examples::ownership::scoped_view;
 
-linear struct Ticket { number: Int }
+linear struct Ticket {
+    number: Int
+}
 
-fn number(view ticket: Ticket) -> Int { ticket.number }
+fn number(view ticket: Ticket) -> Int {
+    ticket.number
+}
 
 fn redeem(ticket: Ticket) -> Int {
     let Ticket { number } = ticket;

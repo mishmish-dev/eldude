@@ -28,8 +28,8 @@ class SourceSemanticExampleTests(unittest.TestCase):
             compile_source(source, str(path))
         self.assertEqual(caught.exception.code, 'semantic')
         self.assertEqual(caught.exception.span.filename, str(path))
-        self.assertEqual(caught.exception.span.line, 4)
-        self.assertEqual(caught.exception.span.column, source.splitlines()[3].index('mut item.grow') + 1)
+        self.assertEqual(caught.exception.span.line, 15)
+        self.assertEqual(caught.exception.span.column, source.splitlines()[14].index('mut item.grow') + 1)
 
     def test_rejection_examples_reach_their_semantic_check(self):
         cases = {

@@ -1,6 +1,8 @@
 module examples::ownership::linear_closure;
 
-linear struct Ticket { number: Int }
+linear struct Ticket {
+    number: Int
+}
 
 fn redeem(ticket: Ticket) -> Int {
     let Ticket { number } = ticket;

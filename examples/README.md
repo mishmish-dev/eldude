@@ -6,11 +6,11 @@
 
 [Positive programs](#positive-programs) · [Source fixtures](#executable-source-fixtures) · [Test host](#fixture-host-profile) · [Rejections](#rejection-targets) · [Handler counterexamples](#enforced-source-rejections)
 
-All **52 positive examples** execute through the source checker and interpreter. Each file is a separate program; the runner uses the documented [entry-point convention](../tools/README.md#entry-point-api-and-diagnostics).
+All **82 positive examples** execute through the source checker and interpreter. Each file is a separate program; the runner uses the documented [entry-point convention](../tools/README.md#entry-point-api-and-diagnostics).
 
 ```sh
 uv run python tools/run_eldude.py --examples --strict
-# 52 passed, 0 unsupported, 0 failed
+# 82 passed, 0 unsupported, 0 failed
 ```
 
 [manifest.json](manifest.json) records independently specified expected values for every positive file. Corpus execution fails for wrong values, unexpected diagnostics, missing manifest entries, or regressions. `--strict` also rejects pending implementation limits; there are currently none in this corpus. Rejection fixtures are checked separately by the test suite.
@@ -18,12 +18,13 @@ uv run python tools/run_eldude.py --examples --strict
 | Stage | Runnable | Capabilities exercised |
 | --- | ---: | --- |
 | [1. Values](01_values) | 9 / 9 | Arithmetic, closures, generics, records, tuples, enums and startup |
-| [2. Ownership](02_ownership) | 7 / 7 | Linear nominal types, capture contracts, inspection, recursion and trait erasure |
+| [2. Ownership](02_ownership) | 24 / 24 | Linear nominal types, capture contracts, inspection, recursion and trait erasure |
 | [3. Results](03_results) | 3 / 3 | Library imports, matching, `?` and `try` |
 | [4. Effects](04_effects) | 6 / 6 | Generic instances, handlers, forwarding and `Result` payloads |
-| [5. State and collections](05_state_and_collections) | 7 / 7 | Regions, captured callbacks, collection primitives, iteration and cleanup traits |
-| [6. Tasks](06_tasks) | 4 / 4 | Cooperative scheduling, task groups, spawn/await and library join |
-| [7. Source pipeline](07_source_pipeline) | 16 / 16 | Handler evidence, ownership, resumption and cleanup regressions |
+| [5. State and collections](05_state_and_collections) | 17 / 17 | Regions, captured callbacks, collection primitives, iteration and cleanup traits |
+| [6. Tasks](06_tasks) | 5 / 5 | Cooperative scheduling, task groups, spawn/await and library join |
+| [7. Source pipeline](07_source_pipeline) | 17 / 17 | Handler evidence, ownership, resumption and cleanup regressions |
+| [8. Formatting](08_formatting) | 1 / 1 | Source formatting preserves field evaluation order, handlers and precedence |
 
 Resolve explicit library imports using the module declarations in [stdlib](../stdlib/README.md). Primitive types and intrinsic constraints have their predefined meanings. There is no implied wildcard library prelude. The bundled profile binds list literals, `?`/`try`, optional access, `for`, cleanup, and task handles to their corresponding library identities.
 
@@ -97,6 +98,7 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 | 6 | [inherited handler](06_tasks/inherited_handler.eld) | `42` | Same inherited handler, different child result types |
 | 6 | [child-local handler](06_tasks/child_local_handler.eld) | `42` | Answer-changing handler inside a child |
 | 6 | [library join](06_tasks/library_join.eld) | `42` | Higher-order task composition |
+| 8 | [formatter semantics](08_formatting/semantics.eld) | `42` | Formatting retains field evaluation order, handler forwarding and precedence |
 
 ## Executable source fixtures
 

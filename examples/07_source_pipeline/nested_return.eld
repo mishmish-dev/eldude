@@ -1,7 +1,14 @@
 module examples::source_pipeline::nested_return;
+
 import eldude::fixture::{acquire, close};
-effect Read { tail value() -> Int; }
-effect Step { once step() -> Unit; }
+
+effect Read {
+    tail value() -> Int;
+}
+
+effect Step {
+    once step() -> Unit;
+}
 
 pub fn main() -> Int {
     let frame = acquire();
@@ -11,14 +18,21 @@ pub fn main() -> Int {
         42
     } with step = handler Step {
         step() => handle {
-            using (temporary = acquire()) { !Read::value() }
+            using (temporary = acquire()) {
+                !Read::value()
+            }
         } with read = handler Read {
             value() => 7;
             return value => {
                 let answer = resume(());
-                using (post = acquire()) { answer }
+                using (post = acquire()) {
+                    answer
+                }
             };
         };
-        return answer => { close(frame); answer };
+        return answer => {
+            close(frame);
+            answer
+        };
     }
 }

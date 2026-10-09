@@ -1,6 +1,8 @@
 module examples::reject::inherited_answer_change;
 
-effect Read { tail value() -> Int; }
+effect Read {
+    tail value() -> Int;
+}
 
 fn main() ->{suspend} Int {
     handle {
@@ -10,6 +12,10 @@ fn main() ->{suspend} Int {
         }
     } with handler Read {
         value() => 21;
-        return flag => if flag { 42 } else { 0 };
+        return flag => if flag {
+            42
+        } else {
+            0
+        };
     }
 }

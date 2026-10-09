@@ -2,11 +2,16 @@ module examples::results::propagation;
 
 import core::result::{Result};
 
-enum InputError { Negative }
+enum InputError {
+    Negative
+}
 
 fn nonnegative(value: Int) -> Result<InputError, Int> {
-    if value < 0 { Result::Err(InputError::Negative) }
-    else { Result::Ok(value) }
+    if value < 0 {
+        Result::Err(InputError::Negative)
+    } else {
+        Result::Ok(value)
+    }
 }
 
 fn add(left: Int, right: Int) -> Result<InputError, Int> {

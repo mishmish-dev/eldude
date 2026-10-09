@@ -1,4 +1,5 @@
 module examples::source_pipeline::multi_operations_affine;
+
 import eldude::fixture::{acquire, close};
 
 effect Multi {
@@ -21,7 +22,9 @@ pub fn main() -> Int {
             }
         }
     } with outer = handler Multi {
-        read(value) => using (temporary = acquire()) { value };
+        read(value) => using (temporary = acquire()) {
+            value
+        };
         step() => resume(());
         stop(answer) => answer;
     };
