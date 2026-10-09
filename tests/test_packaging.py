@@ -7,6 +7,33 @@ import unittest
 
 
 class PackagingTests(unittest.TestCase):
+    def test_artifact_execution_does_not_load_the_source_frontend(self):
+        code = '''
+import sys
+from eldude.ir_artifact import decode_program
+from eldude.handlers import run
+
+program = decode_program({
+    'ir_version': 1,
+    'core': {'tuple': ['nat', 42]},
+    'operations': {'map': []},
+    'result': {'record': 'Ty', 'id': 0,
+               'fields': {'name': 'Nat', 'args': {'tuple': []}, 'region': None}},
+    'effects': {'record': 'Row', 'id': 1,
+                'fields': {'labels': {'tuple': []}, 'tail': None}},
+})
+assert run(program).value == 42
+frontend = {'source_pipeline', 'source_elaboration', 'source_type_elaboration',
+            'source_checking', 'source_lowering', 'source_features',
+            'source_syntax', 'source_modules', 'check_grammar'}
+loaded = {'eldude.' + name for name in frontend} & sys.modules.keys()
+assert not loaded, sorted(loaded)
+'''
+        with TemporaryDirectory() as directory:
+            result = subprocess.run([sys.executable, '-I', '-c', code], cwd=directory,
+                                    capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_module_entry_point_from_another_directory(self):
         with TemporaryDirectory() as directory:
             result = subprocess.run([sys.executable, '-I', '-m', 'eldude', '--help'],

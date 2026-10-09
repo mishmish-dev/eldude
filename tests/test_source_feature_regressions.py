@@ -4,7 +4,8 @@ import unittest
 from eldude.effect_rows import Row
 from eldude.handlers import Defect, compile_program, run
 from eldude.inference import Binding, Context, E, Fn, INT, UNIT, Ty, InferenceError, value, Grant, Owner
-from eldude.source_features import FeatureChecker, NAT, UNKNOWN
+from eldude.source_features import FeatureChecker
+from eldude.source_types import NAT, UNKNOWN
 
 
 class SourceFeatureRegressionTests(unittest.TestCase):

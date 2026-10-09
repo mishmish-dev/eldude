@@ -16,10 +16,9 @@ from eldude.source_modules import load_modules
 from eldude.source_syntax import Diagnostic, parse_source
 
 
-RUNTIME_FILES = ('ir_artifact.py', 'source_pipeline.py', 'source_syntax.py', 'check_grammar.py',
-                 'source_features.py', 'source_declarations.py', 'inference.py', 'handlers.py',
-                 'effect_rows.py', 'capture_rows.py', 'trait_constraints.py', 'task_runtime.py',
-                 'source_modules.py', '__init__.py')
+RUNTIME_FILES = ('ir_artifact.py', 'source_model.py', 'source_types.py', 'source_runtime.py',
+                 'source_declarations.py', 'inference.py', 'handlers.py', 'effect_rows.py',
+                 'capture_rows.py', 'trait_constraints.py', 'task_runtime.py', '__init__.py')
 
 
 def machine_target(requested=None):

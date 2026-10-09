@@ -4,7 +4,8 @@ import unittest
 from eldude.effect_rows import Row
 from eldude.handlers import Defect, compile_program, run
 from eldude.inference import E, Fn, INT, UNIT, Ty, InferenceError
-from eldude.source_features import FeatureChecker, UNKNOWN
+from eldude.source_features import FeatureChecker
+from eldude.source_types import UNKNOWN
 
 
 def function(name, body, parameters=(), effects=Row()):

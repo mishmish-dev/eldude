@@ -3,7 +3,8 @@ import unittest
 
 from eldude.handlers import _Slot, _read, compile_program, run
 from eldude.inference import E, Ty
-from eldude.source_features import FeatureChecker, Variant
+from eldude.source_features import FeatureChecker
+from eldude.source_runtime import Variant
 from eldude.source_pipeline import compile_source
 from eldude.source_syntax import Diagnostic
 

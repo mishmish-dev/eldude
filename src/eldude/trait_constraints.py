@@ -60,7 +60,7 @@ def substitute(term, types=None, regions=None):
     types, regions = types or {}, regions or {}
     from eldude.inference import Fn
     if isinstance(term, Fn):
-        from eldude.source_features import substitute as substitute_type
+        from eldude.source_types import substitute as substitute_type
         return replace(substitute_type(term, types, regions),
                        constraints=tuple(substitute(a, types, regions) for a in term.constraints))
     if term.name.startswith('$') and term.name[1:] in types:

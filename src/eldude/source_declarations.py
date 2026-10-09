@@ -7,10 +7,10 @@ from dataclasses import dataclass, replace
 
 from eldude.effect_rows import Row
 from eldude.handlers import Defect, _Closure, _bind
-from eldude.inference import Binding, Context, E, Fn, UNIT, Ty, InferenceError, free_names, permissions, value
+from eldude.inference import Binding, E, Fn, UNIT, InferenceError, free_names, permissions, value
+from eldude.source_types import UNKNOWN
 
 
-UNKNOWN = Ty('Unknown')
 UNINITIALIZED = object()
 
 

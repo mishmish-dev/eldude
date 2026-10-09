@@ -257,10 +257,10 @@ def free_names(expression, bound=frozenset()):
         case ('variant', _, _, args):
             return set().union(*(free_names(a, bound) for a in args))
         case ('bindpat', pattern, initial, body) | ('for_each', pattern, initial, body):
-            from eldude.source_features import pattern_bindings
+            from eldude.source_types import pattern_bindings
             return free_names(initial, bound) | free_names(body, bound | pattern_bindings(pattern))
         case ('match', subject, arms):
-            from eldude.source_features import pattern_bindings
+            from eldude.source_types import pattern_bindings
             return free_names(subject, bound) | set().union(*(free_names(body, bound | pattern_bindings(p)) for p, body in arms))
         case ('exit_scope', _, _, body, _):
             return free_names(body, bound)
@@ -735,7 +735,7 @@ class Checker:
                 del context.temporaries[start:]
                 if expression[0] == 'record':
                     result = expression[1]
-                    from eldude.source_features import unwrapped
+                    from eldude.source_types import unwrapped
                     fields = {f.name: f.args[0] for f in unwrapped(result).args}
                     type_vars, regions = set(), set()
                     def parameters(t):
@@ -822,7 +822,7 @@ class Checker:
                 if resumption:
                     resumption.used = used
                 second = self._infer(otherwise, context)
-                from eldude.source_features import join_type, NEVER
+                from eldude.source_types import join_type, NEVER
                 result_type = join_type(first.type, second.type)
                 if first.type != NEVER and second.type != NEVER and any(b.consumed != consumed for b, consumed in outgoing.items()):
                     raise InferenceError('Branches must agree on ownership consumption')

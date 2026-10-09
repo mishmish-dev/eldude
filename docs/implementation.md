@@ -18,16 +18,22 @@ Read the component and its tests for the task at hand. The package uses only the
 | [project_resolver.py](../src/eldude/project_resolver.py) | Path graph resolution, atomic TOML locks and package-scoped imports | [Resolver and import boundaries](../tests/test_project_resolver.py) |
 | [project_build.py](../src/eldude/project_build.py) | Experimental Python root validation, IR artifacts, zipapps and isolated execution | [Artifact and execution acceptance](../tests/test_project_build.py) |
 | [ir_artifact.py](../src/eldude/ir_artifact.py) | Deterministic checked-IR encoding, located decoding and bundled Python host entry | [Full corpus IR round trips and artifacts](../tests/test_project_build.py) |
-| [run_eldude.py](../src/eldude/run_eldude.py) | CLI, result display, corpus manifest validation | [Corpus runner](../tests/test_run_examples.py) |
+| [run_eldude.py](../src/eldude/run_eldude.py) | CLI, result display, corpus manifest validation | [Single-file CLI](../tests/test_run_eldude.py), [corpus runner](../tests/test_run_examples.py) |
 | [format_eldude.py](../src/eldude/format_eldude.py) | Syntax-directed source formatting, comment retention, check/write CLI | [Formatting, semantic round trips, and CLI](../tests/test_format_eldude.py) |
 | [check_docs.py](../src/eldude/check_docs.py) | Local Markdown links/anchors, chapter/code map coverage, example table results | [Documentation checks](../tests/test_check_docs.py) |
 | [check_grammar.py](../src/eldude/check_grammar.py) | EBNF lexer, recognizer/concrete trees, and Markdown/JSON generation | [Syntax](../tests/test_grammar.py), [publications](../tests/test_grammar_artifacts.py), [program/API corpus](../tests/test_grammar_programs.py) |
 | [source_syntax.py](../src/eldude/source_syntax.py) | Located AST, syntax errors, executable-subset parsing | [Core syntax](../tests/test_source_syntax.py), [extended syntax](../tests/test_source_extended_syntax.py) |
+| [source_model.py](../src/eldude/source_model.py) | Shared source spans, diagnostics, AST records, binding identities, and checked-source result | [Syntax records](../tests/test_source_syntax.py), [artifact execution without the frontend](../tests/test_packaging.py) |
 | [source_modules.py](../src/eldude/source_modules.py) | Declared module identities, imports, dependency order | [Modules](../tests/test_source_modules.py) |
-| [source_pipeline.py](../src/eldude/source_pipeline.py) | Public compile/execute API, source diagnostics, shared handler lowering, annotation adapter | [Source pipeline and handler traces](../tests/test_source_pipeline.py), [capture contracts and erasure](../tests/test_source_capture_contracts.py) |
-| [source_elaboration.py](../src/eldude/source_elaboration.py) | Module/data elaboration, generics, trait/method resolution | [Values](../tests/test_source_values.py), [ownership and dispatch boundaries](../tests/test_source_ownership_boundaries.py) |
+| [source_pipeline.py](../src/eldude/source_pipeline.py) | Public check/compile/execute API and runtime defect diagnostics | [Source API](../tests/test_source_pipeline.py) |
+| [source_lowering.py](../src/eldude/source_lowering.py) | Base AST expression lowering and checked-feature lowering to handler IR | [Source handler contracts](../tests/test_source_handlers.py), [handler corpus and traces](../tests/test_source_handler_fixtures.py); shared [source assertions](../tests/source_support.py) |
+| [source_checking.py](../src/eldude/source_checking.py) | Written annotation checking, capture preservation, and effect diagnostic origins | [Source API](../tests/test_source_pipeline.py), [capture contracts and erasure](../tests/test_source_capture_contracts.py) |
+| [source_types.py](../src/eldude/source_types.py) | Type substitution, compatibility, joins, and pattern binding names | [Inference](../tests/test_inference.py), [trait constraints](../tests/test_trait_constraints.py), [feature regressions](../tests/test_source_feature_regressions.py) |
+| [source_type_elaboration.py](../src/eldude/source_type_elaboration.py) | Source types, generics, associated types, trait interfaces, and effect/capture contracts | [Values](../tests/test_source_values.py), [capture contracts and erasure](../tests/test_source_capture_contracts.py) |
+| [source_elaboration.py](../src/eldude/source_elaboration.py) | Module declaration collection, source control/data expressions, and compilation orchestration | [Values](../tests/test_source_values.py), [ownership and dispatch boundaries](../tests/test_source_ownership_boundaries.py) |
 | [source_declarations.py](../src/eldude/source_declarations.py) | Recursive bindings and ordered global initialization | [Declarations](../tests/test_source_declarations.py) |
-| [source_features.py](../src/eldude/source_features.py) | Data/control checking and execution, library primitives, source task integration | [Features](../tests/test_source_features.py), [integration regressions](../tests/test_source_feature_regressions.py), [semantic examples](../tests/test_source_semantic_examples.py), [source tasks](../tests/test_source_tasks.py) |
+| [source_features.py](../src/eldude/source_features.py) | Data/control checking, library primitive contracts, and source task checking | [Features](../tests/test_source_features.py), [integration regressions](../tests/test_source_feature_regressions.py), [semantic examples](../tests/test_source_semantic_examples.py), [source tasks](../tests/test_source_tasks.py) |
+| [source_runtime.py](../src/eldude/source_runtime.py) | Runtime data values, pattern matching, library primitive execution, structural exits, and source tasks | [Handler corpus and cleanup traces](../tests/test_source_handler_fixtures.py), [features](../tests/test_source_features.py), [source tasks](../tests/test_source_tasks.py), [built artifacts](../tests/test_project_build.py) |
 | [effect_rows.py](../src/eldude/effect_rows.py) | Scoped-row equality and closed-row opening on resolved labels (§16.5) | [Row counterexamples](../tests/test_effect_rows.py) |
 | [capture_rows.py](../src/eldude/capture_rows.py) | Finite capture unions and scoped whole-argument substitution (§13) | [Capture rows](../tests/test_capture_rows.py) |
 | [trait_constraints.py](../src/eldude/trait_constraints.py) | Full trait heads, one-way evidence selection, prerequisite checks and associated normalization (§10) | [Trait constraints](../tests/test_trait_constraints.py) |
@@ -36,6 +42,25 @@ Read the component and its tests for the task at hand. The package uses only the
 | [task_runtime.py](../src/eldude/task_runtime.py) | Per-execution cooperative scheduling, cancellation, group draining | [Scheduler](../tests/test_task_runtime.py), [source integration](../tests/test_source_tasks.py) |
 
 The source path is `run_eldude` → `source_pipeline` → parsing/module loading → `source_elaboration` → checked expression IR → `handlers.run`. The project CLI supplies explicit module candidates and package import permissions to the same path. The checker layers are `SourceChecker` → `FeatureChecker` → `HandlerChecker` → `Checker`; source features and declarations also extend lowering and execution. The row solver operates on resolved labels and does not select handlers or check ownership.
+
+`source_pipeline` is the public API. It imports the frontend directly; compiler
+components do not import the API back. Elaboration layers are `SourceElaborator`
+→ `TypeElaborator` → `Elaborator`, separating module orchestration, type/contracts,
+and base expression lowering. Shared records and type helpers live below these
+layers. Runtime values and execution are separate from the source checker, so
+checked-IR zipapps do not bundle or import the parser, module loader, or source
+elaborators. The IR artifact format and public source entry points remain unchanged.
+
+The Python implementation remains one distribution with one version and no runtime
+dependencies. A uv workspace with separate runtime/compiler/tooling distributions
+would add package metadata and release boundaries without distinct dependency or
+installation needs today. Revisit that split when a component needs independent
+installation or release; module boundaries do not require workspace members.
+
+Tests stay in `tests/` for the root `unittest discover` command. Source API tests,
+handler contract tests, handler corpus/trace tests, and single-file CLI tests have
+separate suites; `source_support.py` supplies assertions without discoverable test
+cases. The corpus and its rejection diagnostics remain the acceptance contract.
 
 The formatter takes a separate path through the normative grammar's concrete
 tree, preserving source details the executable AST discards. After `uv sync`, `eldude.format_eldude.format_source(text, filename='<source>')` returns

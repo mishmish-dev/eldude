@@ -113,7 +113,7 @@ uv run python -m eldude.run_eldude examples/07_source_pipeline/combined.eld
 uv run python -m unittest discover -s tests -p 'test_source*.py' -v
 ```
 
-These fixtures cover handler evidence, ownership, resumption, and cleanup through the [source pipeline](../docs/implementation.md#file-map). [test_source_pipeline.py](../tests/test_source_pipeline.py) asserts independent expected values and event ordering.
+These fixtures cover handler evidence, ownership, resumption, and cleanup through the [source pipeline](../docs/implementation.md#file-map). [test_source_handler_fixtures.py](../tests/test_source_handler_fixtures.py) asserts independent expected values and event ordering; [test_source_handlers.py](../tests/test_source_handlers.py) checks individual handler contracts.
 
 | Program | Result | Checked execution |
 | --- | --- | --- |

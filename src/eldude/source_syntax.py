@@ -3,40 +3,10 @@
 Full grammar recognition precedes subset parsing, so a subset boundary is never
 reported as invalid Eldude syntax. No declaration lookup participates in parsing.
 """
-from dataclasses import dataclass
 from functools import cache
 
 from eldude.check_grammar import GRAMMAR, Grammar, LexError, Token
-
-
-@dataclass(frozen=True)
-class Span:
-    filename: str
-    start: int
-    end: int
-    line: int
-    column: int
-
-
-class Diagnostic(ValueError):
-    def __init__(self, code, message, span, related=()):
-        super().__init__(message)
-        self.code, self.message, self.span = code, message, span
-        self.related = tuple(related)
-
-    def __str__(self):
-        s = self.span
-        lines = [f'{s.filename}:{s.line}:{s.column}: {self.code}: {self.message}']
-        for message, s in self.related:
-            lines.append(f'{s.filename}:{s.line}:{s.column}: note: {message}')
-        return '\n'.join(lines)
-
-
-@dataclass(frozen=True)
-class Node:
-    kind: str
-    span: Span
-    items: tuple = ()
+from eldude.source_model import Span, Diagnostic, Node
 
 
 @cache

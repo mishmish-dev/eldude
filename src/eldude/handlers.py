@@ -538,7 +538,7 @@ def compile_program(expression, *, operations=None, checker=None, origins=None):
                          lower(body, names | {name: selected}), tuple(clause_cores),
                          result_name, lower(result_body, names))
             case _:
-                from eldude.source_features import lower_feature
+                from eldude.source_lowering import lower_feature
                 extended = lower_feature(expr, names, lower, checker)
                 if extended is not None:
                     return extended
@@ -596,7 +596,7 @@ class Execution:
 
 
 def _dup(retained):
-    from eldude.source_features import Variant, Record, Cell, Buffer, Package
+    from eldude.source_runtime import Variant, Record, Cell, Buffer, Package
     from eldude.task_runtime import TaskHandle
     if isinstance(retained, (Buffer, TaskHandle)):
         return False
@@ -657,7 +657,7 @@ def _protect(computation, finish):
 
 
 def _protect_call(compute, finish):
-    from eldude.source_features import EarlyExit
+    from eldude.source_runtime import EarlyExit
     from eldude.task_runtime import TaskCancelled
     try:
         computation = compute()
@@ -796,11 +796,11 @@ class _Machine:
             case ('tuple', *items):
                 return self.evaluate_arguments(items, environment, evidence, resume, tuple)
             case ('record', t, fields, *items):
-                from eldude.source_features import Record
+                from eldude.source_runtime import Record
                 return self.evaluate_arguments(items, environment, evidence, resume,
                                                lambda values: Record(t, dict(zip(fields, values))))
             case ('field', name, base):
-                from eldude.source_features import Record
+                from eldude.source_runtime import Record
                 source = environment[base[1]].value if base[0] == 'var' else self.evaluate(base, environment, evidence, resume)
                 return _bind(source, lambda record: record.fields[name] if isinstance(record, Record) else record[name])
             case ('unpack', pattern, initial, body):
@@ -865,7 +865,7 @@ class _Machine:
                 inner = evidence | {selected: frame, Evidence(selected.family): frame}
                 return self.handle(frame, self.evaluate(body, environment, inner, resume))
             case _:
-                from eldude.source_features import evaluate_feature
+                from eldude.source_runtime import evaluate_feature
                 return evaluate_feature(self, term, environment, evidence, resume)
 
 

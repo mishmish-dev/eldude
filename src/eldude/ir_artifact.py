@@ -10,15 +10,15 @@ from eldude.capture_rows import Argument, Variable
 from eldude.effect_rows import Row, Var
 from eldude.handlers import Defect, Evidence, Operation, Program, run
 from eldude.inference import Fn, Ty, Value
-from eldude.source_pipeline import Symbol
-from eldude.source_syntax import Diagnostic, Span
-from eldude.source_modules import STDLIB
+from eldude.source_model import Symbol, Diagnostic, Span
 
 
 RECORDS = {cls.__name__: cls for cls in (Argument, Variable, Row, Var, Evidence, Operation, Fn, Ty, Span)}
 
 
 def encode_program(program, *, root=None):
+    from eldude.source_modules import STDLIB
+
     records = {}
 
     def encode(value):
