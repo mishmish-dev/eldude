@@ -1,0 +1,25 @@
+module examples::effects::nested_layers;
+
+effect Read {
+    tail value() -> Int;
+}
+
+pub fn main() -> Int {
+    handle {
+        handle {
+            !Read::value()
+        } with handler Read {
+            value() => !outer::value() + 2;
+        }
+    } with outer = handler Read {
+        value() => 40;
+    }
+}
+
+pub fn verify() -> Int {
+    if main() == 42 {
+        0
+    } else {
+        1
+    }
+}

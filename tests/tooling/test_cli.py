@@ -120,6 +120,46 @@ class EldudeCLITests(unittest.TestCase):
         self.assertEqual(self.cli('interface', 'app').returncode, 2)
         self.assertEqual(self.cli('run').returncode, 2)
 
+    def test_run_lists_ambiguous_applications_on_separate_lines(self):
+        names = [f'example_{index}' for index in range(84)]
+        self.package(targets=''.join(
+            f'[[app]]\nname="{name}"\nentry="app::main"\nhost="python::experimental"\n'
+            for name in names))
+        result = self.cli('run')
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, '')
+        self.assertIn('selected 84', result.stderr.splitlines()[0])
+        self.assertIn('eldude run --app NAME', result.stderr)
+        self.assertEqual([line for line in result.stderr.splitlines() if line.startswith('  ')],
+                         [f'  app:{name}' for name in names])
+        self.assertEqual(self.cli('run', '--app', names[0]).returncode, 0)
+
+    def test_run_workspace_selection_explains_package_and_application_flags(self):
+        self.package(targets='[[app]]\nname="hello"\nentry="app::main"\nhost="python::experimental"\n')
+        manifest = self.root / 'eldude.toml'
+        manifest.write_text(manifest.read_text() + '\n[workspace]\nmembers=["member"]\n')
+        member = self.root / 'member'
+        (member / 'src').mkdir(parents=True)
+        (member / 'eldude.toml').write_text(
+            'manifest-version=1\n[package]\nname="member"\nversion="0.1.0"\n'
+            '[[app]]\nname="hello"\nentry="member::main"\nhost="python::experimental"\n')
+        (member / 'src/main.eld').write_text('module member; pub fn main()->Int { 0 }')
+        result = self.cli('run')
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('eldude run --package PACKAGE --app NAME', result.stderr)
+        self.assertIn('  app:hello\n', result.stderr)
+        self.assertIn('  member:hello\n', result.stderr)
+        self.assertEqual(self.cli('run', '--package', 'app', '--app', 'hello').returncode, 0)
+
+    def test_run_without_applications_explains_manifest_declaration(self):
+        self.package()
+        result = self.cli('run')
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(result.stdout, '')
+        self.assertIn('no applications selected', result.stderr)
+        self.assertIn('[[app]]', result.stderr)
+        self.assertNotIn('--app', result.stderr)
+
     def test_metadata_includes_built_library_ir(self):
         self.package('module app;')
         self.assertEqual(self.cli('build').returncode, 0)

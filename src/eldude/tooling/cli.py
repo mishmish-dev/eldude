@@ -225,8 +225,13 @@ def selected_targets(selection, args):
     if selector and not targets:
         raise ValueError(f'unknown {selector[0]} target {selector[1]!r}')
     if args.command == 'run' and len(targets) != 1:
-        names = ', '.join(p.name + ':' + t['name'] for p, _, t in targets) or '(none)'
-        raise ValueError(f'run requires exactly one application; selected {names}; use --package and --app')
+        if not targets:
+            raise ValueError('no applications selected; declare an [[app]] target in eldude.toml')
+        names = '\n'.join('  ' + p.name + ':' + t['name'] for p, _, t in targets)
+        package_flag = '--package PACKAGE ' if len(selection.packages) > 1 else ''
+        raise ValueError(f'run requires exactly one application; selected {len(targets)}\n'
+                         f'Choose one with: eldude run {package_flag}--app NAME\n\n'
+                         f'Available applications (package:name):\n{names}')
     return targets, selector
 
 

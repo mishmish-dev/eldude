@@ -1,0 +1,846 @@
+manifest-version = 1
+
+[package]
+name = "examples"
+version = "0.1.0"
+source-dir = "examples/src"
+
+[[app]]
+name = "values_arithmetic"
+entry = "examples::values::arithmetic::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_values_arithmetic"
+entry = "examples::values::arithmetic::verify"
+host = "python::experimental"
+
+[[app]]
+name = "values_branches"
+entry = "examples::values::branches::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_values_branches"
+entry = "examples::values::branches::verify"
+host = "python::experimental"
+
+[[app]]
+name = "values_closures"
+entry = "examples::values::closures::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_values_closures"
+entry = "examples::values::closures::verify"
+host = "python::experimental"
+
+[[app]]
+name = "values_enums"
+entry = "examples::values::enums::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_values_enums"
+entry = "examples::values::enums::verify"
+host = "python::experimental"
+
+[[app]]
+name = "values_generics"
+entry = "examples::values::generics::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_values_generics"
+entry = "examples::values::generics::verify"
+host = "python::experimental"
+
+[[app]]
+name = "values_literal"
+entry = "examples::values::literal::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_values_literal"
+entry = "examples::values::literal::verify"
+host = "python::experimental"
+
+[[app]]
+name = "values_records"
+entry = "examples::values::records::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_values_records"
+entry = "examples::values::records::verify"
+host = "python::experimental"
+
+[[app]]
+name = "values_startup"
+entry = "examples::values::startup::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_values_startup"
+entry = "examples::values::startup::verify"
+host = "python::experimental"
+
+[[app]]
+name = "values_tuples"
+entry = "examples::values::tuples::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_values_tuples"
+entry = "examples::values::tuples::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_associated_alias"
+entry = "associated_alias::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_associated_alias"
+entry = "associated_alias::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_associated_decrease"
+entry = "associated_decrease::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_associated_decrease"
+entry = "associated_decrease::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_associated_only"
+entry = "associated_only::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_associated_only"
+entry = "associated_only::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_capture_rows"
+entry = "capture_rows::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_capture_rows"
+entry = "capture_rows::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_capture_trait_bounds"
+entry = "capture_trait_bounds::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_capture_trait_bounds"
+entry = "capture_trait_bounds::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_existential_arguments"
+entry = "existential_arguments::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_existential_arguments"
+entry = "existential_arguments::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_existential_associated"
+entry = "existential_associated::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_existential_associated"
+entry = "existential_associated::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_existential_callback_factory"
+entry = "existential_callback_factory::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_existential_callback_factory"
+entry = "existential_callback_factory::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_existential_constraints"
+entry = "existential_constraints::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_existential_constraints"
+entry = "existential_constraints::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_existential_effect_row"
+entry = "existential_effect_row::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_existential_effect_row"
+entry = "existential_effect_row::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_existential_traits"
+entry = "existential_traits::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_existential_traits"
+entry = "existential_traits::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_existentials"
+entry = "examples::ownership::existentials::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_existentials"
+entry = "examples::ownership::existentials::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_explicit_captures"
+entry = "examples::ownership::explicit_captures::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_explicit_captures"
+entry = "examples::ownership::explicit_captures::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_generic_alias"
+entry = "generic_alias::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_generic_alias"
+entry = "generic_alias::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_generic_kinds"
+entry = "generic_kinds::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_generic_kinds"
+entry = "generic_kinds::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_generic_projection"
+entry = "generic_projection::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_generic_projection"
+entry = "generic_projection::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_linear_closure"
+entry = "examples::ownership::linear_closure::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_linear_closure"
+entry = "examples::ownership::linear_closure::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_nonabandoning"
+entry = "nonabandoning::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_nonabandoning"
+entry = "nonabandoning::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_numeric_recursion"
+entry = "examples::ownership::numeric_recursion::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_numeric_recursion"
+entry = "examples::ownership::numeric_recursion::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_parameter_capture"
+entry = "parameter_capture::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_parameter_capture"
+entry = "parameter_capture::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_structural_recursion"
+entry = "examples::ownership::structural_recursion::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_structural_recursion"
+entry = "examples::ownership::structural_recursion::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_trait_prerequisites"
+entry = "trait_prerequisites::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_trait_prerequisites"
+entry = "trait_prerequisites::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_traits"
+entry = "examples::ownership::traits::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_traits"
+entry = "examples::ownership::traits::verify"
+host = "python::experimental"
+
+[[app]]
+name = "ownership_view"
+entry = "examples::ownership::scoped_view::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_ownership_view"
+entry = "examples::ownership::scoped_view::verify"
+host = "python::experimental"
+
+[[app]]
+name = "results_option"
+entry = "examples::results::option::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_results_option"
+entry = "examples::results::option::verify"
+host = "python::experimental"
+
+[[app]]
+name = "results_propagation"
+entry = "examples::results::propagation::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_results_propagation"
+entry = "examples::results::propagation::verify"
+host = "python::experimental"
+
+[[app]]
+name = "results_try_scope"
+entry = "examples::results::try_scope::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_results_try_scope"
+entry = "examples::results::try_scope::verify"
+host = "python::experimental"
+
+[[app]]
+name = "effects_forwarding"
+entry = "examples::effects::forwarding::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_effects_forwarding"
+entry = "examples::effects::forwarding::verify"
+host = "python::experimental"
+
+[[app]]
+name = "effects_generic_instances"
+entry = "examples::effects::generic_instances::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_effects_generic_instances"
+entry = "examples::effects::generic_instances::verify"
+host = "python::experimental"
+
+[[app]]
+name = "effects_handler"
+entry = "examples::effects::basic_handler::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_effects_handler"
+entry = "examples::effects::basic_handler::verify"
+host = "python::experimental"
+
+[[app]]
+name = "effects_nested_layers"
+entry = "examples::effects::nested_layers::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_effects_nested_layers"
+entry = "examples::effects::nested_layers::verify"
+host = "python::experimental"
+
+[[app]]
+name = "effects_once"
+entry = "examples::effects::once_handler::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_effects_once"
+entry = "examples::effects::once_handler::verify"
+host = "python::experimental"
+
+[[app]]
+name = "effects_tail_result"
+entry = "examples::effects::tail_result::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_effects_tail_result"
+entry = "examples::effects::tail_result::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_affine_capture_row"
+entry = "affine_capture_row::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_affine_capture_row"
+entry = "affine_capture_row::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_captured_callback"
+entry = "examples::state::captured_callback::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_captured_callback"
+entry = "examples::state::captured_callback::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_cleanup"
+entry = "examples::state_and_collections::cleanup::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_cleanup"
+entry = "examples::state_and_collections::cleanup::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_existential_mut"
+entry = "existential_mut::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_existential_mut"
+entry = "existential_mut::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_existential_projected_mut"
+entry = "existential_projected_mut::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_existential_projected_mut"
+entry = "existential_projected_mut::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_explicit_regions"
+entry = "explicit_regions::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_explicit_regions"
+entry = "explicit_regions::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_finite_loop"
+entry = "examples::state_and_collections::finite_loop::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_finite_loop"
+entry = "examples::state_and_collections::finite_loop::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_forwarded_mut"
+entry = "forwarded_mut::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_forwarded_mut"
+entry = "forwarded_mut::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_freeze"
+entry = "examples::state_and_collections::freeze::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_freeze"
+entry = "examples::state_and_collections::freeze::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_inferred_regions"
+entry = "inferred_regions::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_inferred_regions"
+entry = "inferred_regions::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_list_failure"
+entry = "examples::state_and_collections::list_failure::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_list_failure"
+entry = "examples::state_and_collections::list_failure::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_local_state"
+entry = "examples::state_and_collections::local_state::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_local_state"
+entry = "examples::state_and_collections::local_state::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_mut_exit_paths"
+entry = "mut_exit_paths::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_mut_exit_paths"
+entry = "mut_exit_paths::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_mut_suspension"
+entry = "mut_suspension::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_mut_suspension"
+entry = "mut_suspension::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_parameter_capture"
+entry = "examples::state_and_collections::parameter_capture::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_parameter_capture"
+entry = "examples::state_and_collections::parameter_capture::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_projected_mut"
+entry = "projected_mut::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_projected_mut"
+entry = "projected_mut::verify"
+host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_tail_cleanup"
+entry = "examples::state_and_collections::tail_cleanup::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_tail_cleanup"
+entry = "examples::state_and_collections::tail_cleanup::verify"
+host = "python::experimental"
+
+[[app]]
+name = "tasks_capture_rows"
+entry = "task_capture_rows::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_tasks_capture_rows"
+entry = "task_capture_rows::verify"
+host = "python::experimental"
+
+[[app]]
+name = "tasks_child_local_handler"
+entry = "examples::tasks::child_local_handler::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_tasks_child_local_handler"
+entry = "examples::tasks::child_local_handler::verify"
+host = "python::experimental"
+
+[[app]]
+name = "tasks_inherited_handler"
+entry = "examples::tasks::inherited_handler::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_tasks_inherited_handler"
+entry = "examples::tasks::inherited_handler::verify"
+host = "python::experimental"
+
+[[app]]
+name = "tasks_join"
+entry = "examples::tasks::join::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_tasks_join"
+entry = "examples::tasks::join::verify"
+host = "python::experimental"
+
+[[app]]
+name = "tasks_library_join"
+entry = "examples::tasks::library_join::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_tasks_library_join"
+entry = "examples::tasks::library_join::verify"
+host = "python::experimental"
+
+[[app]]
+name = "source_pipeline_affine_async"
+entry = "examples::source_pipeline::affine_async::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_source_pipeline_affine_async"
+entry = "examples::source_pipeline::affine_async::verify"
+host = "python::experimental"
+
+[[app]]
+name = "source_pipeline_affine_scope"
+entry = "examples::source_pipeline::affine_scope::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_source_pipeline_affine_scope"
+entry = "examples::source_pipeline::affine_scope::verify"
+host = "python::experimental"
+
+[[app]]
+name = "source_pipeline_branch"
+entry = "examples::source_pipeline::branch::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_source_pipeline_branch"
+entry = "examples::source_pipeline::branch::verify"
+host = "python::experimental"
+
+[[app]]
+name = "source_pipeline_callbacks"
+entry = "examples::source_pipeline::callbacks::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_source_pipeline_callbacks"
+entry = "examples::source_pipeline::callbacks::verify"
+host = "python::experimental"
+
+[[app]]
+name = "source_pipeline_capture_trait_integration"
+entry = "capture_trait_integration::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_source_pipeline_capture_trait_integration"
+entry = "capture_trait_integration::verify"
+host = "python::experimental"
+
+[[app]]
+name = "source_pipeline_clause_local"
+entry = "examples::source_pipeline::clause_local::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_source_pipeline_clause_local"
+entry = "examples::source_pipeline::clause_local::verify"
+host = "python::experimental"
+
+[[app]]
+name = "source_pipeline_combined"
+entry = "examples::source_pipeline::combined::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_source_pipeline_combined"
+entry = "examples::source_pipeline::combined::verify"
+host = "python::experimental"
+
+[[app]]
+name = "source_pipeline_forwarding"
+entry = "examples::source_pipeline::forwarding::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_source_pipeline_forwarding"
+entry = "examples::source_pipeline::forwarding::verify"
+host = "python::experimental"
+
+[[app]]
+name = "source_pipeline_functions"
+entry = "examples::source_pipeline::functions::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_source_pipeline_functions"
+entry = "examples::source_pipeline::functions::verify"
+host = "python::experimental"
+
+[[app]]
+name = "source_pipeline_multi_operations"
+entry = "examples::source_pipeline::multi_operations::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_source_pipeline_multi_operations"
+entry = "examples::source_pipeline::multi_operations::verify"
+host = "python::experimental"
+
+[[app]]
+name = "source_pipeline_multi_operations_affine"
+entry = "examples::source_pipeline::multi_operations_affine::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_source_pipeline_multi_operations_affine"
+entry = "examples::source_pipeline::multi_operations_affine::verify"
+host = "python::experimental"
+
+[[app]]
+name = "source_pipeline_multi_operations_deep"
+entry = "examples::source_pipeline::multi_operations_deep::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_source_pipeline_multi_operations_deep"
+entry = "examples::source_pipeline::multi_operations_deep::verify"
+host = "python::experimental"
+
+[[app]]
+name = "source_pipeline_nested_return"
+entry = "examples::source_pipeline::nested_return::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_source_pipeline_nested_return"
+entry = "examples::source_pipeline::nested_return::verify"
+host = "python::experimental"
+
+[[app]]
+name = "source_pipeline_once_deep"
+entry = "examples::source_pipeline::once_deep::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_source_pipeline_once_deep"
+entry = "examples::source_pipeline::once_deep::verify"
+host = "python::experimental"
+
+[[app]]
+name = "source_pipeline_operation_arguments"
+entry = "examples::source_pipeline::operation_arguments::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_source_pipeline_operation_arguments"
+entry = "examples::source_pipeline::operation_arguments::verify"
+host = "python::experimental"
+
+[[app]]
+name = "source_pipeline_tail_cleanup"
+entry = "examples::source_pipeline::tail_cleanup::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_source_pipeline_tail_cleanup"
+entry = "examples::source_pipeline::tail_cleanup::verify"
+host = "python::experimental"
+
+[[app]]
+name = "source_pipeline_tail_output"
+entry = "examples::source_pipeline::tail_output::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_source_pipeline_tail_output"
+entry = "examples::source_pipeline::tail_output::verify"
+host = "python::experimental"
+
+[[app]]
+name = "formatting_semantics"
+entry = "examples::formatting::semantics::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_formatting_semantics"
+entry = "examples::formatting::semantics::verify"
+host = "python::experimental"
+
+[[app]]
+name = "tooling_application"
+entry = "tooling_application::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_tooling_application"
+entry = "tooling_application::verify"
+host = "python::experimental"
+
+[[app]]
+name = "tooling_test_runner"
+entry = "tooling_tests::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_tooling_test_runner"
+entry = "tooling_tests::verify"
+host = "python::experimental"

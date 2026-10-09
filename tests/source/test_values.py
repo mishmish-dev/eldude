@@ -22,12 +22,12 @@ class SourceValuesTests(unittest.TestCase):
         }
         for name, expected in cases.items():
             with self.subTest(example=name):
-                self.assertEqual(execute_file(ROOT / f'examples/{name}.eld').value, expected)
+                self.assertEqual(execute_file(ROOT / f'examples/src/{name}.eld').value, expected)
 
     def test_tuples_and_records(self):
         for name, expected in (('tuples', 42), ('records', 9)):
             with self.subTest(example=name):
-                self.assertEqual(execute_file(ROOT / f'examples/01_values/{name}.eld').value, expected)
+                self.assertEqual(execute_file(ROOT / f'examples/src/01_values/{name}.eld').value, expected)
         self.assertEqual(self.execute('let (a, (b, _)) = (19, (23, true)); a+b').value, 42)
         source = '''module m; struct P { x:Int, y:Int }
 fn sum(p:P)->Int {p.x+p.y}
@@ -42,7 +42,7 @@ pub fn main()->Int {let x=19; sum(P { y:23, x })}'''
                 self.execute(body)
 
     def test_generic_functions_infer_and_accept_explicit_types(self):
-        self.assertEqual(execute_file(ROOT / 'examples/01_values/generics.eld').value, 42)
+        self.assertEqual(execute_file(ROOT / 'examples/src/01_values/generics.eld').value, 42)
         source = '''module m; fn identity<T>(x:T)->T {x}
 pub fn main()->Int {let yes=identity(true); if yes {identity::<Int>(42)} else {0}}'''
         self.assertEqual(run(compile_source(source).program).value, 42)

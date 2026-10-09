@@ -10,7 +10,7 @@ from eldude.source.syntax import Diagnostic
 
 class SourceCaptureContractTests(unittest.TestCase):
     def test_review_composition_programs(self):
-        root = Path(__file__).resolve().parents[2] / 'examples/02_ownership'
+        root = Path(__file__).resolve().parents[2] / 'examples/src/02_ownership'
         for name in ('associated_only', 'associated_decrease', 'associated_alias', 'generic_alias',
                      'generic_projection', 'existential_effect_row', 'capture_trait_bounds',
                      'existential_callback_factory', 'generic_kinds', 'nonabandoning'):
@@ -46,7 +46,7 @@ class SourceCaptureContractTests(unittest.TestCase):
             self.assertEqual(caught.exception.span.filename, str(path))
 
     def test_dynamic_mutation_and_integration_programs(self):
-        root = Path(__file__).resolve().parents[2] / 'examples'
+        root = Path(__file__).resolve().parents[2] / 'examples/src'
         for name, expected in (('05_state_and_collections/existential_mut', 1),
                                ('05_state_and_collections/existential_projected_mut', 42),
                                ('06_tasks/capture_rows', 42),
@@ -60,7 +60,7 @@ class SourceCaptureContractTests(unittest.TestCase):
             for signature in checked.functions.values():
                 self.assertEqual(Fn.loads(signature.dumps()), signature)
     def test_mutable_grant_programs(self):
-        root = Path(__file__).resolve().parents[2] / 'examples'
+        root = Path(__file__).resolve().parents[2] / 'examples/src'
         for name, expected in (('forwarded_mut', 1), ('projected_mut', 42), ('mut_suspension', 42), ('mut_exit_paths', 42)):
             path = root / '05_state_and_collections' / (name + '.eld')
             execution = run(compile_source(path.read_text(), str(path)).program)
@@ -70,7 +70,7 @@ class SourceCaptureContractTests(unittest.TestCase):
             if name == 'mut_exit_paths':
                 self.assertTrue(any(event[0] == 'abandon' for event in execution.events))
     def test_instantiated_existential_programs(self):
-        root = Path(__file__).resolve().parents[2] / 'examples/02_ownership'
+        root = Path(__file__).resolve().parents[2] / 'examples/src/02_ownership'
         for name in ('arguments', 'associated', 'constraints', 'traits'):
             path = root / ('existential_' + name + '.eld')
             source = path.read_text()
@@ -87,7 +87,7 @@ class SourceCaptureContractTests(unittest.TestCase):
     def test_region_arguments_and_inference_programs(self):
         root = Path(__file__).resolve().parents[2] / 'examples'
         for name in ('inferred_regions', 'explicit_regions'):
-            path = root / '05_state_and_collections' / (name + '.eld')
+            path = root / 'src/05_state_and_collections' / (name + '.eld')
             self.assertEqual(run(compile_source(path.read_text(), str(path)).program).value, 42)
         for name, code, message in (
                 ('ambiguous_callback_regions', 'type', 'unambiguous'),
@@ -104,7 +104,7 @@ class SourceCaptureContractTests(unittest.TestCase):
     def test_parameter_capture_programs(self):
         root = Path(__file__).resolve().parents[2] / 'examples'
         for folder in ('02_ownership', '05_state_and_collections'):
-            path = root / folder / 'parameter_capture.eld'
+            path = root / 'src' / folder / 'parameter_capture.eld'
             checked = compile_source(path.read_text(), str(path))
             execution = run(checked.program)
             self.assertEqual(execution.value, 42)
@@ -210,7 +210,7 @@ escaped()
     def test_capture_row_programs_preserve_usage(self):
         root = Path(__file__).resolve().parents[2] / 'examples'
         for name in ('02_ownership/capture_rows.eld', '05_state_and_collections/affine_capture_row.eld'):
-            path = root / name
+            path = root / 'src' / name
             execution = run(compile_source(path.read_text(), str(path)).program)
             self.assertEqual(execution.value, 42)
             if name.startswith('02_'):

@@ -23,4 +23,4 @@ packages = ["src/eldude"]
 "stdlib" = "eldude/stdlib"
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "tests", "docs", "examples", "stdlib", "README.md", "AGENTS.md", ".python-version", "uv.lock"]
+include = ["src", "tests", "docs", "examples", "stdlib", "README.md", "AGENTS.md", "eldude.toml", "eldude.lock", ".python-version", "uv.lock"]

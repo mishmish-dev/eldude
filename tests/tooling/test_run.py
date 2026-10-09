@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-FIXTURES = ROOT / 'examples/07_source_pipeline'
+FIXTURES = ROOT / 'examples/src/07_source_pipeline'
 REJECT = ROOT / 'examples/reject/semantics/source_pipeline'
 MULTI_REJECT = ROOT / 'examples/reject/semantics/multi_operations'
 
@@ -27,7 +27,7 @@ class RunEldudeTests(unittest.TestCase):
             (REJECT / 'nested_return_affine_skip.eld', 1, '', ':semantic:'),
             (ROOT / 'examples/reject/semantics/operation_arguments/type.eld', 1, '', ':type:'),
             (FIXTURES / 'branch.eld', 0, '42\n', ''),
-            (ROOT / 'examples/06_tasks/join.eld', 0, '42\n', ''),
+            (ROOT / 'examples/src/06_tasks/join.eld', 0, '42\n', ''),
         )
         for path, status, stdout, category in cases:
             with self.subTest(path=path):

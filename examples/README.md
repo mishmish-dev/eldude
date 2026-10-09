@@ -6,7 +6,33 @@
 
 [Positive programs](#positive-programs) · [Source fixtures](#executable-source-fixtures) · [Test host](#fixture-host-profile) · [Rejections](#rejection-targets) · [Handler counterexamples](#enforced-source-rejections)
 
-All **84 positive examples** execute through the source checker and interpreter. Each file is a separate program; the runner uses the documented [entry-point convention](../docs/implementation.md#entry-point-api-and-diagnostics).
+All **84 positive examples** execute through the source checker and interpreter. The repository root is the Eldude project, with positive programs under [src/](src) and application/test targets declared in [eldude.toml](../eldude.toml). Its `source-dir = "examples/src"` keeps the programs here; build output goes to the repository's `build/` directory.
+
+From the repository root:
+
+```sh
+uv run eldude check
+uv run eldude test
+uv run eldude run --app source_pipeline_combined
+```
+
+Add `--locked` when CI or verification must keep the committed `eldude.lock`
+unchanged. Everyday commands can update a missing or stale lockfile as needed.
+
+With `eldude` on your PATH, run `eldude check`, `eldude test`, or
+`eldude run --app source_pipeline_combined` from the repository root. Commands
+also discover the root project when run from `examples/`. Each program's
+`verify` entry calls its original `main`, checks the expected value, and returns
+exit status zero on success or one on a wrong value. Unit and Nat results keep
+their original types. Tests run each example in a separate process; a defect
+also fails the test. Application names use the stage and filename, such as
+`values_literal`, `ownership_view`, and `tasks_join`; test names add `test_`.
+Use `eldude test --test test_values_literal` to select one test,
+`eldude build` to build applications, and `eldude metadata` to list targets.
+The project uses the experimental Python host described in the
+[project CLI guide](../README.md#experimental-python-builds).
+
+The fixture runner still prints individual `main` results:
 
 ```sh
 uv run python -m eldude.tooling.run --examples --strict
@@ -17,15 +43,15 @@ uv run python -m eldude.tooling.run --examples --strict
 
 | Stage | Runnable | Capabilities exercised |
 | --- | ---: | --- |
-| [1. Values](01_values) | 9 / 9 | Arithmetic, closures, generics, records, tuples, enums and startup |
-| [2. Ownership](02_ownership) | 24 / 24 | Linear nominal types, capture contracts, inspection, recursion and trait erasure |
-| [3. Results](03_results) | 3 / 3 | Library imports, matching, `?` and `try` |
-| [4. Effects](04_effects) | 6 / 6 | Generic instances, handlers, forwarding and `Result` payloads |
-| [5. State and collections](05_state_and_collections) | 17 / 17 | Regions, captured callbacks, collection primitives, iteration and cleanup traits |
-| [6. Tasks](06_tasks) | 5 / 5 | Cooperative scheduling, task groups, spawn/await and library join |
-| [7. Source pipeline](07_source_pipeline) | 17 / 17 | Handler evidence, ownership, resumption and cleanup regressions |
-| [8. Formatting](08_formatting) | 1 / 1 | Source formatting preserves field evaluation order, handlers and precedence |
-| [9. Project tooling](09_tooling) | 2 / 2 | Explicit application entries and process-status test runners |
+| [1. Values](src/01_values) | 9 / 9 | Arithmetic, closures, generics, records, tuples, enums and startup |
+| [2. Ownership](src/02_ownership) | 24 / 24 | Linear nominal types, capture contracts, inspection, recursion and trait erasure |
+| [3. Results](src/03_results) | 3 / 3 | Library imports, matching, `?` and `try` |
+| [4. Effects](src/04_effects) | 6 / 6 | Generic instances, handlers, forwarding and `Result` payloads |
+| [5. State and collections](src/05_state_and_collections) | 17 / 17 | Regions, captured callbacks, collection primitives, iteration and cleanup traits |
+| [6. Tasks](src/06_tasks) | 5 / 5 | Cooperative scheduling, task groups, spawn/await and library join |
+| [7. Source pipeline](src/07_source_pipeline) | 17 / 17 | Handler evidence, ownership, resumption and cleanup regressions |
+| [8. Formatting](src/08_formatting) | 1 / 1 | Source formatting preserves field evaluation order, handlers and precedence |
+| [9. Project tooling](src/09_tooling) | 2 / 2 | Explicit application entries and process-status test runners |
 
 Resolve explicit library imports using the module declarations in [stdlib](../stdlib/README.md). Primitive types and intrinsic constraints have their predefined meanings. There is no implied wildcard library prelude. The bundled profile binds list literals, `?`/`try`, optional access, `for`, cleanup, and task handles to their corresponding library identities.
 
@@ -35,80 +61,80 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 
 | Stage | Program | Expected value | Capability |
 | --- | --- | --- | --- |
-| 1 | [literal](01_values/literal.eld) | `42` | Function and integer literal |
-| 1 | [arithmetic](01_values/arithmetic.eld) | `14` | Precedence |
-| 1 | [branches](01_values/branches.eld) | `7` | Conditional and unary arithmetic |
-| 1 | [tuples](01_values/tuples.eld) | `42` | Tuple construction/destructuring |
-| 1 | [records](01_values/records.eld) | `9` | Nominal records and field copies |
-| 1 | [enums](01_values/enums.eld) | `42` | Exhaustive matching |
-| 1 | [closures](01_values/closures.eld) | `42` | Captures and repeated invocation |
-| 1 | [generics](01_values/generics.eld) | `42` | Type parameters and turbofish |
-| 1 | [startup](01_values/startup.eld) | `42` | Ordered pure top-level initialization |
-| 2 | [structural recursion](02_ownership/structural_recursion.eld) | `42` | Finite inductive recursion |
-| 2 | [numeric recursion](02_ownership/numeric_recursion.eld) | `6nat` | Unproved termination requires `diverge`, including at the caller |
-| 2 | [view](02_ownership/view.eld) | `42` | Scoped inspection followed by consumption |
-| 2 | [linear closure](02_ownership/linear_closure.eld) | `42` | Transfer into a closure |
-| 2 | [explicit captures](02_ownership/explicit_captures.eld) | `42` | A named capture contract preserves linear ownership |
-| 2 | [parameter captures](02_ownership/parameter_capture.eld) | `42` | A factory transfers its file into a returned callable; one explicit close |
-| 2 | [capture rows](02_ownership/capture_rows.eld) | `42` | Generic callback forwarding preserves linear usage; bounded repetition |
-| 2 | [existentials](02_ownership/existentials.eld) | `42` | Distinct concrete values share a checked dynamic trait interface |
-| 2 | [existential arguments](02_ownership/existential_arguments.eld) | `42` | Full instantiated interfaces across all six generic categories |
-| 2 | [existential associated types](02_ownership/existential_associated.eld) | `42` | Fixed associated results dispatch without exposing the hidden type |
-| 2 | [existential constraints](02_ownership/existential_constraints.eld) | `42` | Trait, method and implementation prerequisites with visible usage evidence |
-| 2 | [existential traits](02_ownership/existential_traits.eld) | `42` | One hidden value supplies several dictionaries; bound weakening preserves storage |
-| 2 | [associated only](02_ownership/associated_only.eld) | `42` | Associated-only implementation registers its equation |
-| 2 | [associated decrease](02_ownership/associated_decrease.eld) | `42` | Smaller projection inputs normalize with their prerequisites |
-| 2 | [associated alias](02_ownership/associated_alias.eld) | `42` | Acyclic local associated aliases expand |
-| 2 | [generic alias](02_ownership/generic_alias.eld) | `42` | Generic aliases instantiate before implementation selection |
-| 2 | [generic projection](02_ownership/generic_projection.eld) | `42` | Projection identity retains the explicit trait arguments |
-| 2 | [existential effect row](02_ownership/existential_effect_row.eld) | `42` | Implementation rows match closed interfaces and flow through generic erased calls and associated callbacks |
-| 2 | [capture trait bounds](02_ownership/capture_trait_bounds.eld) | `42` | Inherited capture-row evidence flows through erased helpers and associated duplicable callbacks |
-| 2 | [existential callback factory](02_ownership/existential_callback_factory.eld) | `42` | Dynamic method result names its own callback parameter |
-| 2 | [generic kinds](02_ownership/generic_kinds.eld) | `42` | Explicit constructor and natural arguments preserve declared kinds |
-| 2 | [nonabandoning](02_ownership/nonabandoning.eld) | `42` | Tail-only effect evidence permits a linear file to remain live across a generic call |
-| 2 | [traits](02_ownership/traits.eld) | `42` | Covered impl and associated type |
-| 2 | [trait prerequisites](02_ownership/trait_prerequisites.eld) | `42` | Decreasing element constraints and normalized associated results |
-| 3 | [option](03_results/option.eld) | `42` | Library method and lazy fallback |
-| 3 | [propagation](03_results/propagation.eld) | `42` | Error identity and `?` |
-| 3 | [try scope](03_results/try_scope.eld) | `42` | Local error propagation |
-| 4 | [handler](04_effects/handler.eld) | `42` | Tail clause returns its operation result for automatic resumption |
-| 4 | [generic instances](04_effects/generic_instances.eld) | `42` | Distinct `Read<Int>`/`Read<Bool>` instances |
-| 4 | [once](04_effects/once.eld) | `42` | Work after resumption; parent-local handler |
-| 4 | [nested layers](04_effects/nested_layers.eld) | `42` | Named outer dispatch survives handling an inner instance |
-| 4 | [forwarding](04_effects/forwarding.eld) | `42` | Forwarded operation keeps its outer effect requirement |
-| 4 | [tail result](04_effects/tail_result.eld) | `42` | Clause-local `?` supplies an error result to the caller |
-| 5 | [local state](05_state_and_collections/local_state.eld) | `42` | Regional cell and state elimination |
-| 5 | [captured callback](05_state_and_collections/captured_callback.eld) | `42` | Explicit region/value captures survive higher-order forwarding |
-| 5 | [parameter captures](05_state_and_collections/parameter_capture.eld) | `42` | Nested factories and shadowed cells preserve distinct argument sources |
-| 5 | [affine capture row](05_state_and_collections/affine_capture_row.eld) | `42` | Generic relay retains a nonduplicable array callback |
-| 5 | [inferred regions](05_state_and_collections/inferred_regions.eld) | `42` | Joint callback/type/effect constraints in either argument order |
-| 5 | [explicit regions](05_state_and_collections/explicit_regions.eld) | `42` | Ordered explicit region and capture-row arguments |
-| 5 | [forwarded mutation](05_state_and_collections/forwarded_mut.eld) | `1nat` | Two helpers forward one grant to the same array |
-| 5 | [projected mutation](05_state_and_collections/projected_mut.eld) | `42` | Parent projection, independent inner state, and skipped callback on lookup miss |
-| 5 | [mutation exits](05_state_and_collections/mut_exit_paths.eld) | `42` | Early return, recoverable failure and affine abandonment release the interval |
-| 5 | [mutation suspension](05_state_and_collections/mut_suspension.eld) | `42` | A grant remains valid while a tail handler suspends its call |
-| 5 | [existential mutation](05_state_and_collections/existential_mut.eld) | `1nat` | Erased owner facts survive factories, branches, early return and match forwarding |
-| 5 | [existential projected mutation](05_state_and_collections/existential_projected_mut.eld) | `42` | Dynamic mutation through a parent projection preserves inner state |
-| 5 | [list failure](05_state_and_collections/list_failure.eld) | `3nat` | Failed removal returns original collection |
-| 5 | [finite loop](05_state_and_collections/finite_loop.eld) | `42` | Ownership-threaded finite iteration |
-| 5 | [freeze](05_state_and_collections/freeze.eld) | `2nat` | Capture-free elements escape after freezing through a generic wrapper |
-| 5 | [cleanup](05_state_and_collections/cleanup.eld) | `1` | `using` discharges a linear guard |
-| 5 | [tail cleanup](05_state_and_collections/tail_cleanup.eld) | `42` | Clause-local early return cleans up before resumption |
-| 6 | [capture rows](06_tasks/capture_rows.eld) | `42` | Affine callback captures survive spawn and consuming await |
-| 6 | [join](06_tasks/join.eld) | `42` | Spawn and await |
-| 6 | [inherited handler](06_tasks/inherited_handler.eld) | `42` | Same inherited handler, different child result types |
-| 6 | [child-local handler](06_tasks/child_local_handler.eld) | `42` | Answer-changing handler inside a child |
-| 6 | [library join](06_tasks/library_join.eld) | `42` | Higher-order task composition |
-| 8 | [formatter semantics](08_formatting/semantics.eld) | `42` | Formatting retains field evaluation order, handler forwarding and precedence |
-| 9 | [application entry](09_tooling/application.eld) | `7` | An explicitly named application entry returns its exit status |
-| 9 | [test runner](09_tooling/test_runner.eld) | `0` | An ordinary function reports success through process status |
+| 1 | [literal](src/01_values/literal.eld) | `42` | Function and integer literal |
+| 1 | [arithmetic](src/01_values/arithmetic.eld) | `14` | Precedence |
+| 1 | [branches](src/01_values/branches.eld) | `7` | Conditional and unary arithmetic |
+| 1 | [tuples](src/01_values/tuples.eld) | `42` | Tuple construction/destructuring |
+| 1 | [records](src/01_values/records.eld) | `9` | Nominal records and field copies |
+| 1 | [enums](src/01_values/enums.eld) | `42` | Exhaustive matching |
+| 1 | [closures](src/01_values/closures.eld) | `42` | Captures and repeated invocation |
+| 1 | [generics](src/01_values/generics.eld) | `42` | Type parameters and turbofish |
+| 1 | [startup](src/01_values/startup.eld) | `42` | Ordered pure top-level initialization |
+| 2 | [structural recursion](src/02_ownership/structural_recursion.eld) | `42` | Finite inductive recursion |
+| 2 | [numeric recursion](src/02_ownership/numeric_recursion.eld) | `6nat` | Unproved termination requires `diverge`, including at the caller |
+| 2 | [view](src/02_ownership/view.eld) | `42` | Scoped inspection followed by consumption |
+| 2 | [linear closure](src/02_ownership/linear_closure.eld) | `42` | Transfer into a closure |
+| 2 | [explicit captures](src/02_ownership/explicit_captures.eld) | `42` | A named capture contract preserves linear ownership |
+| 2 | [parameter captures](src/02_ownership/parameter_capture.eld) | `42` | A factory transfers its file into a returned callable; one explicit close |
+| 2 | [capture rows](src/02_ownership/capture_rows.eld) | `42` | Generic callback forwarding preserves linear usage; bounded repetition |
+| 2 | [existentials](src/02_ownership/existentials.eld) | `42` | Distinct concrete values share a checked dynamic trait interface |
+| 2 | [existential arguments](src/02_ownership/existential_arguments.eld) | `42` | Full instantiated interfaces across all six generic categories |
+| 2 | [existential associated types](src/02_ownership/existential_associated.eld) | `42` | Fixed associated results dispatch without exposing the hidden type |
+| 2 | [existential constraints](src/02_ownership/existential_constraints.eld) | `42` | Trait, method and implementation prerequisites with visible usage evidence |
+| 2 | [existential traits](src/02_ownership/existential_traits.eld) | `42` | One hidden value supplies several dictionaries; bound weakening preserves storage |
+| 2 | [associated only](src/02_ownership/associated_only.eld) | `42` | Associated-only implementation registers its equation |
+| 2 | [associated decrease](src/02_ownership/associated_decrease.eld) | `42` | Smaller projection inputs normalize with their prerequisites |
+| 2 | [associated alias](src/02_ownership/associated_alias.eld) | `42` | Acyclic local associated aliases expand |
+| 2 | [generic alias](src/02_ownership/generic_alias.eld) | `42` | Generic aliases instantiate before implementation selection |
+| 2 | [generic projection](src/02_ownership/generic_projection.eld) | `42` | Projection identity retains the explicit trait arguments |
+| 2 | [existential effect row](src/02_ownership/existential_effect_row.eld) | `42` | Implementation rows match closed interfaces and flow through generic erased calls and associated callbacks |
+| 2 | [capture trait bounds](src/02_ownership/capture_trait_bounds.eld) | `42` | Inherited capture-row evidence flows through erased helpers and associated duplicable callbacks |
+| 2 | [existential callback factory](src/02_ownership/existential_callback_factory.eld) | `42` | Dynamic method result names its own callback parameter |
+| 2 | [generic kinds](src/02_ownership/generic_kinds.eld) | `42` | Explicit constructor and natural arguments preserve declared kinds |
+| 2 | [nonabandoning](src/02_ownership/nonabandoning.eld) | `42` | Tail-only effect evidence permits a linear file to remain live across a generic call |
+| 2 | [traits](src/02_ownership/traits.eld) | `42` | Covered impl and associated type |
+| 2 | [trait prerequisites](src/02_ownership/trait_prerequisites.eld) | `42` | Decreasing element constraints and normalized associated results |
+| 3 | [option](src/03_results/option.eld) | `42` | Library method and lazy fallback |
+| 3 | [propagation](src/03_results/propagation.eld) | `42` | Error identity and `?` |
+| 3 | [try scope](src/03_results/try_scope.eld) | `42` | Local error propagation |
+| 4 | [handler](src/04_effects/handler.eld) | `42` | Tail clause returns its operation result for automatic resumption |
+| 4 | [generic instances](src/04_effects/generic_instances.eld) | `42` | Distinct `Read<Int>`/`Read<Bool>` instances |
+| 4 | [once](src/04_effects/once.eld) | `42` | Work after resumption; parent-local handler |
+| 4 | [nested layers](src/04_effects/nested_layers.eld) | `42` | Named outer dispatch survives handling an inner instance |
+| 4 | [forwarding](src/04_effects/forwarding.eld) | `42` | Forwarded operation keeps its outer effect requirement |
+| 4 | [tail result](src/04_effects/tail_result.eld) | `42` | Clause-local `?` supplies an error result to the caller |
+| 5 | [local state](src/05_state_and_collections/local_state.eld) | `42` | Regional cell and state elimination |
+| 5 | [captured callback](src/05_state_and_collections/captured_callback.eld) | `42` | Explicit region/value captures survive higher-order forwarding |
+| 5 | [parameter captures](src/05_state_and_collections/parameter_capture.eld) | `42` | Nested factories and shadowed cells preserve distinct argument sources |
+| 5 | [affine capture row](src/05_state_and_collections/affine_capture_row.eld) | `42` | Generic relay retains a nonduplicable array callback |
+| 5 | [inferred regions](src/05_state_and_collections/inferred_regions.eld) | `42` | Joint callback/type/effect constraints in either argument order |
+| 5 | [explicit regions](src/05_state_and_collections/explicit_regions.eld) | `42` | Ordered explicit region and capture-row arguments |
+| 5 | [forwarded mutation](src/05_state_and_collections/forwarded_mut.eld) | `1nat` | Two helpers forward one grant to the same array |
+| 5 | [projected mutation](src/05_state_and_collections/projected_mut.eld) | `42` | Parent projection, independent inner state, and skipped callback on lookup miss |
+| 5 | [mutation exits](src/05_state_and_collections/mut_exit_paths.eld) | `42` | Early return, recoverable failure and affine abandonment release the interval |
+| 5 | [mutation suspension](src/05_state_and_collections/mut_suspension.eld) | `42` | A grant remains valid while a tail handler suspends its call |
+| 5 | [existential mutation](src/05_state_and_collections/existential_mut.eld) | `1nat` | Erased owner facts survive factories, branches, early return and match forwarding |
+| 5 | [existential projected mutation](src/05_state_and_collections/existential_projected_mut.eld) | `42` | Dynamic mutation through a parent projection preserves inner state |
+| 5 | [list failure](src/05_state_and_collections/list_failure.eld) | `3nat` | Failed removal returns original collection |
+| 5 | [finite loop](src/05_state_and_collections/finite_loop.eld) | `42` | Ownership-threaded finite iteration |
+| 5 | [freeze](src/05_state_and_collections/freeze.eld) | `2nat` | Capture-free elements escape after freezing through a generic wrapper |
+| 5 | [cleanup](src/05_state_and_collections/cleanup.eld) | `1` | `using` discharges a linear guard |
+| 5 | [tail cleanup](src/05_state_and_collections/tail_cleanup.eld) | `42` | Clause-local early return cleans up before resumption |
+| 6 | [capture rows](src/06_tasks/capture_rows.eld) | `42` | Affine callback captures survive spawn and consuming await |
+| 6 | [join](src/06_tasks/join.eld) | `42` | Spawn and await |
+| 6 | [inherited handler](src/06_tasks/inherited_handler.eld) | `42` | Same inherited handler, different child result types |
+| 6 | [child-local handler](src/06_tasks/child_local_handler.eld) | `42` | Answer-changing handler inside a child |
+| 6 | [library join](src/06_tasks/library_join.eld) | `42` | Higher-order task composition |
+| 8 | [formatter semantics](src/08_formatting/semantics.eld) | `42` | Formatting retains field evaluation order, handler forwarding and precedence |
+| 9 | [application entry](src/09_tooling/application.eld) | `7` | An explicitly named application entry returns its exit status |
+| 9 | [test runner](src/09_tooling/test_runner.eld) | `0` | An ordinary function reports success through process status |
 
 ## Executable source fixtures
 
 Run a fixture and the source tests from the repository root:
 
 ```sh
-uv run python -m eldude.tooling.run examples/07_source_pipeline/combined.eld
+uv run python -m eldude.tooling.run examples/src/07_source_pipeline/combined.eld
 # 42
 uv run python -m unittest discover -s tests/source -t tests -p 'test_*.py' -v
 ```
@@ -117,23 +143,23 @@ These fixtures cover handler evidence, ownership, resumption, and cleanup throug
 
 | Program | Result | Checked execution |
 | --- | --- | --- |
-| [branch](07_source_pipeline/branch.eld) | `42` | Conditional execution |
-| [functions](07_source_pipeline/functions.eld) | `42` | Forward function reference, typed callback, closure capture |
-| [tail cleanup](07_source_pipeline/tail_cleanup.eld) | `40` | Clause-local close precedes implicit resume and caller acquisition |
-| [tail output](07_source_pipeline/tail_output.eld) | `()` | Operation returns `Int` even though handler output is `Unit` |
-| [deep once](07_source_pipeline/once_deep.eld) | `99` | Two deep entries, one close of the frame resource, legal post-resume work |
-| [nested normal return](07_source_pipeline/nested_return.eld) | `42` | Nested normal-return clauses resume the enclosing operation; deep re-entry closes one shared frame and preserves local cleanup |
-| [operation arguments](07_source_pipeline/operation_arguments.eld) | `42` | Scalar arguments pass through source functions, forwarding and deep once resumption without becoming frame captures |
-| [multiple operations](07_source_pipeline/multi_operations.eld) | `42` | Mixed modes, nested instances, selective forwarding and tail cleanup |
-| [multiple operations with shared frame](07_source_pipeline/multi_operations_deep.eld) | `42` | Deep re-entry through different operations, one frame close, lexical normal-return resumption and complete sibling residual |
-| [multiple operations with affine exit](07_source_pipeline/multi_operations_affine.eld) | `7` | Forwarded affine exit skips the later read, unwinds body cleanup and preserves an outside resource |
-| [clause local](07_source_pipeline/clause_local.eld) | `()` | Local resource remains owned after resume, then closes |
-| [affine scope](07_source_pipeline/affine_scope.eld) | `7` | Frame closes, captured body cleanup unwinds, outside resource closes afterward |
-| [affine asynchronous cleanup](07_source_pipeline/affine_async.eld) | `()` | Abandonment triggers masked suspension and cleanup; body yield is skipped |
-| [forwarding](07_source_pipeline/forwarding.eld) | `42` | Inner then outer dispatch, outer then inner resumption; outer residual slot retained |
-| [callbacks](07_source_pipeline/callbacks.eld) | `20` | Fixed callback dispatches outer (`10`); ambient callback/source function dispatches inner (`20`) |
-| [capture/trait integration](07_source_pipeline/capture_trait_integration.eld) | `42` | Callback capture rows through tuples, generic multi-trait dispatch and dynamic mutation; one explicit file close |
-| [combined](07_source_pipeline/combined.eld) | `42` | Nested handlers, forwarding, deep once resumption and resource cleanup |
+| [branch](src/07_source_pipeline/branch.eld) | `42` | Conditional execution |
+| [functions](src/07_source_pipeline/functions.eld) | `42` | Forward function reference, typed callback, closure capture |
+| [tail cleanup](src/07_source_pipeline/tail_cleanup.eld) | `40` | Clause-local close precedes implicit resume and caller acquisition |
+| [tail output](src/07_source_pipeline/tail_output.eld) | `()` | Operation returns `Int` even though handler output is `Unit` |
+| [deep once](src/07_source_pipeline/once_deep.eld) | `99` | Two deep entries, one close of the frame resource, legal post-resume work |
+| [nested normal return](src/07_source_pipeline/nested_return.eld) | `42` | Nested normal-return clauses resume the enclosing operation; deep re-entry closes one shared frame and preserves local cleanup |
+| [operation arguments](src/07_source_pipeline/operation_arguments.eld) | `42` | Scalar arguments pass through source functions, forwarding and deep once resumption without becoming frame captures |
+| [multiple operations](src/07_source_pipeline/multi_operations.eld) | `42` | Mixed modes, nested instances, selective forwarding and tail cleanup |
+| [multiple operations with shared frame](src/07_source_pipeline/multi_operations_deep.eld) | `42` | Deep re-entry through different operations, one frame close, lexical normal-return resumption and complete sibling residual |
+| [multiple operations with affine exit](src/07_source_pipeline/multi_operations_affine.eld) | `7` | Forwarded affine exit skips the later read, unwinds body cleanup and preserves an outside resource |
+| [clause local](src/07_source_pipeline/clause_local.eld) | `()` | Local resource remains owned after resume, then closes |
+| [affine scope](src/07_source_pipeline/affine_scope.eld) | `7` | Frame closes, captured body cleanup unwinds, outside resource closes afterward |
+| [affine asynchronous cleanup](src/07_source_pipeline/affine_async.eld) | `()` | Abandonment triggers masked suspension and cleanup; body yield is skipped |
+| [forwarding](src/07_source_pipeline/forwarding.eld) | `42` | Inner then outer dispatch, outer then inner resumption; outer residual slot retained |
+| [callbacks](src/07_source_pipeline/callbacks.eld) | `20` | Fixed callback dispatches outer (`10`); ambient callback/source function dispatches inner (`20`) |
+| [capture/trait integration](src/07_source_pipeline/capture_trait_integration.eld) | `42` | Callback capture rows through tuples, generic multi-trait dispatch and dynamic mutation; one explicit file close |
+| [combined](src/07_source_pipeline/combined.eld) | `42` | Nested handlers, forwarding, deep once resumption and resource cleanup |
 
 In `combined`, allocation identities are deterministic: frame `1`, protected body `2`, tail-clause temporary `3`, and post-resume locals `4` and `5`. The significant ordering is:
 

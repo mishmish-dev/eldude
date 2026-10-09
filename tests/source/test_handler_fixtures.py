@@ -8,7 +8,7 @@ from eldude.core.handlers import run
 from eldude.source.syntax import Diagnostic
 
 ROOT = Path(__file__).resolve().parents[2]
-FIXTURES = ROOT / 'examples/07_source_pipeline'
+FIXTURES = ROOT / 'examples/src/07_source_pipeline'
 REJECT = ROOT / 'examples/reject/semantics/source_pipeline'
 MULTI_REJECT = ROOT / 'examples/reject/semantics/multi_operations'
 MULTI_FAILURES = {
@@ -147,7 +147,7 @@ class SourceFixtureTests(unittest.TestCase):
 
     def test_existing_literal_and_source_functions(self):
         from eldude.source.pipeline import execute_file
-        self.assertEqual(execute_file(ROOT / 'examples/01_values/literal.eld').value, 42)
+        self.assertEqual(execute_file(ROOT / 'examples/src/01_values/literal.eld').value, 42)
         self.assertEqual(run(self.fixture('functions').program).value, 42)
 
     def test_operation_arguments_forward_and_resume_through_source_functions(self):

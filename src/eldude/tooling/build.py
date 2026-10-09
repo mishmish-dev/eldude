@@ -108,7 +108,7 @@ def build_and_execute(graph, args, reporter, checked, roots, application_args):
         artifact_kind = 'application' if kind == 'app' else kind
         reporter.event('artifact', path=str(path), artifact_kind=artifact_kind, package=package.name,
                        target=target['name'] if target else None, profile=profile, backend='python-ir-experimental')
-        if not reporter.machine:
+        if not reporter.machine and args.command != 'run':
             print(f'Built experimental Python {artifact_kind}: {path}', file=sys.stderr)
         if target:
             artifacts.append((package, target, path))
@@ -116,9 +116,12 @@ def build_and_execute(graph, args, reporter, checked, roots, application_args):
         reporter.summary('success', f'Built {len(pending)} experimental Python IR artifacts', artifacts=len(pending))
         return 0
     if args.command == 'run':
-        package, _, path = artifacts[0]
+        package, target, path = artifacts[0]
+        print(f'Running {package.name}:{target["name"]} (experimental Python)', file=sys.stderr)
         result = subprocess.run([sys.executable, str(path)], cwd=package.path.parent)
-        return result.returncode if result.returncode >= 0 else 128 - result.returncode
+        status = result.returncode if result.returncode >= 0 else 128 - result.returncode
+        print(f'Exited {package.name}:{target["name"]} with status {status}', file=sys.stderr)
+        return status
     failures = 0
     for package, target, path in artifacts:
         result = subprocess.run([sys.executable, str(path)], cwd=package.path.parent,

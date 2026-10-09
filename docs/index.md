@@ -49,7 +49,8 @@ Use the chapter's local contents and section links for a precise lookup. Chapter
 | [AGENTS.md](../AGENTS.md) | Short starting instructions for coding agents |
 | [docs/](.) | This map, language contracts, library profile, and grammar publications |
 | [src/eldude/](../src/eldude), [tests/](../tests) | Python subpackages (`core`, `source`, `runtime`, `tooling`) and matching test directories; the [implementation file map](implementation.md#file-map) pairs components with tests |
-| [examples/](../examples/README.md) | Numbered positive programs and `reject/syntax` / `reject/semantics` counterexamples; [manifest.json](../examples/manifest.json) owns expected positive results and runnable/pending status |
+| [eldude.toml](../eldude.toml), [eldude.lock](../eldude.lock) | Repository-root Eldude project with `examples/src` as its source root and registered application/test targets |
+| [examples/](../examples/README.md) | Numbered positive programs in `examples/src` and `reject/syntax` / `reject/semantics` counterexamples outside the project's source roots; [manifest.json](../examples/manifest.json) owns expected positive results and runnable/pending status |
 | [stdlib/](../stdlib/README.md) | `.eld` declarations and source bodies, grouped by module; the README maps APIs and implementation status |
 | [pyproject.toml](../pyproject.toml), [.python-version](../.python-version), [uv.lock](../uv.lock) | Project metadata, Python version, and locked environment |
 | [.gitignore](../.gitignore) | Local environment and Python cache exclusions |

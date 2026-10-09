@@ -12,9 +12,15 @@ Run from the repository root:
 
 ```sh
 uv sync --locked
-uv run eldude-run examples/07_source_pipeline/combined.eld
-# 42
+uv run eldude test
+# 84 tests executed; 0 failed
+uv run eldude run --app source_pipeline_combined
 ```
+
+`run` reports the application name and its exit status on stderr. The example
+applications call `verify()`, which checks the expected result and exits with
+status `0` when it matches. To print an example's `main()` result instead, use
+`uv run eldude-run examples/src/04_effects/handler.eld` (prints `42`).
 
 ## Project CLI
 
@@ -28,15 +34,20 @@ uv run eldude new /tmp/hello --lib
 uv run eldude check --manifest-path /tmp/hello/eldude.toml
 uv run eldude fmt --manifest-path /tmp/hello/eldude.toml
 uv run eldude metadata --manifest-path /tmp/hello/eldude.toml
-uv run eldude check examples/09_tooling/application.eld
+uv run eldude check examples/src/09_tooling/application.eld
 ```
 
 Commands discover the nearest `eldude.toml`, or accept `--manifest-path`.
+The repository's [eldude.toml](eldude.toml) uses `examples/src` as its source root
+and registers every positive program as an application and isolated result-checking
+test; `eldude test` runs them all from the repository root.
 Workspaces support `--package NAME` and `--workspace`, share a root lockfile, and
 reject member toolchain overrides. Path dependencies are resolved by declared
 package/module identities; transitive and test-only imports do not leak into
-production modules. `lock` and `update` reconcile the path graph; `--locked`
-forbids changing its deterministic TOML lock. `--offline` is accepted independently;
+production modules. `lock` and `update` reconcile the path graph. Ordinary `check`,
+`build`, `run`, and `test` reuse or update `eldude.lock` as needed. `--locked` is
+optional for CI or verification: it fails if the lock is missing or stale instead
+of changing it. `--offline` is accepted independently;
 this path-only implementation never fetches remote sources.
 
 `check` checks ordinary libraries without a `main` and never executes initializers.
@@ -102,7 +113,7 @@ spelling, contracts, and evaluation order, including code outside the interprete
 supported subset. It does not require imports to resolve or type checking to pass.
 
 ```sh
-uv run eldude-format examples/08_formatting/semantics.eld
+uv run eldude-format examples/src/08_formatting/semantics.eld
 uv run eldude-format --check path/to/file.eld
 uv run eldude-format --write path/to/file.eld
 ```
@@ -129,6 +140,7 @@ checking, formatting, and building user programs.
 uv run python -m eldude.tooling.check_docs
 uv run python -m eldude.source.grammar
 uv run python -m unittest discover -s tests -p 'test_*.py'
+uv run eldude test
 uv run eldude-run --examples --strict
 git diff --check
 ```
