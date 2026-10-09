@@ -8,7 +8,7 @@ Eldude should provide one standard command for creating, checking, building, run
 
 This design covers the developer workflow, configuration model, compilation boundaries, formatting, dependency reproducibility, diagnostics, and integration points. It does not select a compiler backend or define a package registry service. The numbered language specification remains authoritative for language semantics; this document adds no source syntax or ownership, effect, or lifetime rule.
 
-The current repository provides the project foundation, an experimental Python checker/interpreter, and a source formatter. An explicitly experimental `python::experimental` host additionally supports checked-IR builds, application execution, and isolated test runners. It is separate from the proposed production `cli::standard` host. Complete canonical interfaces, semantic incremental checking, production hosts, native builds, and remote resolution remain future work. Current executable commands and limits are documented in the [root README](../README.md#project-cli) and [implementation guide](../tools/README.md#project-tooling).
+The current repository provides the project foundation, an experimental Python checker/interpreter, and a source formatter. An explicitly experimental `python::experimental` host additionally supports checked-IR builds, application execution, and isolated test runners. It is separate from the proposed production `cli::standard` host. Complete canonical interfaces, semantic incremental checking, production hosts, native builds, and remote resolution remain future work. Current executable commands and limits are documented in the [root README](../README.md#project-cli) and [implementation guide](implementation.md#project-tooling).
 
 ## Contents
 
@@ -469,7 +469,7 @@ The implementation should keep responsibilities separate without creating a plug
 
 The backend is replaceable behind checked inputs and declared artifact outputs. The design does not choose LLVM, C emission, another native backend, or a production runtime strategy. Native support must demonstrate its advertised contracts before `build` claims to produce a supported executable.
 
-The [implementation file map](../tools/README.md#file-map) identifies the components to reuse. In particular, `source_modules.py` owns declared module identities, `source_pipeline.py` provides the current check/execute path, `source_syntax.py` supplies located syntax and diagnostics, and `format_eldude.py` already implements source preservation and safe writes. Their adjacent tests are part of any future implementation change.
+The [implementation file map](implementation.md#file-map) identifies the components to reuse. In particular, `source_modules.py` owns declared module identities, `source_pipeline.py` provides the current check/execute path, `source_syntax.py` supplies located syntax and diagnostics, and `format_eldude.py` already implements source preservation and safe writes. Their corresponding tests are part of any future implementation change.
 
 The current `compile_source`/`compile_file` APIs return checked programs for interpretation; their names do not imply native code generation. Existing interface serialization experiments do not establish a complete, validated canonical-interface cache. Host fixture support does not establish a production CLI host. Each capability remains explicitly labeled until its acceptance evidence exists.
 

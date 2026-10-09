@@ -8,7 +8,7 @@
 
 **Tech stack:** Python 3.14.8 or newer, standard library only, Eldude source fixtures, `unittest`.
 
-**Spec:** [Types and ownership](language-spec/02-types-and-ownership.md) (§§6, 9), [traits](language-spec/03-traits.md) (§§10–11), [captures and access](language-spec/04-captures-and-access.md) (§§12–15), [canonical interfaces](language-spec/12-interfaces-and-tooling.md) (§72). Use the [code/test map](../tools/README.md#file-map) to find the current implementation.
+**Spec:** [Types and ownership](language-spec/02-types-and-ownership.md) (§§6, 9), [traits](language-spec/03-traits.md) (§§10–11), [captures and access](language-spec/04-captures-and-access.md) (§§12–15), [canonical interfaces](language-spec/12-interfaces-and-tooling.md) (§72). Use the [code/test map](implementation.md#file-map) to find the current implementation.
 
 **Status:** Complete. All eight tasks have runnable acceptance programs. A fresh whole-branch review identified eight groups of composition defects; the follow-up fixes have source regression coverage. The milestone adds no dependency.
 
@@ -51,15 +51,15 @@ Each task ends with its programs working, focused checks passing, updated suppor
 
 | File | Planned responsibility |
 | --- | --- |
-| `tools/capture_rows.py` (new), `tools/test_capture_rows.py` (new) | Scoped capture terms, substitution, equality/inclusion constraints; keep separate from effect rows, whose algebra differs |
-| `tools/trait_constraints.py` (new), `tools/test_trait_constraints.py` (new) | Canonical trait heads, evidence selection, prerequisite checks, associated-equation normalization |
-| `tools/inference.py`, `tools/source_pipeline.py` | Callable contracts, usage, region/capture instantiation, owner and grant checking |
-| `tools/source_syntax.py`, `tools/source_elaboration.py`, `tools/source_declarations.py` | Preserve generic binder kinds/order, resolve source contracts, validate declarations and dynamic interfaces |
-| `tools/source_features.py`, `tools/handlers.py` | Checked package dictionaries, access projection, dynamic calls and runtime storage |
-| `tools/test_source_capture_contracts.py`, `tools/test_source_semantic_examples.py` | Execute acceptance files; assert metadata, events, and precise rejection diagnostics |
-| `tools/test_source_ownership_boundaries.py`, `tools/test_source_feature_regressions.py`, `tools/test_source_tasks.py` | Existing access, mutation, handler, and task regression coverage |
+| `src/eldude/capture_rows.py` (new), `tests/test_capture_rows.py` (new) | Scoped capture terms, substitution, equality/inclusion constraints; keep separate from effect rows, whose algebra differs |
+| `src/eldude/trait_constraints.py` (new), `tests/test_trait_constraints.py` (new) | Canonical trait heads, evidence selection, prerequisite checks, associated-equation normalization |
+| `src/eldude/inference.py`, `src/eldude/source_pipeline.py` | Callable contracts, usage, region/capture instantiation, owner and grant checking |
+| `src/eldude/source_syntax.py`, `src/eldude/source_elaboration.py`, `src/eldude/source_declarations.py` | Preserve generic binder kinds/order, resolve source contracts, validate declarations and dynamic interfaces |
+| `src/eldude/source_features.py`, `src/eldude/handlers.py` | Checked package dictionaries, access projection, dynamic calls and runtime storage |
+| `tests/test_source_capture_contracts.py`, `tests/test_source_semantic_examples.py` | Execute acceptance files; assert metadata, events, and precise rejection diagnostics |
+| `tests/test_source_ownership_boundaries.py`, `tests/test_source_feature_regressions.py`, `tests/test_source_tasks.py` | Existing access, mutation, handler, and task regression coverage |
 | `stdlib/collections/dyn_array.eld`, `stdlib/README.md`, `docs/standard-library.md` | Declare and document the minimum projection API used in tasks 7–8 |
-| `examples/`, `tools/README.md`, `docs/index.md` | Programs, expected results, supported-subset claims, and navigation |
+| `examples/`, `docs/implementation.md`, `docs/index.md` | Programs, expected results, supported-subset claims, and navigation |
 
 Keep the new modules limited to those two shared semantic responsibilities. Do not reorganize the checker hierarchy as part of this work.
 
@@ -166,16 +166,16 @@ Keep the new modules limited to those two shared semantic responsibilities. Do n
 - [x] Enable dynamic `mut` interfaces using task 7's access path and task 5's checked evidence. Pass original storage/grants through runtime dictionaries. Preserve conservative mutation bounds on every continuing exit, including recoverable failures and handler-mediated exits; retain `Ref`'s fixed retention horizon.
 - [x] Create `examples/07_source_pipeline/capture_trait_integration.eld`: relay a capture-polymorphic callback through a helper, use a generic existential with a fixed associated type and two trait bounds, mutate through dynamic access, then invoke the callback to return `42`. Assert observable state and cleanup events independently of the checker.
 - [x] Add cross-feature source cases for a mutated erased owner surviving a branch, a recoverable failure, and a handler exit. Run `whole_argument_capture.eld`, `await_whole_argument_capture.eld`, and `mut_capture_escape.eld`; all must still reject at their existing ownership/lifetime checks.
-- [x] Remove only the six restrictions now demonstrated by these programs from `tools/README.md`. Document remaining unrelated subset limits and the permanent DynCompatible requirements accurately. Complete the checks below before claiming this milestone works.
+- [x] Remove only the six restrictions now demonstrated by these programs from `docs/implementation.md`. Document remaining unrelated subset limits and the permanent DynCompatible requirements accurately. Complete the checks below before claiming this milestone works.
 
 ## Verification and handoff
 
 Run a new positive program directly as it is developed:
 
 ```sh
-uv run python tools/run_eldude.py examples/02_ownership/parameter_capture.eld
-uv run python -m unittest discover -s tools -p 'test_source_capture_contracts.py' -v
-uv run python -m unittest discover -s tools -p 'test_source_semantic_examples.py' -v
+uv run python -m eldude.run_eldude examples/02_ownership/parameter_capture.eld
+uv run python -m unittest discover -s tests -p 'test_source_capture_contracts.py' -v
+uv run python -m unittest discover -s tests -p 'test_source_semantic_examples.py' -v
 ```
 
 The positive command must print its manifest value. Semantic rejection tests must assert the expected diagnostic category/message and source location, not merely that compilation raised an exception. Use the existing source fixture adapter for rejection programs without an exported entry point. Host cleanup and handler events are asserted through the existing source execution API.
@@ -183,10 +183,10 @@ The positive command must print its manifest value. Semantic rejection tests mus
 At each task boundary, update example expectations, the code map if files were added, and supported-subset prose, then run the [root checks](../README.md#checks):
 
 ```sh
-uv run python tools/check_docs.py
-uv run python tools/check_grammar.py
-uv run python -m unittest discover -s tools -p 'test_*.py'
-uv run python tools/run_eldude.py --examples --strict
+uv run python -m eldude.check_docs
+uv run python -m eldude.check_grammar
+uv run python -m unittest discover -s tests -p 'test_*.py'
+uv run python -m eldude.run_eldude --examples --strict
 git diff --check
 ```
 
@@ -212,4 +212,4 @@ The File factory, linear callback relay, and integration program each assert exa
 
 Rejection programs assert category, message and source filename. The generated-grant regression also pins the offending call's line and column. Original whole-argument, await and mutation escape programs still reject. Additional boundary programs reject static member ambiguity in both declaration orders, growing/cyclic associated equations, projection-bearing heads/prerequisites, constructor/type kind confusion, and affine/suspending substitutions for `NonAbandoning`.
 
-Remaining experimental limits are documented in [the implementation guide](../tools/README.md#implementation-limits): bounded trait/termination checking and specialized static methods, recursive record representations, guarded matches, untyped closure parameters, operation resource/callback payloads, general foreign execution, and parts of the library/runtime. The language's DynCompatible restrictions remain normative, including method-local generics, raw `Self`, missing receivers and GAT projections.
+Remaining experimental limits are documented in [the implementation guide](implementation.md#implementation-limits): bounded trait/termination checking and specialized static methods, recursive record representations, guarded matches, untyped closure parameters, operation resource/callback payloads, general foreign execution, and parts of the library/runtime. The language's DynCompatible restrictions remain normative, including method-local generics, raw `Self`, missing receivers and GAT projections.

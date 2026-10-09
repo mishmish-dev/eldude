@@ -1,6 +1,6 @@
 # Executable example coverage
 
-**Status: completed milestone.** Current behavior and limits live in the [implementation guide](../tools/README.md); the [example guide](../examples/README.md) records coverage and expected outcomes. This page preserves the scope of the completed work.
+**Status: completed milestone.** Current behavior and limits live in the [implementation guide](implementation.md); the [example guide](../examples/README.md) records coverage and expected outcomes. This page preserves the scope of the completed work.
 
 The milestone made all 49 positive examples executable through located parsing, static checking, and interpretation, preserving their source, expected results, diagnostics, handler evidence, ownership checks, and fixture traces. It reused the expression IR and interpreter, kept the normative grammar unchanged, and used only the Python standard library.
 

@@ -31,7 +31,7 @@ and the source formatter. No new language syntax or dependencies are needed.
   versions, workspace selection, source discovery, and package boundaries.
 - [x] Add `project_resolver.py` and tests for direct dependency environments,
   path constraints, cycles/origins, deterministic atomic locks, and locked/offline behavior.
-- [x] Add `eldude` / `tools/eldude.py` for new/init, check, fmt, metadata,
+- [x] Add `eldude` / `src/eldude/cli.py` for new/init, check, fmt, metadata,
   lock/update, clean, and explicit unsupported commands. Test source diagnostics,
   JSON events, target scope, safe creation, formatting preflight, and symlinks.
 - [x] Update the implementation map and user commands, review the diff, and run

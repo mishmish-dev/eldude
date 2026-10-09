@@ -6,29 +6,29 @@ Eldude is a strict, statically typed functional language design with explicit ow
 
 ## Quick start
 
-The Python tools use only the standard library. Install [uv](https://docs.astral.sh/uv/getting-started/installation/); the project pins Python in [.python-version](.python-version).
+The Python implementation uses only the standard library at runtime. Install [uv](https://docs.astral.sh/uv/getting-started/installation/); the project pins Python in [.python-version](.python-version).
 
 Run from the repository root:
 
 ```sh
 uv sync --locked
-uv run python tools/run_eldude.py examples/07_source_pipeline/combined.eld
+uv run eldude-run examples/07_source_pipeline/combined.eld
 # 42
 ```
 
 ## Project CLI
 
-The repository's executable [eldude](eldude) provides the project workflow from
-[the tooling design](docs/tooling-design.md). Run it through the pinned Python
-environment; no additional Python dependencies are required:
+The installed `eldude` command provides the project workflow from
+[the tooling design](docs/tooling-design.md). `uv sync` installs the package from
+`src/eldude/` and its commands into the pinned Python environment:
 
 ```sh
-uv run ./eldude --help
-uv run ./eldude new /tmp/hello --lib
-uv run ./eldude check --manifest-path /tmp/hello/eldude.toml
-uv run ./eldude fmt --manifest-path /tmp/hello/eldude.toml
-uv run ./eldude metadata --manifest-path /tmp/hello/eldude.toml
-uv run ./eldude check examples/09_tooling/application.eld
+uv run eldude --help
+uv run eldude new /tmp/hello --lib
+uv run eldude check --manifest-path /tmp/hello/eldude.toml
+uv run eldude fmt --manifest-path /tmp/hello/eldude.toml
+uv run eldude metadata --manifest-path /tmp/hello/eldude.toml
+uv run eldude check examples/09_tooling/application.eld
 ```
 
 Commands discover the nearest `eldude.toml`, or accept `--manifest-path`.
@@ -66,9 +66,9 @@ host = "python::experimental"
 With `src/main.eld` declaring `module hello; pub fn main() -> Int { 0 }`:
 
 ```sh
-uv run ./eldude build --manifest-path /tmp/hello/eldude.toml
-uv run ./eldude run --manifest-path /tmp/hello/eldude.toml
-uv run ./eldude test --manifest-path /tmp/hello/eldude.toml --message-format=json
+uv run eldude build --manifest-path /tmp/hello/eldude.toml
+uv run eldude run --manifest-path /tmp/hello/eldude.toml
+uv run eldude test --manifest-path /tmp/hello/eldude.toml --message-format=json
 ```
 
 The Python host requires an exported, nongeneric, nullary `Int` function, closed
@@ -92,7 +92,7 @@ production host is not implemented: explicitly change its manifest host to
 an Eldude application-argument API, registry/Git resolution, complete canonical
 interfaces, and semantic incremental caching remain unsupported. Checking still
 checks imported source closures, and resources/I/O retain the fixture limitations.
-See the [implementation guide](tools/README.md#project-tooling) for boundaries.
+See the [implementation guide](docs/implementation.md#project-tooling) for boundaries.
 
 ## Format source
 
@@ -102,9 +102,9 @@ spelling, contracts, and evaluation order, including code outside the interprete
 supported subset. It does not require imports to resolve or type checking to pass.
 
 ```sh
-uv run python tools/format_eldude.py examples/08_formatting/semantics.eld
-uv run python tools/format_eldude.py --check path/to/file.eld
-uv run python tools/format_eldude.py --write path/to/file.eld
+uv run eldude-format examples/08_formatting/semantics.eld
+uv run eldude-format --check path/to/file.eld
+uv run eldude-format --write path/to/file.eld
 ```
 
 Without flags it prints one formatted file to stdout; omit the filename or use `-`
@@ -117,30 +117,34 @@ source/test files, `fmt --check` checks them, and `fmt --diff` prints changes wi
 writing. Explicit files/directories and sole stdin input `fmt -` also work without
 a manifest. No-argument formatting requires a project. All selected inputs and
 toolchain pins are validated before writing; each replacement preserves permissions
-and checks for concurrent edits. The old Python command keeps its stdout default.
+and checks for concurrent edits. The standalone `eldude-format` command keeps its stdout default.
 
 ## Checks
 
+These maintenance commands and `eldude-run --examples` require a repository
+checkout. Installed wheels include the grammar and standard library for running,
+checking, formatting, and building user programs.
+
 ```sh
-uv run python tools/check_docs.py
-uv run python tools/check_grammar.py
-uv run python -m unittest discover -s tools -p 'test_*.py'
-uv run python tools/run_eldude.py --examples --strict
+uv run python -m eldude.check_docs
+uv run python -m eldude.check_grammar
+uv run python -m unittest discover -s tests -p 'test_*.py'
+uv run eldude-run --examples --strict
 git diff --check
 ```
 
 The documentation check verifies local links and fragment anchors, chapter/code map coverage, and example tables against [manifest.json](examples/manifest.json). The grammar check verifies syntax and generated publications. The tests check static diagnostics and execution; the strict corpus run executes every positive example. See the [example guide](examples/README.md) for expected values and rejection fixtures.
 
-After editing [eldude.ebnf](docs/eldude.ebnf) or the originating parsing/interface clauses, regenerate the Markdown and JSON grammar publications with `uv run python tools/check_grammar.py --write`. The [editing guide](docs/index.md#editing-and-checking) identifies the source files.
+After editing [eldude.ebnf](docs/eldude.ebnf) or the originating parsing/interface clauses, regenerate the Markdown and JSON grammar publications with `uv run python -m eldude.check_grammar --write`. The [editing guide](docs/index.md#editing-and-checking) identifies the source files.
 
 ## Source-to-execution experiment
 
-The [implementation guide](tools/README.md#source-to-execution-experiment) describes supported source forms, entry-point conventions, diagnostics, and remaining limits. The [file map](tools/README.md#file-map) connects each compiler component to its tests. Resources are simulated; execution uses a bounded cooperative scheduler.
+The [implementation guide](docs/implementation.md#source-to-execution-experiment) describes supported source forms, entry-point conventions, diagnostics, and remaining limits. The [file map](docs/implementation.md#file-map) connects each compiler component to its tests. Resources are simulated; execution uses a bounded cooperative scheduler.
 
 ## Inference experiment
 
-The [inference guide](tools/README.md#inference-experiment) covers annotated expression checking, effect rows, ownership, captures, and its conservative boundaries.
+The [inference guide](docs/implementation.md#inference-experiment) covers annotated expression checking, effect rows, ownership, captures, and its conservative boundaries.
 
 ## Handler and resumption experiment
 
-The [handler guide](tools/README.md#handler-and-resumption-experiment) covers clause checking, explicit evidence, resumption, forwarding, and the interpreter API.
+The [handler guide](docs/implementation.md#handler-and-resumption-experiment) covers clause checking, explicit evidence, resumption, forwarding, and the interpreter API.

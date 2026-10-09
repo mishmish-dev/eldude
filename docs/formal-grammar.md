@@ -421,9 +421,9 @@ User-authored source need not be reordered solely to match this interface order;
 From the repository root:
 
 ```sh
-uv run python tools/check_grammar.py --write
-uv run python tools/check_grammar.py
-uv run python -m unittest discover -s tools -p 'test_grammar*.py'
+uv run python -m eldude.check_grammar --write
+uv run python -m eldude.check_grammar
+uv run python -m unittest discover -s tests -p 'test_grammar*.py'
 ```
 
 The first command regenerates this document and the JSON export; the specification chapters are inputs and are not rewritten. The second rejects undefined symbols, duplicate productions, malformed EBNF, reserved-word drift, or stale generated publications. Tests cover accepted/rejected syntax, source/interface separation, JSON consumption, and stale-publication detection. Edit the EBNF or originating specification clauses, then regenerate; do not edit generated presentations directly.

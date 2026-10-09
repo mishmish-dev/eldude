@@ -2,14 +2,14 @@
 
 <a id="eldude-implementation-targets"></a>
 
-[Documentation and project map](../docs/index.md) · [Implementation support and limits](../tools/README.md#source-to-execution-experiment)
+[Documentation and project map](../docs/index.md) · [Implementation support and limits](../docs/implementation.md#source-to-execution-experiment)
 
 [Positive programs](#positive-programs) · [Source fixtures](#executable-source-fixtures) · [Test host](#fixture-host-profile) · [Rejections](#rejection-targets) · [Handler counterexamples](#enforced-source-rejections)
 
-All **84 positive examples** execute through the source checker and interpreter. Each file is a separate program; the runner uses the documented [entry-point convention](../tools/README.md#entry-point-api-and-diagnostics).
+All **84 positive examples** execute through the source checker and interpreter. Each file is a separate program; the runner uses the documented [entry-point convention](../docs/implementation.md#entry-point-api-and-diagnostics).
 
 ```sh
-uv run python tools/run_eldude.py --examples --strict
+uv run python -m eldude.run_eldude --examples --strict
 # 84 passed, 0 unsupported, 0 failed
 ```
 
@@ -108,12 +108,12 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 Run a fixture and the source tests from the repository root:
 
 ```sh
-uv run python tools/run_eldude.py examples/07_source_pipeline/combined.eld
+uv run python -m eldude.run_eldude examples/07_source_pipeline/combined.eld
 # 42
-uv run python -m unittest discover -s tools -p 'test_source*.py' -v
+uv run python -m unittest discover -s tests -p 'test_source*.py' -v
 ```
 
-These fixtures cover handler evidence, ownership, resumption, and cleanup through the [source pipeline](../tools/README.md#file-map). [test_source_pipeline.py](../tools/test_source_pipeline.py) asserts independent expected values and event ordering.
+These fixtures cover handler evidence, ownership, resumption, and cleanup through the [source pipeline](../docs/implementation.md#file-map). [test_source_pipeline.py](../tests/test_source_pipeline.py) asserts independent expected values and event ordering.
 
 | Program | Result | Checked execution |
 | --- | --- | --- |
@@ -157,7 +157,7 @@ In `multi_operations_deep`, named dispatch enters the shared outer `step`; its n
 
 In `multi_operations_affine`, after inner `step` resumes, inner `stop(7)` forwards to outer `stop`; both captured segments are abandoned, body resource `2` is cleaned, and outside resource `1` is explicitly closed. No read dispatch or read-clause temporary acquisition occurs.
 
-See the [handler interpreter reference](../tools/README.md#handler-and-resumption-experiment) for dispatch event shapes.
+See the [handler interpreter reference](../docs/implementation.md#handler-and-resumption-experiment) for dispatch event shapes.
 
 ## Fixture host profile
 
@@ -183,11 +183,11 @@ Acquisition is pure in this simulated profile. `using` owns any acquired resourc
 
 Fixture primitives must be called directly by their imported names/aliases. Use a source closure, such as `fn() => acquire()`, when passing one as a callback. There is no implicit prelude, and user declarations with these spellings execute their own checked bodies. Fixture type names also require imports. Ordinary source module loading and the cleanup implementations used by the examples execute; real resource management remains deferred.
 
-Source annotations, operation arguments, forwarding, lexical resumption, and implementation limits are documented in the [implementation guide](../tools/README.md#source-to-execution-experiment).
+Source annotations, operation arguments, forwarding, lexical resumption, and implementation limits are documented in the [implementation guide](../docs/implementation.md#source-to-execution-experiment).
 
 ## Rejection targets
 
-`reject/syntax` must fail the grammar recognizer. `reject/semantics` must parse and reach its intended static failure; [test_source_semantic_examples.py](../tools/test_source_semantic_examples.py) checks these diagnostics, including all three existential capture cases. [Handler counterexamples](#enforced-source-rejections) are enforced separately below.
+`reject/syntax` must fail the grammar recognizer. `reject/semantics` must parse and reach its intended static failure; [test_source_semantic_examples.py](../tests/test_source_semantic_examples.py) checks these diagnostics, including all three existential capture cases. [Handler counterexamples](#enforced-source-rejections) are enforced separately below.
 
 | Program | Required failure |
 | --- | --- |
@@ -252,10 +252,10 @@ In particular, [sibling residual](reject/semantics/multi_operations/sibling_resi
 For example:
 
 ```sh
-uv run python tools/run_eldude.py examples/reject/semantics/source_pipeline/frame_transfer.eld
+uv run python -m eldude.run_eldude examples/reject/semantics/source_pipeline/frame_transfer.eld
 # .../frame_transfer.eld:9:19: semantic: file was already consumed
 # ...:5:9: note: Binding declared here
 # ...:8:13: note: Ownership transferred here
 ```
 
-The [missing-semicolon fixture](reject/syntax/source_pipeline/missing_semicolon.eld) reports `syntax` and exits nonzero without executing. Additional tests cover unknown/duplicate names, malformed tokens, incorrect annotations, root evidence, named dispatch scope, and source/host contracts. The [code/test map](../tools/README.md#file-map) locates these checks and the underlying IR regressions.
+The [missing-semicolon fixture](reject/syntax/source_pipeline/missing_semicolon.eld) reports `syntax` and exits nonzero without executing. Additional tests cover unknown/duplicate names, malformed tokens, incorrect annotations, root evidence, named dispatch scope, and source/host contracts. The [code/test map](../docs/implementation.md#file-map) locates these checks and the underlying IR regressions.

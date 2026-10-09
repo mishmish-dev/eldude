@@ -12,10 +12,10 @@ Choose a task below, then read the linked chapter or component. The language spe
 | --- | --- |
 | Run a program or verify a change | [Quick start and checks](../README.md#quick-start) |
 | Format Eldude source or check formatting | [Formatter commands](../README.md#format-source); [design and conventions](formatter.md) |
-| Use or extend project tooling | [Project CLI](../README.md#project-cli), [implementation boundaries](../tools/README.md#project-tooling), and [tooling design](tooling-design.md) with explicit application hosts |
+| Use or extend project tooling | [Project CLI](../README.md#project-cli), [implementation boundaries](implementation.md#project-tooling), and [tooling design](tooling-design.md) with explicit application hosts |
 | Understand the design goals | [Manifesto](#the-eldude-manifesto); [precedents](language-spec/precedents.md) for background |
 | Look up a language rule | [Topic map below](#language-topics); [specification index](language-specification.md) for conventions and a full reading order |
-| Find implemented behavior or a compiler component | [Implementation guide and code/test map](../tools/README.md) |
+| Find implemented behavior or a compiler component | [Implementation guide and code/test map](implementation.md) |
 | Find capture and existential acceptance coverage | [Completed implementation plan](capture-and-existential-plan.md), with executable acceptance programs and verified results for each step |
 | Find a small program or expected diagnostic | [Executable examples](../examples/README.md); [illustrative spec snippets](language-spec/examples.md) |
 | Check library APIs, ownership, or cost contracts | [Module/API map](../stdlib/README.md); [library profile](standard-library.md) |
@@ -48,7 +48,7 @@ Use the chapter's local contents and section links for a precise lookup. Chapter
 | [README.md](../README.md) | Setup, commands, and implementation entry points |
 | [AGENTS.md](../AGENTS.md) | Short starting instructions for coding agents |
 | [docs/](.) | This map, language contracts, library profile, and grammar publications |
-| [tools/](../tools/README.md#file-map) | Python recognizer, parser, checking/lowering, interpreter, scheduler, and adjacent `test_*.py` files; the file map pairs components with tests |
+| [src/eldude/](../src/eldude), [tests/](../tests) | Installed Python package and separate test suite; the [implementation file map](implementation.md#file-map) pairs components with tests |
 | [examples/](../examples/README.md) | Numbered positive programs and `reject/syntax` / `reject/semantics` counterexamples; [manifest.json](../examples/manifest.json) owns expected positive results and runnable/pending status |
 | [stdlib/](../stdlib/README.md) | `.eld` declarations and source bodies, grouped by module; the README maps APIs and implementation status |
 | [pyproject.toml](../pyproject.toml), [.python-version](../.python-version), [uv.lock](../uv.lock) | Project metadata, Python version, and locked environment |
@@ -61,12 +61,12 @@ Use the chapter's local contents and section links for a precise lookup. Chapter
 ## Editing and checking
 
 - **Language rules:** edit the owning numbered chapter. The [invariants](language-spec/invariants.md) and example index link to those rules; they do not add competing contracts. Keep existing § identifiers and anchors, and link new references directly to the chapter. The specification index's large [legacy directory](language-specification.md#earlier-section-links) exists only for old bookmarks.
-- **Syntax:** edit [eldude.ebnf](eldude.ebnf) and the relevant clauses in [chapter 1](language-spec/01-foundations.md#2-surface-and-parsing-model) or [chapter 12](language-spec/12-interfaces-and-tooling.md#72-canonical-semantic-interfaces). [check_grammar.py](../tools/check_grammar.py) generates `formal-grammar.md` and `eldude-grammar.json`; regenerate with `uv run python tools/check_grammar.py --write` instead of editing outputs.
-- **Implementation:** check the [supported subset and limits](../tools/README.md#source-to-execution-experiment), then use the [code/test map](../tools/README.md#file-map). Grammar acceptance, static checking, and execution are separate checks.
+- **Syntax:** edit [eldude.ebnf](eldude.ebnf) and the relevant clauses in [chapter 1](language-spec/01-foundations.md#2-surface-and-parsing-model) or [chapter 12](language-spec/12-interfaces-and-tooling.md#72-canonical-semantic-interfaces). [check_grammar.py](../src/eldude/check_grammar.py) generates `formal-grammar.md` and `eldude-grammar.json`; regenerate with `uv run python -m eldude.check_grammar --write` instead of editing outputs.
+- **Implementation:** check the [supported subset and limits](implementation.md#source-to-execution-experiment), then use the [code/test map](implementation.md#file-map). Grammar acceptance, static checking, and execution are separate checks.
 - **Library and examples:** keep the [library profile](standard-library.md), declarations, and example expectations consistent. Preserve expected results independently of the implementation. Spec snippets may be schematic or deliberately rejected; executable expectations belong in the example corpus.
-- **Verification:** use the [root README commands](../README.md#checks). [check_docs.py](../tools/check_docs.py) checks local links and fragment anchors, chapter/code map coverage, and documented example results. It checks the inline links and heading/HTML anchors used here; it skips code examples and external URLs. When moving prose, update incoming links and keep useful anchors. Update this map when an entry point or file responsibility changes.
+- **Verification:** use the [root README commands](../README.md#checks). [check_docs.py](../src/eldude/check_docs.py) checks local links and fragment anchors, chapter/code map coverage, and documented example results. It checks the inline links and heading/HTML anchors used here; it skips code examples and external URLs. When moving prose, update incoming links and keep useful anchors. Update this map when an entry point or file responsibility changes.
 
-For a narrow lookup, search the owning file: `rg -n '^#{2,3} ' docs/language-spec/06-handlers.md` lists its sections; `rg -n 'resume' tools/handlers.py tools/test_handlers.py` finds the matching implementation and checks.
+For a narrow lookup, search the owning file: `rg -n '^#{2,3} ' docs/language-spec/06-handlers.md` lists its sections; `rg -n 'resume' src/eldude/handlers.py tests/test_handlers.py` finds the matching implementation and checks.
 
 ## The Eldude Manifesto
 

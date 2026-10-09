@@ -2,5 +2,25 @@
 name = "eldude"
 version = "0.0.5"
 description = "Grammar checks and language-design prototypes for Eldude"
+readme = "README.md"
 requires-python = ">=3.14.8"
 dependencies = []
+
+[project.scripts]
+eldude = "eldude.cli:main"
+eldude-run = "eldude.run_eldude:main"
+eldude-format = "eldude.format_eldude:main"
+
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/eldude"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"docs/eldude.ebnf" = "eldude/eldude.ebnf"
+"stdlib" = "eldude/stdlib"
+
+[tool.hatch.build.targets.sdist]
+include = ["src", "tests", "docs", "examples", "stdlib", "README.md", "AGENTS.md", ".python-version", "uv.lock"]
