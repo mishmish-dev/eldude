@@ -47,6 +47,27 @@ MULTI_FAILURES = {
 }
 
 
+class LibraryCheckingTests(unittest.TestCase):
+    def test_library_needs_no_entry_and_does_not_execute_initializers(self):
+        from source_pipeline import check_source
+        checked = check_source('module lib; let value: Int = 1 / 0; pub fn answer()->Int { value }')
+        self.assertEqual(checked.inferred.type, UNIT)
+        self.assertTrue(checked.functions)
+        check_source('module empty;')
+
+    def test_unused_and_generic_bodies_are_still_checked(self):
+        from source_pipeline import check_source
+        for body in ('fn unused()->Int { true }', 'fn unused<T>(x:T)->Int { true }'):
+            with self.subTest(body=body), self.assertRaises(Diagnostic) as caught:
+                check_source('module lib; ' + body)
+            self.assertIn(caught.exception.code, ('type', 'semantic'))
+
+    def test_library_effects_do_not_need_a_host(self):
+        from source_pipeline import check_source
+        check_source('module lib; pub effect Ask { tail ask()->Int; } '
+                     'pub fn ask()->{Ask} Int { !Ask::ask() }')
+
+
 class SourcePipelineTests(unittest.TestCase):
     def compile(self, source):
         from source_pipeline import compile_source

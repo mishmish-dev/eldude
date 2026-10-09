@@ -492,7 +492,21 @@ def compile_source(text, filename='<source>'):
 
 def compile_file(path):
     path = Path(path)
-    return compile_source(path.read_text(encoding='utf-8'), str(path))
+    return compile_source(path.read_text(encoding='utf-8', newline=''), str(path))
+
+
+def check_source(text, filename='<source>', *, sources=None, import_allowed=None):
+    """Check an ordinary module and its imports without an execution root."""
+    from source_elaboration import SourceElaborator
+    from source_modules import load_modules
+    ast = parse_source(text, filename)
+    graph = load_modules(ast, sources=sources, import_allowed=import_allowed)
+    return SourceElaborator(ast, graph).compile(entry=None)
+
+
+def check_file(path, **kwargs):
+    path = Path(path)
+    return check_source(path.read_text(encoding='utf-8', newline=''), str(path), **kwargs)
 
 
 def execute_file(path):

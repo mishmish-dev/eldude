@@ -81,7 +81,9 @@
     "07_source_pipeline/operation_arguments.eld": 42,
     "07_source_pipeline/tail_cleanup.eld": 40,
     "07_source_pipeline/tail_output.eld": null,
-    "08_formatting/semantics.eld": 42
+    "08_formatting/semantics.eld": 42,
+    "09_tooling/application.eld": 7,
+    "09_tooling/test_runner.eld": 0
   },
   "pending": {}
 }

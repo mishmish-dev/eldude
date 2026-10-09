@@ -12,6 +12,11 @@ Read the component and its tests for the task at hand. All tools use the Python 
 
 | File | Responsibility | Tests |
 | --- | --- | --- |
+| [eldude.py](eldude.py) | Unified project commands, selection, safe creation/formatting, metadata and JSON diagnostics; launched by [eldude](../eldude) | [Project CLI](test_eldude_cli.py) |
+| [project_model.py](project_model.py) | Strict manifests, semantic versions, workspace ownership, pins and source boundaries | [Project model](test_project_model.py) |
+| [project_resolver.py](project_resolver.py) | Path graph resolution, atomic TOML locks and package-scoped imports | [Resolver and import boundaries](test_project_resolver.py) |
+| [project_build.py](project_build.py) | Experimental Python root validation, IR artifacts, zipapps and isolated execution | [Artifact and execution acceptance](test_project_build.py) |
+| [ir_artifact.py](ir_artifact.py) | Deterministic checked-IR encoding, located decoding and bundled Python host entry | [Full corpus IR round trips and artifacts](test_project_build.py) |
 | [run_eldude.py](run_eldude.py) | CLI, result display, corpus manifest validation | [Corpus runner](test_run_examples.py) |
 | [format_eldude.py](format_eldude.py) | Syntax-directed source formatting, comment retention, check/write CLI | [Formatting, semantic round trips, and CLI](test_format_eldude.py) |
 | [check_docs.py](check_docs.py) | Local Markdown links/anchors, chapter/code map coverage, example table results | [Documentation checks](test_check_docs.py) |
@@ -29,7 +34,7 @@ Read the component and its tests for the task at hand. All tools use the Python 
 | [handlers.py](handlers.py) | Handler clause/resumption checks, evidence lowering, interpreter | [Handlers](test_handlers.py) |
 | [task_runtime.py](task_runtime.py) | Per-execution cooperative scheduling, cancellation, group draining | [Scheduler](test_task_runtime.py), [source integration](test_source_tasks.py) |
 
-The source path is `run_eldude` → `source_pipeline` → parsing/module loading → `source_elaboration` → checked expression IR → `handlers.run`. The checker layers are `SourceChecker` → `FeatureChecker` → `HandlerChecker` → `Checker`; source features and declarations also extend lowering and execution. The row solver operates on resolved labels and does not select handlers or check ownership.
+The source path is `run_eldude` → `source_pipeline` → parsing/module loading → `source_elaboration` → checked expression IR → `handlers.run`. The project CLI supplies explicit module candidates and package import permissions to the same path. The checker layers are `SourceChecker` → `FeatureChecker` → `HandlerChecker` → `Checker`; source features and declarations also extend lowering and execution. The row solver operates on resolved labels and does not select handlers or check ownership.
 
 The formatter takes a separate path through the normative grammar's concrete
 tree, preserving source details the executable AST discards. With `tools` on the
@@ -39,6 +44,46 @@ source grammar, keeps author-written contracts unchanged, and verifies token and
 comment preservation before returning. See the [design and style rules](../docs/formatter.md)
 and [CLI commands](../README.md#format-source). It does not canonicalize generated
 semantic interfaces; those require resolved semantic identities under §77.
+
+## Project tooling
+
+The [project commands](../README.md#project-cli) implement the foundation of the
+[tooling design](../docs/tooling-design.md), plus the explicitly experimental
+`python::experimental` application/test host. The [implementation plan](../docs/tooling-implementation-plan.md)
+records the delivered scope. `cli::standard`, native hosts, embeddings, cross
+compilation, remote dependency resolution, full semantic interfaces, and interface
+cache invalidation remain separate delivery work and are not implied by these commands.
+
+The path resolver locks the full owning workspace, including its members' development
+dependencies. Consumers ignore dependency development pins, locks, and test dependencies.
+Source selection keeps test and production import environments separate, indexes
+declared module identities, and rejects duplicate providers and filesystem paths that
+cross source or package boundaries. Selected roots can check despite unrelated body
+errors. Libraries need no entry or host, but declaration/generic-body checks retain
+the existing supported-subset limits.
+
+Python builds serialize checked IR with a versioned, explicit record whitelist.
+This artifact format is neither a canonical semantic interface nor a public ABI.
+Bundled interpreter code executes the stored IR in a subprocess, with source origins
+retained for defects. Application output is inherited by `run`; machine-mode tests
+capture labeled stdout/stderr events. The Python host currently has no Eldude argument
+or production I/O API. The two profiles preserve the same evaluator behavior.
+
+Build products use atomic replacement and identity-safe internal paths. Application
+filenames include their content digest, so concurrent invocations can launch their
+own products; deleting `build/` affects no source semantics. Repeated identical builds
+preserve unchanged artifacts. This is artifact reuse only: every invocation still
+checks source closures, without downstream semantic reuse or complete separate
+compilation. Build records include toolchain/compiler identity, Python version,
+resolved graph, host, machine target, and profile; there are no native inputs.
+
+`check`, `build`, and `test --message-format=json` emit version-1 newline-delimited
+events and a scoped summary. Diagnostics share their source messages with terminal
+output, using zero-based half-open Unicode scalar offsets and one-based lines/columns.
+Source/root rejection exits 1; configuration, unsupported capabilities, and operational
+or internal tool failures exit 2. Formatting syntax failures also exit 2. Tests report
+runner counts and failures, including empty selection, and application execution
+returns the application's status.
 
 ## Source-to-execution experiment
 
@@ -77,6 +122,12 @@ The explicit `eldude::fixture` profile supplies simulated resource tokens and su
 The runner calls an exported, nullary, nongeneric `main` returning `Int`, `Nat`, `Bool`, or `Unit`. This is a fixture convention, not a language entry-point rule. No unhandled algebraic slots may remain; intrinsic `suspend`/`diverge` may be admitted.
 
 `compile_source(text, filename)` and `compile_file(path)` return `SourceProgram` with `ast`, `expression`, `program`, `inferred`, `functions`, and `handled_rows`. With `tools` on Python's import path, `handlers.run(checked.program)` returns `Execution.value` and `Execution.events`; `execute_file(path)` combines checking and execution. `Program.origins` maps lowered-node identities to source spans.
+
+`check_source(text, filename)` and `check_file(path)` return the same checked-program
+shape with a `Unit` terminal expression instead of a fixture entry call. They check
+all declarations and initializers without executing them. Optional `sources` and
+`import_allowed` inputs constrain discovery to the project's package graph. Existing
+fixture compilation/execution APIs retain their entry convention.
 
 Parsing first checks full EBNF membership using the normative lexer's tokens, then builds a filename/span-bearing AST. `Grammar.lex` retains its token-pair API alongside `lex_spanned`. Malformed syntax reports `syntax`; valid syntax outside the subset reports `unsupported: Implementation limit`. `Diagnostic` carries a category, message, primary span, and related declaration/transfer spans. Single-file CLI diagnostics go to stderr with filename, line, and column and a nonzero exit. Static errors prevent execution; arithmetic defects terminate it after structural unwinding.
 

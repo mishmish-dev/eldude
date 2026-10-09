@@ -12,6 +12,7 @@ Choose a task below, then read the linked chapter or component. The language spe
 | --- | --- |
 | Run a program or verify a change | [Quick start and checks](../README.md#quick-start) |
 | Format Eldude source or check formatting | [Formatter commands](../README.md#format-source); [design and conventions](formatter.md) |
+| Use or extend project tooling | [Project CLI](../README.md#project-cli), [implementation boundaries](../tools/README.md#project-tooling), and [tooling design](tooling-design.md) with explicit application hosts |
 | Understand the design goals | [Manifesto](#the-eldude-manifesto); [precedents](language-spec/precedents.md) for background |
 | Look up a language rule | [Topic map below](#language-topics); [specification index](language-specification.md) for conventions and a full reading order |
 | Find implemented behavior or a compiler component | [Implementation guide and code/test map](../tools/README.md) |
@@ -55,6 +56,7 @@ Use the chapter's local contents and section links for a precise lookup. Chapter
 | [Capture and existential implementation plan](capture-and-existential-plan.md) | Implementation work order, dependencies, and program-based acceptance criteria for capture and existential support |
 | [implementation-plan.md](implementation-plan.md) | Completed example-coverage milestone; historical context, not a current backlog |
 | [Formatter design](formatter.md) | Source formatting guarantees, canonical layout, API, and verification |
+| [Tooling design](tooling-design.md) | CLI, projects/workspaces, explicit hosts, compilation, locking, and formatting contract; [implementation plan](tooling-implementation-plan.md) distinguishes the Python delivery from later stages |
 
 ## Editing and checking
 

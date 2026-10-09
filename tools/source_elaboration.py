@@ -15,10 +15,10 @@ from source_syntax import Node, Diagnostic
 
 
 class SourceElaborator(Elaborator):
-    def __init__(self, ast):
+    def __init__(self, ast, graph=None):
         super().__init__(ast)
         self.root_module = self.module
-        self.graph = load_modules(ast)
+        self.graph = graph if graph is not None else load_modules(ast)
         self.scopes = {m: {} for m in self.graph.modules}
         self.aliases = {m: {} for m in self.graph.modules}
         self.owners, self.named, self.enums, self.traits = {}, {}, {}, {}
@@ -1259,7 +1259,7 @@ class SourceElaborator(Elaborator):
         return self.ir(node, kind, name, self.expression(receiver, environment, handlers),
                        tuple(self.expression(a, environment, handlers) for a in arguments), mode or '')
 
-    def compile(self):
+    def compile(self, entry='main', *, fixture=True):
         self.collect()
         expressions = {}
         for symbol, declaration in self.definitions.items():
@@ -1301,17 +1301,24 @@ class SourceElaborator(Elaborator):
         self.module = self.root_module
         self.values = self.scopes[self.module]
         self.bind_generics(())
-        main = self.values.get('main')
-        if main not in self.definitions or not self.definitions[main].items[0]:
-            self.error('entry', 'Fixture runner requires an exported main function', self.ast)
-        declaration = self.definitions[main]
-        if self.generics(declaration.items[1]):
-            self.error('entry', 'Fixture main cannot be generic', declaration.items[1])
-        if declaration.items[2]:
-            self.error('entry', 'Fixture main must have no parameters', declaration.items[1])
-        if self.signatures[main].result not in (INT, UNIT, BOOL, NAT):
-            self.limit('fixture main must return Int, Nat, Bool or Unit', declaration.items[3])
-        expression = self.ir(declaration.items[1], 'call', main)
+        main = self.values.get(entry) if entry is not None else None
+        if entry is None:
+            expression = self.ir(self.ast, 'unit')
+        else:
+            label = 'Fixture main' if fixture else f'Python entry {entry}'
+            if main not in self.definitions or not self.definitions[main].items[0]:
+                self.error('entry', 'Fixture runner requires an exported main function' if fixture else
+                           f'Python host requires an exported function {entry}', self.ast)
+            declaration = self.definitions[main]
+            if self.generics(declaration.items[1]):
+                self.error('entry', label + ' cannot be generic', declaration.items[1])
+            if declaration.items[2]:
+                self.error('entry', label + ' must have no parameters', declaration.items[1])
+            if not fixture and self.signatures[main].result != INT:
+                self.error('entry', label + ' must return Int', declaration.items[3])
+            if fixture and self.signatures[main].result not in (INT, UNIT, BOOL, NAT):
+                self.limit('fixture main must return Int, Nat, Bool or Unit', declaration.items[3])
+            expression = self.ir(declaration.items[1], 'call', main)
         order, visiting, done, cyclic = [], set(), set(), False
         def visit(symbol):
             nonlocal cyclic
@@ -1358,9 +1365,10 @@ class SourceElaborator(Elaborator):
                 if id(transferred) in self.origins:
                     related.append(('Ownership transferred here', self.origins[id(transferred)]))
             raise Diagnostic(error.code, str(error), span, related) from error
-        if program.inferred.effects.tail or any(label not in ('suspend', 'diverge') for label in program.inferred.effects.labels):
+        if entry is not None and (program.inferred.effects.tail or any(
+                label not in ('suspend', 'diverge') for label in program.inferred.effects.labels)):
             origin = checker.effect_origin(expressions[main][2], set(program.inferred.effects.labels))
-            raise Diagnostic('effect', 'Fixture main requires closed handler evidence; an operation remains unhandled',
+            raise Diagnostic('effect', label + ' requires closed handler evidence; an operation remains unhandled',
                              self.origins.get(id(origin), declaration.items[3].span))
         functions = {str(s): checker.results[id(body)].type for s, body in expressions.items()}
         return SourceProgram(self.ast, expression, program, functions, {str(n): r for n, r in checker.handled_rows.items()})

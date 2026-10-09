@@ -83,7 +83,7 @@ def _module_order(dependencies):
     return tuple(order)
 
 
-def load_modules(root_ast, search_roots=()):
+def load_modules(root_ast, search_roots=(), *, sources=None, import_allowed=None):
     """Load root, adjacent sources, explicit search roots, and bundled stdlib.
 
     ``modules`` retains the supplied root object. ``exports[module][name]`` is
@@ -94,15 +94,17 @@ def load_modules(root_ast, search_roots=()):
     root_name = root_ast.items[0].items[0]
     root_file = Path(root_ast.span.filename).resolve()
     roots = [Path(path).resolve() for path in search_roots] + [STDLIB]
-    if not root_ast.span.filename.startswith('<'):
+    if sources is None and not root_ast.span.filename.startswith('<'):
         roots.append(root_file.parent)
-    candidates = sorted({path.resolve() for root in roots for path in root.rglob('*.eld')})
+    candidates = {path.resolve() for root in roots for path in root.rglob('*.eld')}
+    candidates.update(Path(path).resolve() for path in sources or ())
+    candidates = sorted(candidates)
     index = {}
     for path in candidates:
         if path == root_file:
             continue
         try:
-            text = path.read_text(encoding='utf-8', errors='replace')
+            text = path.read_text(encoding='utf-8', errors='replace', newline='')
         except OSError as error:
             raise Diagnostic('module', f'Cannot read source: {error}', Span(str(path), 0, 0, 1, 1)) from error
         header = _header(text, path)
@@ -121,6 +123,9 @@ def load_modules(root_ast, search_roots=()):
             raise Diagnostic('module', f'Duplicate module identity {name!r}', span, locations)
 
     check_duplicates(root_name, root_ast.items[0].span)
+    if sources is not None:
+        for name, entries in sorted(index.items()):
+            check_duplicates(name, entries[0][1])
 
     def visit(name):
         module = modules[name]
@@ -130,6 +135,9 @@ def load_modules(root_ast, search_roots=()):
         for node in imports:
             path = node.items[1]
             imported = path.items[0]
+            if import_allowed is not None and not import_allowed(name, imported):
+                raise Diagnostic('module', f'Module {imported!r} is not provided by a direct dependency of {name!r}',
+                                 path.span)
             if imported == HOST_MODULE:
                 continue
             check_duplicates(imported, path.span)
@@ -138,7 +146,7 @@ def load_modules(root_ast, search_roots=()):
                     raise Diagnostic('module', f'Cannot find module {imported!r}', path.span)
                 filename = index[imported][0][0]
                 try:
-                    text = filename.read_text(encoding='utf-8')
+                    text = filename.read_text(encoding='utf-8', newline='')
                 except (OSError, UnicodeError) as error:
                     raise Diagnostic('syntax', f'Cannot read source: {error}',
                                      Span(str(filename), 0, 0, 1, 1)) from error
