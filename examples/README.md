@@ -6,7 +6,7 @@
 
 [Positive programs](#positive-programs) · [Source fixtures](#executable-source-fixtures) · [Test host](#fixture-host-profile) · [Rejections](#rejection-targets) · [Handler counterexamples](#enforced-source-rejections)
 
-All **117 positive examples** execute through the source checker and interpreter. The repository root is the Eldude project, with positive programs under [src/](src) and application/test targets declared in [eldude.toml](../eldude.toml). Its `source-dir = "examples/src"` keeps the programs here; build output goes to the repository's `build/` directory.
+All **118 positive examples** execute through the source checker and interpreter. The repository root is the Eldude project, with positive programs under [src/](src) and application/test targets declared in [eldude.toml](../eldude.toml). Its `source-dir = "examples/src"` keeps the programs here; build output goes to the repository's `build/` directory.
 
 From the repository root:
 
@@ -36,7 +36,7 @@ The fixture runner still prints individual `main` results:
 
 ```sh
 uv run python -m eldude.tooling.run --examples --strict
-# 117 passed, 0 unsupported, 0 failed
+# 118 passed, 0 unsupported, 0 failed
 ```
 
 [manifest.json](manifest.json) records independently specified expected values for every positive file. Corpus execution fails for wrong values, unexpected diagnostics, missing manifest entries, or regressions. `--strict` also rejects pending implementation limits; there are currently none in this corpus. Rejection fixtures are checked separately by the test suite.
@@ -47,7 +47,7 @@ uv run python -m eldude.tooling.run --examples --strict
 | [2. Ownership](src/02_ownership) | 26 / 26 | Linear nominal types, capture contracts, inspection, recursion and trait erasure |
 | [3. Results](src/03_results) | 6 / 6 | Library imports, matching, `?` and `try` |
 | [4. Effects](src/04_effects) | 6 / 6 | Generic instances, handlers, forwarding and `Result` payloads |
-| [5. State and collections](src/05_state_and_collections) | 34 / 34 | Regions, captured callbacks, collection primitives, iteration and cleanup traits |
+| [5. State and collections](src/05_state_and_collections) | 35 / 35 | Regions, captured callbacks, collection primitives, iteration and cleanup traits |
 | [6. Tasks](src/06_tasks) | 11 / 11 | Cooperative scheduling, task groups, spawn/await and library join |
 | [7. Source pipeline](src/07_source_pipeline) | 17 / 17 | Handler evidence, ownership, resumption and cleanup regressions |
 | [8. Formatting](src/08_formatting) | 1 / 1 | Source formatting preserves field evaluation order, handlers and precedence |
@@ -154,6 +154,7 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 | 5 | [list api partition owned](src/05_state_and_collections/list_api_partition_owned.eld) | `42` | Partition preserves all linear elements |
 | 5 | [list api replace owned](src/05_state_and_collections/list_api_replace_owned.eld) | `42` | Bounds failure returns source and incoming owner |
 | 5 | [list api values](src/05_state_and_collections/list_api_values.eld) | `42` | List push, lookup, replacement, and bounds metadata |
+| 5 | [list literal long](src/05_state_and_collections/list_literal_long.eld) | `512` | Parse, check, and execute a 512-element literal |
 | 5 | [list storage growth](src/05_state_and_collections/list_storage_growth.eld) | `2096128` | Append 2048 elements and traverse a retained snapshot without recursive loop frames |
 | 5 | [list storage snapshots](src/05_state_and_collections/list_storage_snapshots.eld) | `42` | Appending, branching, and updating shared list ranges preserve earlier values |
 | 5 | [list storage owned](src/05_state_and_collections/list_storage_owned.eld) | `42` | Freeze, append, and next transfer every resource exactly once |
@@ -261,6 +262,7 @@ rejections by [value tests](../tests/source/test_values.py).
 
 | Program | Required failure |
 | --- | --- |
+| [unclosed long list literal](reject/syntax/list_literal_unclosed.eld) | Unexpected `;` after 512 elements; the closing `]` is missing |
 | [missing loop separator](reject/syntax/missing_loop_separator.eld) | Missing `;` after a nonfinal loop |
 | [effect application](reject/syntax/effect_application.eld) | Expression type application needs `::<...>` |
 | [multiple row tails](reject/syntax/multiple_row_tails.eld) | Only one tail may follow `\|` |

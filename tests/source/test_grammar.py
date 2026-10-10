@@ -1,7 +1,7 @@
 """Syntax conformance cases for the normative Eldude grammar, not type tests."""
 import unittest
 from pathlib import Path
-from eldude.source.grammar import Grammar
+from eldude.source.grammar import Grammar, SyntaxNode
 
 GRAMMAR = Path(__file__).resolve().parents[2] / 'docs/eldude.ebnf'
 
@@ -70,6 +70,79 @@ class GrammarTests(unittest.TestCase):
             tree, failure = self.grammar.parse_tokens(tokens)
             self.assertIsNone(tree)
             self.assertEqual(failure, self.grammar.syntax_failure(tokens))
+
+    def test_repetition_does_not_rescan_terminal_states(self):
+        class CountedTokens(list):
+            reads = 0
+
+            def __getitem__(self, index):
+                self.reads += 1
+                return super().__getitem__(index)
+
+        grammar = Grammar('source_file ::= item*; item ::= "x";')
+        for size in (16, 32):
+            for build_tree in (False, True):
+                with self.subTest(size=size, build_tree=build_tree):
+                    tokens = CountedTokens([('TOKEN', 'x')] * size)
+                    tree, failure = grammar._recognize(tokens, 'source_file', build_tree)
+                    self.assertIsNone(failure)
+                    if build_tree:
+                        self.assertEqual(tree, SyntaxNode('source_file', 0, size, tuple(
+                            SyntaxNode('item', i, i + 1, (i,)) for i in range(size))))
+                    self.assertLessEqual(tokens.reads, size * 2)
+
+    def test_nullable_completions_reach_later_waiters(self):
+        grammar = Grammar('source_file ::= prefix empty "x"; prefix ::= empty; empty ::= ;')
+        tokens = [('TOKEN', 'x')]
+        expected = SyntaxNode('source_file', 0, 1, (
+            SyntaxNode('prefix', 0, 0, (SyntaxNode('empty', 0, 0, ()),)),
+            SyntaxNode('empty', 0, 0, ()), 0))
+        self.assertEqual(grammar.parse_tokens(tokens), (expected, None))
+        self.assertIsNone(grammar.syntax_failure(tokens))
+        for tokens, failure in (([], 0), ([('TOKEN', 'y')], 0),
+                                ([('TOKEN', 'x'), ('TOKEN', 'y')], 1)):
+            with self.subTest(tokens=tokens):
+                self.assertEqual(grammar.syntax_failure(tokens), failure)
+                self.assertEqual(grammar.parse_tokens(tokens), (None, failure))
+
+    def test_recursive_nullable_and_ambiguous_rules_keep_first_tree(self):
+        cases = (
+            ('source_file ::= item; item ::= item | ;', [],
+             SyntaxNode('source_file', 0, 0, (SyntaxNode('item', 0, 0, ()),))),
+            ('source_file ::= a | b; a ::= "x"; b ::= "x";', [('TOKEN', 'x')],
+             SyntaxNode('source_file', 0, 1, (SyntaxNode('a', 0, 1, (0,)),))),
+        )
+        for rules, tokens, expected in cases:
+            with self.subTest(rules=rules):
+                grammar = Grammar(rules)
+                self.assertEqual(grammar.parse_tokens(tokens), (expected, None))
+                self.assertIsNone(grammar.syntax_failure(tokens))
+
+    def test_nullable_completion_can_create_another_waiter_for_itself(self):
+        grammar = Grammar('source_file ::= empty empty "x"; empty ::= ;')
+        empty = SyntaxNode('empty', 0, 0, ())
+        self.assertEqual(grammar.parse_tokens([('TOKEN', 'x')]),
+                         (SyntaxNode('source_file', 0, 1, (empty, empty, 0)), None))
+
+    def test_late_nullable_completion_preserves_derivation_order(self):
+        grammar = Grammar('source_file ::= a; a ::= | b; b ::= | a c; c ::= c "x" | b a;')
+        empty_a = SyntaxNode('a', 0, 0, ())
+        empty_b = SyntaxNode('b', 0, 0, ())
+        empty_c = SyntaxNode('c', 0, 0, (empty_b, SyntaxNode('a', 0, 0, (empty_b,))))
+        b = SyntaxNode('b', 0, 1, (empty_a, SyntaxNode('c', 0, 1, (empty_c, 0))))
+        expected = SyntaxNode('source_file', 0, 1, (SyntaxNode('a', 0, 1, (b,)),))
+        self.assertEqual(grammar.parse_tokens([('TOKEN', 'x')]), (expected, None))
+
+    def test_left_recursive_ambiguity_preserves_first_association(self):
+        grammar = Grammar('source_file ::= expression; expression ::= expression "+" expression | "x";')
+        first = SyntaxNode('expression', 0, 1, (0,))
+        second = SyntaxNode('expression', 2, 3, (2,))
+        third = SyntaxNode('expression', 4, 5, (4,))
+        left = SyntaxNode('expression', 0, 3, (first, 1, second))
+        expected = SyntaxNode('source_file', 0, 5, (
+            SyntaxNode('expression', 0, 5, (left, 3, third)),))
+        self.assertEqual(grammar.parse_tokens([('TOKEN', value) for value in 'x+x+x']),
+                         (expected, None))
 
     def test_rejected_source_forms(self):
         for source in [

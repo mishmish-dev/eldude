@@ -78,6 +78,7 @@
     "src/05_state_and_collections/list_api_values.eld": 42,
     "src/05_state_and_collections/list_failure.eld": 3,
     "src/05_state_and_collections/list_iteration_control.eld": 42,
+    "src/05_state_and_collections/list_literal_long.eld": 512,
     "src/05_state_and_collections/list_storage_growth.eld": 2096128,
     "src/05_state_and_collections/list_storage_owned.eld": 42,
     "src/05_state_and_collections/list_storage_snapshots.eld": 42,

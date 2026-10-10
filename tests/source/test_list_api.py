@@ -11,6 +11,19 @@ REJECT = ROOT / 'examples/reject/semantics'
 
 
 class ListApiTests(unittest.TestCase):
+    def test_long_literal_executes_every_element(self):
+        self.assertEqual(execute_file(EXAMPLES / 'list_literal_long.eld').value, 512)
+
+    def test_unclosed_long_literal_reports_the_failing_token(self):
+        path = ROOT / 'examples/reject/syntax/list_literal_unclosed.eld'
+        with self.assertRaises(Diagnostic) as caught:
+            compile_file(path)
+        diagnostic = caught.exception
+        self.assertEqual((diagnostic.code, diagnostic.message), ('syntax', "Unexpected ';'"))
+        self.assertEqual((diagnostic.span.filename, diagnostic.span.line, diagnostic.span.column),
+                         (str(path), 37, 5))
+        self.assertEqual(path.read_text()[diagnostic.span.start:diagnostic.span.end], ';')
+
     def test_iteration_preserves_resumption_early_return_and_cleanup(self):
         result = execute_file(EXAMPLES / 'list_iteration_control.eld')
         self.assertEqual(result.value, 42)

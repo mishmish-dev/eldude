@@ -1174,3 +1174,13 @@ host = "python::experimental"
 name = "test_state_and_collections_list_iteration_control"
 entry = "list_iteration_control::verify"
 host = "python::experimental"
+
+[[app]]
+name = "state_and_collections_list_literal_long"
+entry = "list_literal_long::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_state_and_collections_list_literal_long"
+entry = "list_literal_long::verify"
+host = "python::experimental"

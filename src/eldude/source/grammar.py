@@ -4,6 +4,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
+from heapq import heappop, heappush
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -283,32 +284,69 @@ class Grammar:
         if start not in self.bnf:
             raise ValueError(f'Unknown grammar entry point: {start}')
         chart = [{} for _ in range(len(tokens)+1)]
+        waiting = [{} for _ in chart]
         initial = ('@start', (start,), 0, 0)
         chart[0][initial] = ()
-        for index in range(len(chart)):
-            changed = True
-            while changed:
-                before = len(chart[index])
-                for (lhs, rhs, dot, origin), children in tuple(chart[index].items()):
-                    if dot == len(rhs):
-                        completed = ()
-                        if build_tree:
-                            completed = children if lhs.startswith('@') else (SyntaxNode(lhs, origin, index, children),)
-                        for (outer_lhs, outer_rhs, outer_dot, outer_origin), prefix in tuple(chart[origin].items()):
-                            if outer_dot < len(outer_rhs) and outer_rhs[outer_dot] == lhs:
-                                chart[index].setdefault((outer_lhs, outer_rhs, outer_dot+1, outer_origin),
-                                                        prefix + completed)
-                    else:
-                        symbol = rhs[dot]
-                        if isinstance(symbol, str):
-                            for option in self.bnf[symbol]:
-                                chart[index].setdefault((symbol, option, 0, index), ())
-                        elif index < len(tokens):
-                            kind, value = tokens[index]
-                            if (symbol[0] == 'token' and kind == symbol[1]) or (symbol[0] == 'literal' and value == symbol[1]):
-                                chart[index+1].setdefault((lhs, rhs, dot+1, origin),
-                                                          children + (index,) if build_tree else ())
-                changed = len(chart[index]) != before
+        for index, column in enumerate(chart):
+            states = list(column)
+            # Round and insertion order preserve the first concrete derivation.
+            pending = [(0, number) for number in range(len(states))]
+            scheduled = set(pending)
+            nullable, consumed = {}, {}
+
+            def enqueue(round_number, number):
+                item = (round_number, number)
+                if item not in scheduled:
+                    scheduled.add(item)
+                    heappush(pending, item)
+
+            def register(state):
+                _, rhs, dot, _ = state
+                if dot < len(rhs) and isinstance(rhs[dot], str):
+                    symbol = rhs[dot]
+                    waiting[index].setdefault(symbol, []).append((state, column[state]))
+                    for number in nullable.get(symbol, ()):
+                        enqueue(round_number + (number <= current), number)
+
+            def add(state, children):
+                if state not in column:
+                    column[state] = children
+                    enqueue(round_number + 1, len(states))
+                    states.append(state)
+                    register(state)
+
+            for state in states:
+                register(state)
+            while pending:
+                round_number, current = heappop(pending)
+                scheduled.remove((round_number, current))
+                state = states[current]
+                lhs, rhs, dot, origin = state
+                children = column[state]
+                if dot == len(rhs):
+                    completed = ()
+                    if build_tree:
+                        completed = children if lhs.startswith('@') else (SyntaxNode(lhs, origin, index, children),)
+                    matches = waiting[origin].get(lhs, ())
+                    begin, end = 0, len(matches)
+                    if origin == index:
+                        # Revisit late nullable waiters in the original chart round/order.
+                        if current not in consumed:
+                            nullable.setdefault(lhs, []).append(current)
+                        begin = consumed.get(current, 0)
+                        consumed[current] = end
+                    for (outer_lhs, outer_rhs, outer_dot, outer_origin), prefix in matches[begin:end]:
+                        add((outer_lhs, outer_rhs, outer_dot+1, outer_origin), prefix + completed)
+                else:
+                    symbol = rhs[dot]
+                    if isinstance(symbol, str):
+                        for option in self.bnf[symbol]:
+                            add((symbol, option, 0, index), ())
+                    elif index < len(tokens):
+                        kind, value = tokens[index]
+                        if (symbol[0] == 'token' and kind == symbol[1]) or (symbol[0] == 'literal' and value == symbol[1]):
+                            chart[index+1].setdefault((lhs, rhs, dot+1, origin),
+                                                      children + (index,) if build_tree else ())
         if ('@start', (start,), 1, 0) in chart[-1]:
             tree = chart[-1][('@start', (start,), 1, 0)][0] if build_tree else None
             return tree, None
