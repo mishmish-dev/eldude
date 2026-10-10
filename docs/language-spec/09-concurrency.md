@@ -18,7 +18,7 @@ enum FetchBothError {
 
 fn fetchBoth(id: UserId)
     ->{net, suspend, diverge}
-      Result<FetchBothError, Pair>
+      Result<Pair, FetchBothError>
 {
     taskgroup {
         let userTask = spawn fetchUser(id);
@@ -244,7 +244,7 @@ consumes `Task<T>` and returns exactly `T`.
 
 There is no mandatory `TaskOutcome<T>` wrapper.
 
-A child `Result::Err` remains the ordinary `T` value when `T = Result<E,A>`.
+A child `Result::Err` remains the ordinary `T` value when `T = Result<A,E>`.
 
 ### 42.2 Suspension
 
@@ -329,7 +329,7 @@ They are not stored as a type parameter on `Task<T>`.
 If:
 
 ```eldude
-fetch: fn() ->{net, suspend, diverge} Result<E, Data>
+fetch: fn() ->{net, suspend, diverge} Result<Data, E>
 ```
 
 then a taskgroup that spawns `fetch()` admits those child effects as part of the whole structured computation, even if the individual task handle is later discarded.

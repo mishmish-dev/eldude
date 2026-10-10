@@ -575,7 +575,7 @@ The same abandonment model is invoked indirectly at an ordinary call when the ca
 If:
 
 ```text
-expression : Result<ErrorType, SuccessType>
+expression : Result<SuccessType, ErrorType>
 ```
 
 then `expression?` has local success type `SuccessType` and an error-propagation edge carrying the same nominal `ErrorType` to the nearest `try` or enclosing function result. Within a `tail` clause, the local result delimiter of [§25.2](06-handlers.md#252-tail) replaces the enclosing function boundary: propagation may target a `try` inside the clause or its operation result, never an outer `try` or function.
@@ -587,7 +587,7 @@ The target error type must be exactly `ErrorType` after any explicit mapping alr
 If every `?` edge inside a `try` block carries the same nominal `ErrorType` after explicit mapping, and normal completion has type `SuccessType`, the result is:
 
 ```text
-Result<ErrorType, SuccessType>
+Result<SuccessType, ErrorType>
 ```
 
 A `try` block whose propagation edges have incompatible nominal error types is rejected until the program maps them explicitly to one chosen type.

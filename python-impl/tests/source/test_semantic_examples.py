@@ -24,6 +24,8 @@ class SourceSemanticExampleTests(unittest.TestCase):
 
     def test_rejection_examples_reach_their_semantic_check(self):
         cases = {
+            'result_error_mismatch': ('type', 'Propagation error type mismatch'),
+            'result_try_error_mismatch': ('type', 'Propagation error type mismatch'),
             'duplicate_record_field': ('type', 'Duplicate record pattern field'),
             'return_argument_temporary': ('semantic', 'Early return would abandon an owned argument temporary'),
             'propagate_argument_temporary': ('semantic', 'Propagation would abandon an owned argument temporary'),

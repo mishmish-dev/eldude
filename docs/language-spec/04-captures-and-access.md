@@ -369,7 +369,7 @@ fn withMut2Distinct<T, @r, R, !e, ..C>(
     left: Int,
     right: Int,
     f: fn(mut T, mut T) ->{| e} R captures {..C},
-) ->{state<@r> | e} Result<ProjectionError, R>
+) ->{state<@r> | e} Result<R, ProjectionError>
 where ..C: Discard;
 ```
 

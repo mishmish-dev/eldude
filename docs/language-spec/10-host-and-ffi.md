@@ -70,7 +70,7 @@ For example:
 
 ```eldude
 fn load(path: Path)
-    ->{fs, suspend} Result<IOError, Data>;
+    ->{fs, suspend} Result<Data, IOError>;
 ```
 
 states the behavior required from whatever application host ultimately supplies the external implementation.

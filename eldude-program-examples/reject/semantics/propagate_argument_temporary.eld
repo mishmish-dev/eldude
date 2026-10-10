@@ -7,8 +7,8 @@ fn consume(file: File, value: Unit) -> Unit {
     close(file);
 }
 
-fn attempt() -> Result<Int, Unit> {
-    let failed: Result<Int, Unit> = Result::Err(7);
+fn attempt() -> Result<Unit, Int> {
+    let failed: Result<Unit, Int> = Result::Err(7);
     Result::Ok(consume(acquire(), failed?))
 }
 

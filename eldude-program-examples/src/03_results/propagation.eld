@@ -6,7 +6,7 @@ enum InputError {
     Negative
 }
 
-fn nonnegative(value: Int) -> Result<InputError, Int> {
+fn nonnegative(value: Int) -> Result<Int, InputError> {
     if value < 0 {
         Result::Err(InputError::Negative)
     } else {
@@ -14,7 +14,7 @@ fn nonnegative(value: Int) -> Result<InputError, Int> {
     }
 }
 
-fn add(left: Int, right: Int) -> Result<InputError, Int> {
+fn add(left: Int, right: Int) -> Result<Int, InputError> {
     Result::Ok(nonnegative(left)? + nonnegative(right)?)
 }
 

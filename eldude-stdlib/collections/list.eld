@@ -18,10 +18,10 @@ impl<T> List<T> {
     where T: Dup;
 
     pub fn remove(self, index: Int)
-        -> Result<(BoundsError, List<T>), (T, List<T>)>;
+        -> Result<(T, List<T>), (BoundsError, List<T>)>;
 
     pub fn replace(self, index: Int, value: T)
-        -> Result<(BoundsError, List<T>, T), (T, List<T>)>;
+        -> Result<(T, List<T>), (BoundsError, List<T>, T)>;
 
     pub fn with<R, !e, ..C>(
         view self,

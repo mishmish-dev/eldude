@@ -379,7 +379,7 @@ A type for which silent abandonment would violate semantics must be linear rathe
 
 ```eldude
 fn copyFile(src: Path, dst: Path)
-    ->{fs, suspend, diverge} Result<IOError, Unit>
+    ->{fs, suspend, diverge} Result<Unit, IOError>
 {
     using (
         input = openInput(src)?,

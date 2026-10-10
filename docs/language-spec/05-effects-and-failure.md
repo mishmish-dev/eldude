@@ -473,8 +473,10 @@ Assertion failure is a defect; it is not represented in the function's effect ro
 Recoverable expected failure uses:
 
 ```eldude
-Result<E, T>
+Result<T, E>
 ```
+
+The value type `T` comes first; the error type `E` comes second.
 
 `Result` is the standard representation for routine expected failure. Zero-resumption affine algebraic effects remain available for abstractions whose semantics specifically require dynamically scoped control; they are not a second standard exception convention.
 
@@ -503,7 +505,7 @@ For:
 expr?
 ```
 
-`expr` is evaluated exactly once and must produce `Result<E,T>` compatible with the nearest lexical propagation target.
+`expr` is evaluated exactly once and must produce `Result<T,E>` compatible with the nearest lexical propagation target.
 
 On `Ok(value)`, the expression yields `value`.
 
@@ -520,7 +522,7 @@ Programmer-defined conversion code is never run implicitly by `?`. Nominally dif
 A lexical `try` creates a local `Result` propagation boundary:
 
 ```eldude
-let result: Result<LoadError, Config> = try {
+let result: Result<Config, LoadError> = try {
     let bytes =
         readFile(path).mapError(LoadError::IO)?;
     parse(bytes).mapError(LoadError::Parse)?
@@ -559,7 +561,7 @@ enum LoadError {
     Parse(ParseError),
 }
 
-fn load(path: Path) ->{fs, diverge} Result<LoadError, Config>
+fn load(path: Path) ->{fs, diverge} Result<Config, LoadError>
 {
     let bytes =
         readFile(path).mapError(LoadError::IO)?;
@@ -583,7 +585,7 @@ trait Diagnostic {
 
 `DiagnosticRecord` is structured diagnostic data. Its exact standard-library field schema is not a core-language semantic requirement.
 
-`Result<E,T>` accepts any `E`; `Diagnostic` is optional.
+`Result<T,E>` accepts any `E`; `Diagnostic` is optional.
 
 ### 22.2 Logging
 

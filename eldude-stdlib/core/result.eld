@@ -1,12 +1,12 @@
 module core::result;
 
-// Error type first, success type second.
-pub enum Result<E, T> {
+// Value type first, error type second.
+pub enum Result<T, E> {
     pub Err(E),
     pub Ok(T),
 }
 
-impl<E, T> Result<E, T> {
+impl<T, E> Result<T, E> {
     pub fn isOk(view self) -> Bool {
         match self {
             case Result::Err(_) => false;
@@ -17,7 +17,7 @@ impl<E, T> Result<E, T> {
     pub fn map<U, !e, ..C>(
         self,
         transform: fn(T) ->{| e} U captures {..C},
-    ) ->{| e} Result<E, U>
+    ) ->{| e} Result<U, E>
     where ..C: Discard {
         match self {
             case Result::Err(error) => Result::Err(error);
@@ -28,7 +28,7 @@ impl<E, T> Result<E, T> {
     pub fn mapError<F, !e, ..C>(
         self,
         transform: fn(E) ->{| e} F captures {..C},
-    ) ->{| e} Result<F, T>
+    ) ->{| e} Result<T, F>
     where ..C: Discard {
         match self {
             case Result::Err(error) => Result::Err(transform(error));
@@ -38,8 +38,8 @@ impl<E, T> Result<E, T> {
 
     pub fn andThen<U, !e, ..C>(
         self,
-        transform: fn(T) ->{| e} Result<E, U> captures {..C},
-    ) ->{| e} Result<E, U>
+        transform: fn(T) ->{| e} Result<U, E> captures {..C},
+    ) ->{| e} Result<U, E>
     where ..C: Discard {
         match self {
             case Result::Err(error) => Result::Err(error);

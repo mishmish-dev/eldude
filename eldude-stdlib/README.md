@@ -9,7 +9,7 @@ The [library profile](../docs/standard-library.md) owns representation, cost, ow
 | Module | Initial surface | Implementation status |
 | --- | --- | --- |
 | [core::option](core/option.eld) | `Option`, `isSome`, `map`, `andThen` | All methods execute checked source bodies |
-| [core::result](core/result.eld) | `Result<E,T>`, `isOk`, `map`, `mapError`, `andThen` | All methods execute checked source bodies; propagation is intrinsic |
+| [core::result](core/result.eld) | `Result<T,E>`, `isOk`, `map`, `mapError`, `andThen` | All methods execute checked source bodies; propagation is intrinsic |
 | [core::iter](core/iter.eld) | `Next<I,T>`, ownership-threaded `Iterator` | `for` uses checked `next` implementations; finite stored-subterm steps and primitive `List` iteration need no `diverge` |
 | [core::cleanup](core/cleanup.eld) | `Cleanup<!e>` | Intrinsic protocol; user implementation bodies are checked and executed |
 | [collections::linked_list](collections/linked_list.eld) | `LinkedList`, `prepend`, consuming `length`, `next` | All three methods execute checked source bodies |

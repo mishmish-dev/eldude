@@ -6,12 +6,12 @@ enum ReadError {
     Unavailable
 }
 
-fn unavailable() -> Result<ReadError, Int> {
+fn unavailable() -> Result<Int, ReadError> {
     Result::Err(ReadError::Unavailable)
 }
 
 effect Read {
-    tail value() -> Result<ReadError, Int>;
+    tail value() -> Result<Int, ReadError>;
 }
 
 pub fn main() -> Int {

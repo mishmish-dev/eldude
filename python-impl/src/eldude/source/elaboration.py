@@ -330,7 +330,7 @@ class SourceElaborator(TypeElaborator):
     def scoped_body(self, node, environment, handlers, expected, wrap=False):
         key = self.symbol(Node('name', node.span, ('exit',)))
         self.exit_stack.append((key, expected))
-        body = self.expression(node, environment, handlers, expected.args[1] if wrap and expected else expected)
+        body = self.expression(node, environment, handlers, expected.args[0] if wrap and expected else expected)
         self.exit_stack.pop()
         return self.ir(node, 'exit_scope', key, expected, body, wrap)
 

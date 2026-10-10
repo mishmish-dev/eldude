@@ -8,11 +8,11 @@ pub fn main() -> Int {
     let present = Option::Some(acquire());
     let flag = view present.isSome();
     let mapped = present.map(
-        fn(file: File) -> Result<Int, File> {
+        fn(file: File) -> Result<File, Int> {
             Result::Ok(file)
         }
     ).andThen(
-        fn(result: Result<Int, File>) -> Option<File> {
+        fn(result: Result<File, Int>) -> Option<File> {
             match result {
                 case Result::Err(_) => Option::None;
                 case Result::Ok(file) => Option::Some(file);
@@ -23,14 +23,14 @@ pub fn main() -> Int {
         case Option::Some(file) => close(file);
         case Option::None => ();
     };
-    let failed: Result<File, Int> = Result::Err(acquire());
+    let failed: Result<Int, File> = Result::Err(acquire());
     match failed.map(fn(n: Int) -> Int {
         n + 1
     }) {
         case Result::Err(file) => close(file);
         case Result::Ok(_) => ();
     };
-    let succeeded: Result<Int, File> = Result::Ok(acquire());
+    let succeeded: Result<File, Int> = Result::Ok(acquire());
     let result = succeeded.mapError(
         fn(n: Int) -> Int {
             n + 1

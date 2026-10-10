@@ -8,8 +8,8 @@ fn consume(file: File, value: Unit) -> Unit {
 }
 
 pub fn main() -> Unit {
-    let result: Result<Int, Unit> = try {
-        let failed: Result<Int, Unit> = Result::Err(7);
+    let result: Result<Unit, Int> = try {
+        let failed: Result<Unit, Int> = Result::Err(7);
         consume(acquire(), failed?)
     };
 }

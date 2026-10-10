@@ -31,7 +31,7 @@ The [stdlib module map](../eldude-stdlib/README.md) distinguishes checked source
 | Language hook | Library identity |
 | --- | --- |
 | Optional access and `??` | `core::option::Option<T>` |
-| `?` and `try` | `core::result::Result<E,T>`, error first |
+| `?` and `try` | `core::result::Result<T,E>`, value first, error second |
 | List literal | `collections::list::List<T>` |
 | `for` | `core::iter::Iterator` and `core::iter::Next<I,T>` |
 | `using` | `core::cleanup::Cleanup<!e>` |
@@ -48,7 +48,7 @@ The following facts must accompany the eventual canonical interfaces; a semicolo
 | Type | `Dup` guarantee | `Discard` guarantee | Stored provenance |
 | --- | --- | --- | --- |
 | `Option<T>` | `T: Dup` | `T: Discard` | Selected payload |
-| `Result<E,T>` | `E: Dup` and `T: Dup` | `E: Discard` and `T: Discard` | Selected error/success payload |
+| `Result<T,E>` | `E: Dup` and `T: Dup` | `E: Discard` and `T: Discard` | Selected error/success payload |
 | `Next<I,T>` | `I: Dup` and `T: Dup` | `I: Discard` and `T: Discard` | Item and successor state |
 | `LinkedList<T>` | `T: Dup` | `T: Discard` | Finite visible recursive storage |
 | `List<T>` | `T: Dup` | `T: Discard` | Whole-value summary of retained contents; no intrinsic allocation-region identity |

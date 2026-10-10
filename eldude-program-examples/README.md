@@ -102,7 +102,7 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 | 2 | [trait prerequisites](src/02_ownership/trait_prerequisites.eld) | `42` | Decreasing element constraints and normalized associated results |
 | 3 | [option](src/03_results/option.eld) | `42` | Library method and lazy fallback |
 | 3 | [propagation](src/03_results/propagation.eld) | `42` | Error identity and `?` |
-| 3 | [try scope](src/03_results/try_scope.eld) | `42` | Local error propagation |
+| 3 | [try scope](src/03_results/try_scope.eld) | `42` | Value-first Result inference, transformations, and local error propagation |
 | 3 | [try argument owner](src/03_results/try_argument_owner.eld) | `42` | Local propagation preserves a pending resource outside its boundary |
 | 4 | [handler](src/04_effects/handler.eld) | `42` | Tail clause returns its operation result for automatic resumption |
 | 4 | [generic instances](src/04_effects/generic_instances.eld) | `42` | Distinct `Read<Int>`/`Read<Bool>` instances |
@@ -292,6 +292,8 @@ rejections by [value tests](../python-impl/tests/source/test_values.py).
 | [return argument temporary](reject/semantics/return_argument_temporary.eld) | Return cannot abandon an earlier owned argument |
 | [propagation argument temporary](reject/semantics/propagate_argument_temporary.eld) | Function propagation cannot abandon an earlier owned argument |
 | [try argument temporary](reject/semantics/try_argument_temporary.eld) | Local propagation cannot abandon an argument created inside its boundary |
+| [Result error mismatch](reject/semantics/result_error_mismatch.eld) | Function propagation requires the same nominal error type in the second parameter |
+| [try error mismatch](reject/semantics/result_try_error_mismatch.eld) | Local propagation requires the same nominal error type in the second parameter |
 | [nonexhaustive record pattern](reject/semantics/nonexhaustive_record_pattern.eld) | Nested refutable fields require complete coverage |
 | [recursive callable parameter](reject/semantics/recursive_callable_parameter.eld) | Recursion beneath a callable parameter is not finite positive storage |
 | [recursive callable result](reject/semantics/recursive_callable_result.eld) | Recursion beneath a callable result is not finite positive storage |

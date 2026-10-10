@@ -108,7 +108,7 @@ where T: Dup;
 fn remove<T>(
     values: List<T>,
     index: Int,
-) -> Result<(BoundsError, List<T>), (T, List<T>)>;
+) -> Result<(T, List<T>), (BoundsError, List<T>)>;
 
 fn filter<T, ..C>(
     values: List<T>,
@@ -131,7 +131,7 @@ where ..C: Dup + Discard;
 An immutable update that discards a displaced element requires `T: Discard`:
 
 ```eldude
-fn set<T>(values: List<T>, index: Int, value: T) -> Result<BoundsError, List<T>>
+fn set<T>(values: List<T>, index: Int, value: T) -> Result<List<T>, BoundsError>
 where T: Discard;
 ```
 
@@ -142,7 +142,7 @@ fn replace<T>(
     values: List<T>,
     index: Int,
     value: T,
-) -> Result<(BoundsError, List<T>, T), (T, List<T>)>;
+) -> Result<(T, List<T>), (BoundsError, List<T>, T)>;
 ```
 
 ## 34. Indexing and scoped inspection

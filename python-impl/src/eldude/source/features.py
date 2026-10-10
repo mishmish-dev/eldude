@@ -42,7 +42,7 @@ class FeatureChecker(HandlerChecker):
         if t.name == 'Option':
             return () if tag == 'None' else (t.args[0],)
         if t.name == 'Result':
-            return (t.args[0 if tag == 'Err' else 1],)
+            return (t.args[1 if tag == 'Err' else 0],)
         declarations = self.variants.get(t.name, {})
         if tag not in declarations:
             raise InferenceError('Unknown enum variant ' + tag, code='type')
@@ -311,7 +311,7 @@ class FeatureChecker(HandlerChecker):
                     t = replace(t, args=(join_type(t.args[0], values[0].type),))
                 elif t.name == 'Result':
                     args = list(t.args)
-                    index = 0 if tag == 'Err' else 1
+                    index = 1 if tag == 'Err' else 0
                     args[index] = join_type(args[index], values[0].type)
                     t = replace(t, args=tuple(args))
                 return value(t, ambient(*(v.effects for v in values)), frozenset().union(*(v.captures for v in values)))
@@ -386,7 +386,7 @@ class FeatureChecker(HandlerChecker):
                 self.exit_temporaries[key] = len(context.temporaries)
                 result = self._infer(body, context)
                 if wrap:
-                    inferred = Ty('Result', (expected.args[0] if expected else UNKNOWN, result.type))
+                    inferred = Ty('Result', (result.type, expected.args[1] if expected else UNKNOWN))
                 else:
                     inferred = result.type
                 captures = result.captures
@@ -431,7 +431,7 @@ class FeatureChecker(HandlerChecker):
                 expected = self.exit_contracts[key]
                 if not isinstance(result.type, Ty) or result.type.name != 'Result':
                     raise InferenceError('? requires Result', code='type')
-                if expected and (expected.name != 'Result' or not compatible(expected.args[0], result.type.args[0])):
+                if expected and (expected.name != 'Result' or not compatible(expected.args[1], result.type.args[1])):
                     raise InferenceError('Propagation error type mismatch', code='type')
                 for name, binding in context.live:
                     if (binding not in self.exit_outside[key] and not binding.consumed
@@ -439,9 +439,9 @@ class FeatureChecker(HandlerChecker):
                         raise InferenceError(f'Propagation would abandon {name}', subject=name)
                 if any(not permissions(v.type)[1] for v in context.temporaries[self.exit_temporaries[key]:]):
                     raise InferenceError('Propagation would abandon an owned argument temporary')
-                self.record_exit(key, value(Ty('Result', (result.type.args[0], NEVER)),
+                self.record_exit(key, value(Ty('Result', (NEVER, result.type.args[1])),
                                             captures=result.captures), context)
-                return value(result.type.args[1], result.effects, result.captures)
+                return value(result.type.args[0], result.effects, result.captures)
             case ('coalesce', option, fallback):
                 first = self._infer(option, context)
                 if first.type.name != 'Option':
@@ -685,7 +685,7 @@ class FeatureChecker(HandlerChecker):
                     error = library_types.get('collections::list::BoundsError',
                         Ty('Record:collections::list::BoundsError', (Ty('index', (INT,)), Ty('length', (NAT,)))))
                     failure = (error, t, element) if method == 'replace' else (error, t)
-                    result = Ty('Result', (Ty('Tuple', failure), Ty('Tuple', (element, t))))
+                    result = Ty('Result', (Ty('Tuple', (element, t)), Ty('Tuple', failure)))
             elif method in ('with', 'filter', 'partition') and len(values) == (2 if method == 'with' else 1):
                 callback = values[-1]
                 if method == 'with' and values[0].type != INT:
