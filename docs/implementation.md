@@ -97,7 +97,9 @@ dependencies. Consumers ignore dependency development pins, locks, and test depe
 Source selection keeps test and production import environments separate, indexes
 declared module identities, and rejects duplicate providers and filesystem paths that
 cross source or package boundaries. Selected roots can check despite unrelated body
-errors. Libraries need no entry or host, but declaration/generic-body checks retain
+errors. Application targets inherit an explicit `package.host` when they omit
+their own host; per-app hosts override it. Tests and embeddings require their own
+hosts. Libraries need no entry or host, but declaration/generic-body checks retain
 the existing supported-subset limits.
 
 Python builds serialize checked IR with a versioned, explicit record whitelist. Version 2 records the checker’s handler-inheritance decision on each installation; version 1 artifacts must be rebuilt for this interpreter. Existing zipapps retain their bundled interpreter.

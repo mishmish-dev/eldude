@@ -53,6 +53,22 @@ class EldudeCLITests(unittest.TestCase):
         self.assertEqual(event['kind'], 'diagnostic')
         self.assertEqual(event['primary']['line'], 2)
 
+    def test_run_with_inherited_package_host_and_explicit_override(self):
+        self.package(targets=(
+            'host="python::experimental"\n'
+            '[[app]]\nname="inherited"\nentry="app::main"\n'
+            '[[app]]\nname="override"\nentry="app::main"\nhost="cli::standard"\n'))
+        result = self.cli('metadata')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        targets = json.loads(result.stdout)['packages'][0]['targets']['app']
+        self.assertEqual([target['host'] for target in targets],
+                         ['python::experimental', 'cli::standard'])
+        result = self.cli('run', '--app', 'inherited')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        result = self.cli('run', '--app', 'override')
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn('cli::standard', result.stderr)
+
     def test_json_spans_count_unicode_scalars_and_preserve_crlf(self):
         self.package()
         source = 'module app;\r\n// π 🚀\r\nfn bad()->Int { true }\r\n'

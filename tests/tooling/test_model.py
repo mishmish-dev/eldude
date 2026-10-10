@@ -62,6 +62,39 @@ class ProjectModelTests(unittest.TestCase):
                         read_manifest(root / 'eldude.toml')
                     self.assertEqual(caught.exception.span.line, line)
 
+    def test_apps_inherit_package_host_and_can_override_it(self):
+        from eldude.tooling.model import read_manifest
+        root = self.package(extra=(
+            'host="python::experimental"\n'
+            '[[app]]\nname="inherited"\nentry="app::main"\n'
+            '[[app]]\nname="override"\nentry="app::main"\nhost="cli::standard"\n'))
+        manifest = read_manifest(root / 'eldude.toml')
+        self.assertEqual([target['host'] for target in manifest.data['app']],
+                         ['python::experimental', 'cli::standard'])
+
+    def test_invalid_package_and_app_hosts_have_locations(self):
+        from eldude.tooling.model import read_manifest
+        for value in ('"invalid"', '""', '42'):
+            for package_host in (True, False):
+                extra = (f'host={value}\n' if package_host else
+                         'host="python::experimental"\n[[app]]\nname="app"\n'
+                         f'entry="app::main"\nhost={value}\n')
+                root = self.package(extra=extra)
+                with self.subTest(value=value, package_host=package_host):
+                    with self.assertRaisesRegex(Diagnostic, 'invalid string value') as caught:
+                        read_manifest(root / 'eldude.toml')
+                    self.assertEqual(caught.exception.code, 'configuration')
+                    self.assertEqual(caught.exception.span.line, 5 if package_host else 9)
+
+    def test_tests_and_embeddings_still_require_their_own_host(self):
+        from eldude.tooling.model import read_manifest
+        for kind, entries in (('test', 'entry="app::main"'),
+                              ('embed', 'exports=["app::main"]')):
+            root = self.package(extra=(
+                f'host="python::experimental"\n[[{kind}]]\nname="runner"\n{entries}\n'))
+            with self.subTest(kind=kind), self.assertRaisesRegex(Diagnostic, 'missing required field host'):
+                read_manifest(root / 'eldude.toml')
+
     def test_discovery_excludes_nested_packages_builds_and_symlink_directories(self):
         from eldude.tooling.model import read_manifest, source_files
         root = self.package()

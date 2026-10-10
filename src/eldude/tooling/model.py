@@ -128,11 +128,13 @@ def read_manifest(path):
         version(data['toolchain']['version'], 'toolchain.version')
     if 'package' in data:
         package = data['package']
-        table(package, ('name', 'version', 'eldude', 'source-dir', 'test-dir'), 'package', ('name', 'version'))
+        table(package, ('name', 'version', 'eldude', 'source-dir', 'test-dir', 'host'), 'package', ('name', 'version'))
         string(package['name'], 'package.name', IDENTIFIER)
         version(package['version'], 'package.version')
         if 'eldude' in package:
             version(package['eldude'], 'package.eldude', True)
+        if 'host' in package:
+            string(package['host'], 'package.host', QUALIFIED)
         for kind in ('source-dir', 'test-dir'):
             string(package.get(kind, 'src' if kind == 'source-dir' else 'tests'), 'package.' + kind)
             root = manifest.directory(kind)
@@ -168,7 +170,12 @@ def read_manifest(path):
             manifest.fail(kind, 'target arrays require a package')
         for occurrence, target in enumerate(targets):
             entries = 'exports' if kind == 'embed' else 'entry'
-            table(target, ('name', entries, 'host'), kind, ('name', entries, 'host'), occurrence=occurrence)
+            table(target, ('name', entries, 'host'), kind, ('name', entries), occurrence=occurrence)
+            if 'host' not in target:
+                if kind == 'app' and 'host' in data['package']:
+                    target['host'] = data['package']['host']
+                else:
+                    manifest.fail(kind, 'missing required field host', occurrence=occurrence)
             string(target['name'], kind + '.name', IDENTIFIER, occurrence=occurrence)
             string(target['host'], kind + '.host', QUALIFIED, occurrence=occurrence)
             if target['name'] in names:

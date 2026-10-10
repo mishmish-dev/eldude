@@ -67,11 +67,11 @@ manifest-version = 1
 [package]
 name = "hello"
 version = "0.1.0"
+host = "python::experimental"
 
 [[app]]
 name = "hello"
 entry = "hello::main"
-host = "python::experimental"
 ```
 
 With `src/main.eld` declaring `module hello; pub fn main() -> Int { 0 }`:
@@ -81,6 +81,10 @@ uv run eldude build --manifest-path /tmp/hello/eldude.toml
 uv run eldude run --manifest-path /tmp/hello/eldude.toml
 uv run eldude test --manifest-path /tmp/hello/eldude.toml --message-format=json
 ```
+
+`package.host` supplies the host for apps that omit `host`; an app's explicit
+`host` overrides it. An app must have either a package host or its own host.
+Test and embedding targets still require their own explicit `host`.
 
 The Python host requires an exported, nongeneric, nullary `Int` function, closed
 handler evidence, and a result from 0 through 255. That result becomes the process
