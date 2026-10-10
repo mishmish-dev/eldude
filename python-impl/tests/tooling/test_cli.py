@@ -69,6 +69,23 @@ class EldudeCLITests(unittest.TestCase):
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn('cli::standard', result.stderr)
 
+    def test_tests_inherit_package_host_and_can_override_it(self):
+        self.package(targets=(
+            'host="python::experimental"\n'
+            '[[test]]\nname="inherited"\nentry="app::main"\n'
+            '[[test]]\nname="override"\nentry="app::main"\nhost="cli::standard"\n'))
+        result = self.cli('metadata')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        targets = json.loads(result.stdout)['packages'][0]['targets']['test']
+        self.assertEqual([target['host'] for target in targets],
+                         ['python::experimental', 'cli::standard'])
+        result = self.cli('test', '--test', 'inherited')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('1 tests executed; 0 failed', result.stderr)
+        result = self.cli('test', '--test', 'override')
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn('cli::standard', result.stderr)
+
     def test_json_spans_count_unicode_scalars_and_preserve_crlf(self):
         self.package()
         source = 'module app;\r\n// π 🚀\r\nfn bad()->Int { true }\r\n'
@@ -174,8 +191,9 @@ class EldudeCLITests(unittest.TestCase):
         self.assertEqual(result.stdout, '')
         self.assertIn('selected 84', result.stderr.splitlines()[0])
         self.assertIn('eldude run --app NAME', result.stderr)
-        self.assertEqual([line for line in result.stderr.splitlines() if line.startswith('  ')],
-                         [f'  app:{name}' for name in names])
+        self.assertIn('Available applications:\n  Package app:\n', result.stderr)
+        self.assertEqual([line for line in result.stderr.splitlines() if line.startswith('    ')],
+                         [f'    {name}' for name in names])
         self.assertEqual(self.cli('run', '--app', names[0]).returncode, 0)
 
     def test_run_workspace_selection_explains_package_and_application_flags(self):
@@ -191,8 +209,8 @@ class EldudeCLITests(unittest.TestCase):
         result = self.cli('run')
         self.assertEqual(result.returncode, 2)
         self.assertIn('eldude run --package PACKAGE --app NAME', result.stderr)
-        self.assertIn('  app:hello\n', result.stderr)
-        self.assertIn('  member:hello\n', result.stderr)
+        self.assertIn('Available applications:\n  Package app:\n    hello\n'
+                      '  Package member:\n    hello\n', result.stderr)
         self.assertEqual(self.cli('run', '--package', 'app', '--app', 'hello').returncode, 0)
 
     def test_run_without_applications_explains_manifest_declaration(self):

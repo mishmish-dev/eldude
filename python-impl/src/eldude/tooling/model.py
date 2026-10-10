@@ -172,7 +172,7 @@ def read_manifest(path):
             entries = 'exports' if kind == 'embed' else 'entry'
             table(target, ('name', entries, 'host'), kind, ('name', entries), occurrence=occurrence)
             if 'host' not in target:
-                if kind == 'app' and 'host' in data['package']:
+                if kind in ('app', 'test') and 'host' in data['package']:
                     target['host'] = data['package']['host']
                 else:
                     manifest.fail(kind, 'missing required field host', occurrence=occurrence)

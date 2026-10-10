@@ -82,15 +82,16 @@ uv run eldude run --manifest-path /tmp/hello/eldude.toml
 uv run eldude test --manifest-path /tmp/hello/eldude.toml --message-format=json
 ```
 
-`package.host` supplies the host for apps that omit `host`; an app's explicit
-`host` overrides it. An app must have either a package host or its own host.
-Test and embedding targets still require their own explicit `host`.
+`package.host` supplies the host for apps and tests that omit `host`; a target's
+explicit `host` overrides it. Apps and tests must have either a package host or
+their own host. Embedding targets require their own explicit `host`.
 
 The Python host requires an exported, nongeneric, nullary `Int` function, closed
 handler evidence, and a result from 0 through 255. That result becomes the process
 exit status; other results and execution defects fail. Register tests with
-`[[test]]`, `name`, `entry`, and `host` using the same convention. Each runner starts
-in its package directory in a separate Python process. No registered runners
+`[[test]]`, `name`, and `entry` using the same convention; `host` may be inherited
+from the package. Each runner starts in its package directory in a separate Python
+process. No registered runners
 reports `No test targets selected` with zero executed tests.
 
 Application artifacts are `.pyz` archives containing checked IR and the interpreter;

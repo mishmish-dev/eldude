@@ -145,11 +145,11 @@ A library has a `[package]` and may have dependencies and a toolchain pin. It om
 | `package.eldude` | Optional supported compiler version constraint; checked for every resolved package. Omission adds no declared version constraint. |
 | `package.source-dir` | Package-relative source directory; defaults to `src`. |
 | `package.test-dir` | Package-relative test directory; defaults to `tests`, which may be absent. |
-| `package.host` | Optional explicit host identity inherited by application targets that omit `host`. |
+| `package.host` | Optional explicit host identity inherited by application and test targets that omit `host`. |
 | `toolchain.version` | Optional exact development toolchain version, owned by the package or workspace root. Generated projects include it. |
 | `app[].name`, `app[].entry`, `app[].host` | Required application name and exported root; host overrides `package.host`, or is required when no package host is declared. |
 | `embed[].name`, `embed[].exports`, `embed[].host` | Required embedding name, nonempty exported function list, and host identity. |
-| `test[].name`, `test[].entry`, `test[].host` | Required test runner name, exported root, and host identity. |
+| `test[].name`, `test[].entry`, `test[].host` | Required test runner name and exported root; host overrides `package.host`, or is required when no package host is declared. |
 | `dependencies` | Direct dependencies used by production modules and targets. |
 | `dev-dependencies` | Additional dependencies available to test targets and test-directory modules. |
 | `workspace.members` | Explicit member directories; no implicit recursive membership or globs. |
@@ -176,7 +176,7 @@ Source editions and independently selectable formatter editions are deferred. An
 
 ### Explicit root declarations
 
-Every application, embedding target, and executable test runner has an explicitly configured host. An application's own `host` takes precedence over `package.host`; omitting both is a configuration error, including when the intended host is the standard CLI host. Embedding targets and test runners require their own `host` and do not inherit the package host. `eldude new` writes the declaration rather than relying on a hidden default. There is no global fallback host or command-line host override in version 1. Metadata and build records report each target's effective host.
+Every application, embedding target, and executable test runner has an explicitly configured host. An application's or test runner's own `host` takes precedence over `package.host`; omitting both is a configuration error, including when the intended host is the standard CLI host. Embedding targets require their own `host` and do not inherit the package host. `eldude new` writes the declaration rather than relying on a hidden default. There is no global fallback host or command-line host override in version 1. Metadata and build records report each target's effective host.
 
 This follows the language's [host model](language-spec/10-host-and-ffi.md#48-host-model). A host defines startup and entry compatibility, external service implementations, scheduler/event integration, lifecycle ownership, and relevant native trust contracts. It is build metadata, not an implicitly passed value or capture.
 
