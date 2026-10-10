@@ -168,31 +168,29 @@ The [handler guide](docs/implementation.md#handler-and-resumption-experiment) co
 
 ## Licence
 
-```
-THE LICENCE
-Version 1.0
-
-Copyright (c) 2026 Mishmish Dev
-
-Right. We’ll do this with an example. There’s you, and there’s another chap. He isn’t here. I’ve invented him. We don’t need to look for him.
-
-You’ve obtained a copy of some software, together with the documents that go with it. For the purposes of this explanation, all of that is “the Software”. I’m going to point at this bit of paper when I say it. It isn’t actually on the paper. That’s just to help.
-
-Now, you’re given permission, at no cost, to deal with the Software without restriction. You can use it, copy it, modify it, merge it, publish it, distribute it, sublicense it, or sell copies. Any of those. Other things as well. We haven’t made a list of everything because then we’d still be making the list.
-
-So you give a copy to this other chap. He’s got it now. You’ve still got it as well. That’s perfectly normal. We haven’t accidentally given it to you twice.
-
-You’re allowed to let him do all those things too. And that applies to anyone you supply it to. He could be several people. He couldn’t personally be several people, but there could be several people in the position I’ve put him in.
-
-There is a condition: every copy, or substantial portion of the Software, must include the copyright notice above and this permission notice. Those go with it. So when he gets it, he gets the bit explaining why he’s allowed to have it and what he’s allowed to do. Otherwise I’d have to explain this to him separately, and we’ve only just got you sorted.
-
-Now, the Software is supplied “as is”, without any warranty, express or implied. No promises about merchantable quality, suitability for a particular purpose, or noninfringement of anyone else’s rights. It might do exactly what you want. That’s allowed to happen. They just haven’t promised it will.
-
-And under no circumstances are the authors or copyright holders liable for any claims, damages or other liability arising from or connected with the Software, using it, or any other dealings with it. Contract, tort, otherwise—it covers all of those.
-
-So if the chap has a claim connected with it, the authors and copyright holders aren’t liable. You might be an author as well, of course. I haven’t asked. You could be giving him something you wrote yourself.
-
-In which case I’ve been imagining an extra person unnecessarily.
-
-Right. Where’s this other chap, then? I’d like to hear his side.
-```
+> THE LICENCE
+> Version 1.0
+> 
+> Copyright (c) 2026 Mishmish Dev
+> 
+> Right. We’ll do this with an example. There’s you, and there’s another chap. He isn’t here. I’ve invented him. We don’t need to look for him.
+> 
+> You’ve obtained a copy of some software, together with the documents that go with it. For the purposes of this explanation, all of that is “the Software”. I’m going to point at this bit of paper when I say it. It isn’t actually on the paper. That’s just to help.
+> 
+> Now, you’re given permission, at no cost, to deal with the Software without restriction. You can use it, copy it, modify it, merge it, publish it, distribute it, sublicense it, or sell copies. Any of those. Other things as well. We haven’t made a list of everything because then we’d still be making the list.
+> 
+> So you give a copy to this other chap. He’s got it now. You’ve still got it as well. That’s perfectly normal. We haven’t accidentally given it to you twice.
+> 
+> You’re allowed to let him do all those things too. And that applies to anyone you supply it to. He could be several people. He couldn’t personally be several people, but there could be several people in the position I’ve put him in.
+> 
+> There is a condition: every copy, or substantial portion of the Software, must include the copyright notice above and this permission notice. Those go with it. So when he gets it, he gets the bit explaining why he’s allowed to have it and what he’s allowed to do. Otherwise I’d have to explain this to him separately, and we’ve only just got you sorted.
+> 
+> Now, the Software is supplied “as is”, without any warranty, express or implied. No promises about merchantable quality, suitability for a particular purpose, or noninfringement of anyone else’s rights. It might do exactly what you want. That’s allowed to happen. They just haven’t promised it will.
+> 
+> And under no circumstances are the authors or copyright holders liable for any claims, damages or other liability arising from or connected with the Software, using it, or any other dealings with it. Contract, tort, otherwise—it covers all of those.
+> 
+> So if the chap has a claim connected with it, the authors and copyright holders aren’t liable. You might be an author as well, of course. I haven’t asked. You could be giving him something you wrote yourself.
+> 
+> In which case I’ve been imagining an extra person unnecessarily.
+> 
+> Right. Where’s this other chap, then? I’d like to hear his side.
