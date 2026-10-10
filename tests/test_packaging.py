@@ -14,7 +14,7 @@ from eldude.runtime.artifact import decode_program
 from eldude.core.handlers import run
 
 program = decode_program({
-    'ir_version': 1,
+    'ir_version': 2,
     'core': {'tuple': ['nat', 42]},
     'operations': {'map': []},
     'result': {'record': 'Ty', 'id': 0,

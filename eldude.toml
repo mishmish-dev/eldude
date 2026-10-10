@@ -1184,3 +1184,153 @@ host = "python::experimental"
 name = "test_state_and_collections_list_literal_long"
 entry = "list_literal_long::verify"
 host = "python::experimental"
+
+[[app]]
+name = "runtime_recursion"
+entry = "examples::ownership::runtime_recursion::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_runtime_recursion"
+entry = "examples::ownership::runtime_recursion::verify"
+host = "python::experimental"
+
+[[app]]
+name = "runtime_structural_values"
+entry = "examples::ownership::runtime_structural_values::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_runtime_structural_values"
+entry = "examples::ownership::runtime_structural_values::verify"
+host = "python::experimental"
+
+[[app]]
+name = "runtime_cleanup_propagation"
+entry = "examples::results::runtime_cleanup_propagation::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_runtime_cleanup_propagation"
+entry = "examples::results::runtime_cleanup_propagation::verify"
+host = "python::experimental"
+
+[[app]]
+name = "runtime_abandon_cleanup"
+entry = "examples::effects::runtime_abandon_cleanup::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_runtime_abandon_cleanup"
+entry = "examples::effects::runtime_abandon_cleanup::verify"
+host = "python::experimental"
+
+[[app]]
+name = "runtime_resumptions"
+entry = "examples::effects::runtime_resumptions::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_runtime_resumptions"
+entry = "examples::effects::runtime_resumptions::verify"
+host = "python::experimental"
+
+[[app]]
+name = "runtime_await_dependency"
+entry = "examples::tasks::runtime_await_dependency::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_runtime_await_dependency"
+entry = "examples::tasks::runtime_await_dependency::verify"
+host = "python::experimental"
+
+[[app]]
+name = "runtime_cancel_await"
+entry = "examples::tasks::runtime_cancel_await::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_runtime_cancel_await"
+entry = "examples::tasks::runtime_cancel_await::verify"
+host = "python::experimental"
+
+[[app]]
+name = "runtime_cancel_shutdown"
+entry = "examples::tasks::runtime_cancel_shutdown::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_runtime_cancel_shutdown"
+entry = "examples::tasks::runtime_cancel_shutdown::verify"
+host = "python::experimental"
+
+[[app]]
+name = "runtime_inherited_return"
+entry = "examples::tasks::runtime_inherited_return::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_runtime_inherited_return"
+entry = "examples::tasks::runtime_inherited_return::verify"
+host = "python::experimental"
+
+[[app]]
+name = "runtime_nested_groups"
+entry = "examples::tasks::runtime_nested_groups::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_runtime_nested_groups"
+entry = "examples::tasks::runtime_nested_groups::verify"
+host = "python::experimental"
+
+[[app]]
+name = "runtime_parent_handler"
+entry = "examples::tasks::runtime_parent_handler::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_runtime_parent_handler"
+entry = "examples::tasks::runtime_parent_handler::verify"
+host = "python::experimental"
+
+[[app]]
+name = "runtime_yields"
+entry = "examples::tasks::runtime_yields::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_runtime_yields"
+entry = "examples::tasks::runtime_yields::verify"
+host = "python::experimental"
+
+[[app]]
+name = "runtime_fixed_recursion"
+entry = "examples::effects::runtime_fixed_recursion::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_runtime_fixed_recursion"
+entry = "examples::effects::runtime_fixed_recursion::verify"
+host = "python::experimental"
+
+[[app]]
+name = "runtime_defect_cleanup"
+entry = "examples::tasks::runtime_defect_cleanup::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_runtime_defect_cleanup"
+entry = "examples::tasks::runtime_defect_cleanup::verify"
+host = "python::experimental"
+
+[[app]]
+name = "runtime_inherited_closure"
+entry = "examples::tasks::runtime_inherited_closure::verify"
+host = "python::experimental"
+
+[[test]]
+name = "test_runtime_inherited_closure"
+entry = "examples::tasks::runtime_inherited_closure::verify"
+host = "python::experimental"

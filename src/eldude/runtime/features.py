@@ -1,7 +1,7 @@
 """Runtime values, pattern matching, and execution of source feature IR."""
 from dataclasses import dataclass, replace
 
-from eldude.core.handlers import Defect, _bind, _protect_call, _Slot, _Request, _read
+from eldude.core.handlers import Defect, _bind, _protect_call, _Slot, _read
 
 
 @dataclass(frozen=True)
@@ -83,34 +83,40 @@ class EarlyExit(BaseException):
 
 
 def catch_exit(compute, key, finish):
-    try:
-        result = compute()
-    except EarlyExit as error:
-        if error.key != key:
-            raise
-        return error.result
-    if isinstance(result, _Request):
-        return replace(result, continue_with=lambda supplied: catch_exit(lambda: result.continue_with(supplied), key, finish))
-    return finish(result)
+    from eldude.runtime.control import Bind, Call, Catch
+    def recover(error):
+        if isinstance(error, EarlyExit) and error.key == key:
+            return error.result
+        raise error
+    return Catch(Bind(Call(compute), finish), recover)
 
 
 def match_value(pattern, retained, output):
-    kind = pattern[0]
-    if kind == 'wild':
-        return True
-    if kind == 'bind':
-        output[pattern[1]] = _Slot(retained)
-        return True
-    if kind == 'literal_pat':
-        return type(retained) is type(pattern[1]) and retained == pattern[1]
-    if kind == 'tuple_pat':
-        return isinstance(retained, tuple) and len(retained) == len(pattern)-1 and all(match_value(p, v, output) for p, v in zip(pattern[1:], retained))
-    if kind == 'variant_pat':
-        return isinstance(retained, Variant) and retained.tag == pattern[2] and len(retained.fields) == len(pattern)-3 and all(match_value(p, v, output) for p, v in zip(pattern[3:], retained.fields))
-    if kind == 'record_pat':
-        fields = retained.fields if isinstance(retained, Record) else retained
-        return all(match_value(p, fields[n], output) for n, p in zip(pattern[2], pattern[3:]))
-    return False
+    pending = [(pattern, retained)]
+    while pending:
+        pattern, retained = pending.pop()
+        kind = pattern[0]
+        if kind == 'wild':
+            continue
+        if kind == 'bind':
+            output[pattern[1]] = _Slot(retained)
+        elif kind == 'literal_pat':
+            if type(retained) is not type(pattern[1]) or retained != pattern[1]:
+                return False
+        elif kind == 'tuple_pat':
+            if not isinstance(retained, tuple) or len(retained) != len(pattern) - 1:
+                return False
+            pending.extend(reversed(tuple(zip(pattern[1:], retained))))
+        elif kind == 'variant_pat':
+            if not isinstance(retained, Variant) or retained.tag != pattern[2] or len(retained.fields) != len(pattern) - 3:
+                return False
+            pending.extend(reversed(tuple(zip(pattern[3:], retained.fields))))
+        elif kind == 'record_pat':
+            fields = retained.fields if isinstance(retained, Record) else retained
+            pending.extend((item, fields[name]) for name, item in reversed(tuple(zip(pattern[2], pattern[3:]))))
+        else:
+            return False
+    return True
 
 
 def evaluate_feature(machine, term, environment, evidence, resume):
@@ -147,11 +153,10 @@ def evaluate_feature(machine, term, environment, evidence, resume):
                         task = machine.tasks._current_task
                         if task is not None:
                             task.mask_depth += 1
-                        try:
-                            machine.invoke(_read(cleanup, environment), evidence, [retained])
-                        finally:
+                        def unmask():
                             if task is not None:
                                 task.mask_depth -= 1
+                        return _protect_call(lambda: machine.invoke(_read(cleanup, environment), evidence, [retained]), unmask)
                 return _protect_call(lambda: evaluate(body, environment | {name: slot}), finish)
             return _bind(evaluate(initial), enter)
         case ('nat', number):
@@ -222,9 +227,16 @@ def evaluate_feature(machine, term, environment, evidence, resume):
                             return Variant(None, 'Ok', ((retained[index], ListValue.from_items(rest)),))
                         if method in ('filter', 'partition'):
                             selected, rejected = [], []
-                            for item in retained:
-                                (selected if machine.invoke(args[0], evidence, [item]) else rejected).append(item)
-                            return ListValue.from_items(selected) if method == 'filter' else (ListValue.from_items(selected), ListValue.from_items(rejected))
+                            def visit(index):
+                                if index == len(retained):
+                                    kept = ListValue.from_items(selected)
+                                    return kept if method == 'filter' else (kept, ListValue.from_items(rejected))
+                                item = retained[index]
+                                def accept(keep):
+                                    (selected if keep else rejected).append(item)
+                                    return visit(index + 1)
+                                return _bind(machine.invoke(args[0], evidence, [item]), accept)
+                            return visit(0)
                         if method == 'next':
                             return list_next(retained)
                     if method == 'get':
@@ -264,37 +276,16 @@ def evaluate_feature(machine, term, environment, evidence, resume):
                     return None
                 return _bind(run_body(result), lambda _: loop(result.fields[1]))
             def loop(iterator):
-                while True:
-                    result = machine.invoke(_read(step, environment), evidence, [iterator]) if step else list_next(iterator)
-                    if isinstance(result, _Request):
-                        return _bind(result, accept)
-                    if result.tag == 'Done':
-                        return None
-                    body_result = run_body(result)
-                    iterator = result.fields[1]
-                    if isinstance(body_result, _Request):
-                        return _bind(body_result, lambda _: loop(iterator))
+                result = machine.invoke(_read(step, environment), evidence, [iterator]) if step else list_next(iterator)
+                return _bind(result, accept)
             return _bind(evaluate(iterable), loop)
         case ('taskgroup', _, body):
+            from eldude.runtime.control import Ensure
             group = machine.tasks.enter()
             group.handler_evidence = dict(evidence)
-            def finish(result):
-                machine.tasks.leave(group)
-                return result
-            def shutdown():
-                if not group.closed:
-                    machine.tasks.leave(group, abnormal=True)
-            return _protect_call(lambda: _bind(evaluate(body), finish), shutdown)
+            return Ensure(evaluate(body), lambda error: machine.tasks.leave(group, error))
         case ('spawn', closure):
-            def spawn(function):
-                baseline = machine.tasks.current_group.handler_evidence
-                def child():
-                    result = machine.invoke(function, baseline, [])
-                    while isinstance(result, _Request):
-                        result = machine.handle(result.target, result)
-                    return result
-                return machine.tasks.spawn(child)
-            return _bind(evaluate(closure), spawn)
+            return _bind(evaluate(closure), machine.spawn)
         case ('await', task):
             machine.events.append(('suspend', False))
             return _bind(evaluate(task), machine.tasks.await_result)

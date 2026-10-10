@@ -51,6 +51,29 @@ class SourceModuleTests(unittest.TestCase):
         self.assertEqual(graph.order, ('lib', 'app'))
         self.assertEqual(graph.modules['lib'].span.filename, str(self.root / 'lib.eld'))
 
+    def test_nested_projects_do_not_supply_modules_implicitly(self):
+        from eldude.core.handlers import run
+        from eldude.source.elaboration import SourceElaborator
+        self.write('eldude.toml', 'manifest-version = 1\n')
+        self.write('lib.eld', 'module lib; pub fn value()->Int { 42 }')
+        for directory, marker in (('.worktrees/review', '.git'), ('vendor/other', 'eldude.toml')):
+            self.write(directory + '/' + marker, '')
+            self.write(directory + '/lib.eld', 'module lib; pub fn value()->Int { 0 }')
+        graph = self.load('module app; import lib::{value}; pub fn main()->Int { value() }')
+        self.assertEqual(run(SourceElaborator(graph.modules['app'], graph).compile().program).value, 42)
+
+    def test_nested_project_requires_an_explicit_search_root(self):
+        source = 'module app; import hidden::{value};'
+        for directory, marker in (('nested', 'eldude.toml'), ('checkout', '.git')):
+            with self.subTest(boundary=marker):
+                self.write(directory + '/' + marker, '')
+                self.write(directory + '/hidden.eld', 'module hidden; pub fn value()->Int { 42 }')
+                with self.assertRaises(Diagnostic) as caught:
+                    self.load(source)
+                self.assertEqual(caught.exception.code, 'module')
+                self.assertIn('hidden', caught.exception.message)
+                self.assertEqual(self.load(source, (self.root / directory,)).order, ('hidden', 'app'))
+
     def test_missing_and_private_names_report_the_import_location(self):
         self.write('lib.eld', 'module lib; fn secret()->Int { 1 }')
         for imported, name, code in (('absent', 'x', 'module'), ('lib', 'missing', 'name'), ('lib', 'secret', 'visibility')):

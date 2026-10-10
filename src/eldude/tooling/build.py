@@ -20,7 +20,7 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_FILES = ('__init__.py', 'core/__init__.py', 'runtime/__init__.py',
                  'runtime/artifact.py', 'core/model.py', 'core/types.py', 'runtime/features.py',
                  'core/declarations.py', 'core/inference.py', 'core/handlers.py', 'core/rows.py',
-                 'core/captures.py', 'core/traits.py', 'runtime/tasks.py')
+                 'core/captures.py', 'core/traits.py', 'runtime/tasks.py', 'runtime/control.py')
 
 
 def machine_target(requested=None):

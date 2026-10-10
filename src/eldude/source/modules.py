@@ -92,14 +92,20 @@ def load_modules(root_ast, search_roots=(), *, sources=None, import_allowed=None
     the defining declaration (also for aliases/re-exports). ``dependencies``
     excludes host fixture imports. ``order`` includes the root and preserves
     cyclic imports by visiting each SCC's members in canonical path order.
+    Nested projects and checkouts require an explicit root or source selection.
     """
     root_name = root_ast.items[0].items[0]
     root_file = Path(root_ast.span.filename).resolve()
     roots = [Path(path).resolve() for path in search_roots] + [STDLIB]
     if sources is None and not root_ast.span.filename.startswith('<'):
         roots.append(root_file.parent)
-    candidates = {path.resolve() for root in roots for path in root.rglob('*.eld')
-                  if '.venv' not in path.relative_to(root).parts}
+    candidates = set()
+    for root in roots:
+        for directory, subdirectories, filenames in root.walk():
+            subdirectories[:] = [name for name in subdirectories if name != '.venv'
+                                 and not (directory / name / 'eldude.toml').is_file()
+                                 and not (directory / name / '.git').exists()]
+            candidates.update((directory / name).resolve() for name in filenames if name.endswith('.eld'))
     candidates.update(Path(path).resolve() for path in sources or ())
     candidates = sorted(candidates)
     index = {}

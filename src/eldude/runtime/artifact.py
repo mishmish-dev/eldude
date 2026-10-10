@@ -48,12 +48,12 @@ def encode_program(program, *, root=None):
                     'fields': {name: encode(item) for name, item in values.items()}}
         raise ValueError(f'unsupported IR artifact value {type(value).__name__}')
 
-    return {'ir_version': 1, 'core': encode(program.core), 'operations': encode(program.operations),
+    return {'ir_version': 2, 'core': encode(program.core), 'operations': encode(program.operations),
             'result': encode(program.inferred.type), 'effects': encode(program.inferred.effects)}
 
 
 def decode_program(data):
-    if data.get('ir_version') != 1:
+    if data.get('ir_version') != 2:
         raise ValueError('unsupported Python IR artifact version')
     origins, records = {}, {}
 

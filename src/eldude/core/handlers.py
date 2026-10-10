@@ -138,6 +138,7 @@ class HandlerChecker(Checker):
                              'once' if any(op.mode == 'once' for op in ops.values()) else 'tail'
                       for family, ops in self.operations.items()}
         self.frames = {}
+        self.handler_inheritance = {}
         self.in_call = False
 
     def sole_operation(self, family):
@@ -218,7 +219,7 @@ class HandlerChecker(Checker):
             if not binding.consumed and not permissions(binding.value.type)[1]:
                 raise InferenceError(f'Unconsumed handler obligation {name}', subject=name)
 
-    def _handler(self, family, name, body, clauses, returning, context):
+    def _handler(self, family, name, body, clauses, returning, context, expression):
         if family not in self.operations:
             raise InferenceError('Unknown effect family')
         operations = self.operations[family]
@@ -256,13 +257,14 @@ class HandlerChecker(Checker):
         outside = {entry[3] for entry in self._obligations(context)} | {id(b) for b in captures.values()}
         frame = Frame(key, family, outside, captures)
         self.frames[key] = frame
+        inheritable = (all(permissions(b.value.type)[0] for b in captures.values())
+                       and preserves_handler_result(result_body, result_name)
+                       and all(clause == E('forward') or operations[op].mode == 'tail'
+                               or preserves_handler_result(clause[2] if clause[0] == 'clause' else clause, resume=True)
+                               for op, clause in clauses))
+        self.handler_inheritance[id(expression)] = inheritable
         if hasattr(self, 'baselines'):
-            self.baselines[key] = (
-                all(permissions(b.value.type)[0] for b in captures.values())
-                and preserves_handler_result(result_body, result_name)
-                and all(clause == E('forward') or operations[op].mode == 'tail'
-                        or preserves_handler_result(clause[2] if clause[0] == 'clause' else clause, resume=True)
-                        for op, clause in clauses))
+            self.baselines[key] = inheritable
         old_handlers, old_names, old_active = context.handlers, context.names, context.active
         context.handlers += ((family, key),)
         context.names = context.names | {name: key}
@@ -410,9 +412,9 @@ class HandlerChecker(Checker):
     def _infer_expression(self, expression, context):
         match expression:
             case ('handle', family, name, body, clause, returning):
-                return self._handler(family, name, body, ((self.sole_operation(family), clause),), returning, context)
+                return self._handler(family, name, body, ((self.sole_operation(family), clause),), returning, context, expression)
             case ('handle_ops', family, name, body, clauses, returning):
-                return self._handler(family, name, body, clauses, returning, context)
+                return self._handler(family, name, body, clauses, returning, context, expression)
             case ('resume', argument):
                 return self._resume(self._infer(argument, context), context)
             case ('perform', family, *named):
@@ -514,8 +516,10 @@ def compile_program(expression, *, operations=None, checker=None, origins=None):
             case ('resume', supplied):
                 return E('resume', lower(supplied, names))
             case ('handle', family, name, body, clause, returning):
-                return lower_expression(E('handle_ops', family, name, body,
-                                         ((checker.sole_operation(family), clause),), returning), names)
+                expanded = E('handle_ops', family, name, body,
+                             ((checker.sole_operation(family), clause),), returning)
+                checker.handler_inheritance[id(expanded)] = checker.handler_inheritance[id(expr)]
+                return lower_expression(expanded, names)
             case ('handle_ops', family, name, body, clauses, ('returning', result_name, result_body)):
                 serial += 1
                 selected = Evidence(family, serial)
@@ -537,7 +541,7 @@ def compile_program(expression, *, operations=None, checker=None, origins=None):
                     clause_cores.append((operation_name, clause_core, forwarding))
                 return E('install', selected, name, captures,
                          lower(body, names | {name: selected}), tuple(clause_cores),
-                         result_name, lower(result_body, names))
+                         result_name, lower(result_body, names), checker.handler_inheritance[id(expr)])
             case _:
                 from eldude.source.lowering import lower_feature
                 extended = lower_feature(expr, names, lower, checker)
@@ -579,6 +583,8 @@ class _Handler:
     result_name: str
     result_body: tuple
     enclosing_resume: object
+    inheritable: bool
+    original: object = None
 
 
 @dataclass
@@ -599,32 +605,31 @@ class Execution:
 def _dup(retained):
     from eldude.runtime.features import Variant, Record, Cell, Buffer, Package, ListValue
     from eldude.runtime.tasks import TaskHandle
-    if isinstance(retained, (Buffer, TaskHandle)):
-        return False
-    if isinstance(retained, Cell):
-        return True
-    if isinstance(retained, ListValue):
-        return retained.duplicable
-    if isinstance(retained, Package):
-        return permissions(retained.type)[0]
-    if isinstance(retained, Record):
-        # Constructor types can retain generic placeholders; the actual fields
-        # determine structural usage, while nominal restrictions remain binding.
-        return retained.type.name not in ('Linear', 'Affine') and all(_dup(v) for v in retained.fields.values())
-    if isinstance(retained, Variant):
-        return (retained.type is None or retained.type.name not in ('Linear', 'Affine')) and all(_dup(v) for v in retained.fields)
-    from eldude.core.declarations import DeclarationClosure
-    if isinstance(retained, DeclarationClosure):
-        return True
-    if isinstance(retained, tuple):
-        return all(_dup(item) for item in retained)
-    if isinstance(retained, dict):
-        return all(_dup(item) for item in retained.values())
-    if isinstance(retained, _Resource):
-        return False
-    if isinstance(retained, _Closure):
-        from eldude.core.declarations import GlobalSlot
-        return all(isinstance(s, GlobalSlot) or _dup(s.value) for s in retained.environment.values())
+    from eldude.core.declarations import DeclarationClosure, GlobalSlot
+    pending = [retained]
+    while pending:
+        retained = pending.pop()
+        if isinstance(retained, (Buffer, TaskHandle, _Resource)):
+            return False
+        if isinstance(retained, (Cell, DeclarationClosure)):
+            continue
+        if isinstance(retained, ListValue):
+            if not retained.duplicable:
+                return False
+        elif isinstance(retained, Package):
+            if not permissions(retained.type)[0]:
+                return False
+        elif isinstance(retained, (Record, Variant)):
+            if retained.type is not None and retained.type.name in ('Linear', 'Affine'):
+                return False
+            # Actual fields retain generic ownership after type erasure.
+            pending.extend(retained.fields.values() if isinstance(retained, Record) else retained.fields)
+        elif isinstance(retained, tuple):
+            pending.extend(retained)
+        elif isinstance(retained, dict):
+            pending.extend(retained.values())
+        elif isinstance(retained, _Closure):
+            pending.extend(slot.value for slot in retained.environment.values() if not isinstance(slot, GlobalSlot))
     return True
 
 
@@ -643,38 +648,18 @@ def _read(name, environment, expression=None):
 
 
 def _bind(computation, then):
-    if isinstance(computation, _Request):
-        return replace(computation, continue_with=lambda result: _bind(computation.continue_with(result), then))
-    return then(computation)
+    from eldude.runtime.control import Bind
+    return Bind(computation, then)
 
 
 def _protect(computation, finish):
-    if isinstance(computation, _Request):
-        def abandon():
-            return _protect_call(computation.abandon, finish)
-        return replace(computation,
-                       continue_with=lambda result: _protect_call(lambda: computation.continue_with(result), finish), abandon=abandon)
-    finish()
-    return computation
+    from eldude.runtime.control import Ensure
+    return Ensure(computation, lambda _: finish())
 
 
 def _protect_call(compute, finish):
-    from eldude.runtime.features import EarlyExit
-    from eldude.runtime.tasks import TaskCancelled
-    try:
-        computation = compute()
-    except (Defect, EarlyExit, TaskCancelled) as primary:
-        try:
-            finish()
-        except Defect as secondary:
-            if not isinstance(primary, Defect):
-                raise
-            if primary is not secondary:
-                primary.add_note(f'Suppressed cleanup defect: {type(secondary).__name__}: {secondary}')
-                for note in getattr(secondary, '__notes__', ()):
-                    primary.add_note(note)
-        raise
-    return _protect(computation, finish)
+    from eldude.runtime.control import Call
+    return _protect(Call(compute), finish)
 
 
 class _Machine:
@@ -702,26 +687,34 @@ class _Machine:
         return _Request(target, operation, lambda supplied: supplied, lambda: None, tuple(arguments))
 
     def invoke(self, function, evidence, arguments):
+        from eldude.runtime.control import Call
+        return Call(self._invoke, (function, evidence, arguments))
+
+    def _invoke(self, function, evidence, arguments):
         if function in ('close', 'close_async'):
             self.close(arguments[0], 'explicit')
             return None
         if function == 'yield':
             self.events.append(('suspend', False))
-            self.tasks.yield_now()
-            return None
+            return self.tasks.yield_now()
         if not isinstance(function, _Closure):
             raise RuntimeError('Unknown executable callable')
         environment = {name: replace(slot) for name, slot in function.environment.items()}
         environment.update({name: _Slot(a) for name, a in zip(function.parameters, arguments)})
-        return self.evaluate(function.body, environment, evidence | function.fixed)
+        inherited = self.tasks._current_task.handler_copies
+        fixed = {key: inherited.get(frame.original or frame, frame.original or frame)
+                 for key, frame in function.fixed.items()}
+        return self.evaluate(function.body, environment, evidence | fixed)
 
     def handle(self, frame, computation):
-        if not isinstance(computation, _Request):
-            environment = frame.captures | {frame.result_name: _Slot(computation)}
-            return self.evaluate(frame.result_body, environment, frame.outer_evidence, frame.enclosing_resume)
-        if computation.target is not frame:
-            return replace(computation,
-                           continue_with=lambda supplied: self.handle(frame, computation.continue_with(supplied)))
+        from eldude.runtime.control import Handle
+        return Handle(computation, frame, self._return_handler, self._handle_request)
+
+    def _return_handler(self, frame, result):
+        environment = frame.captures | {frame.result_name: _Slot(result)}
+        return self.evaluate(frame.result_body, environment, frame.outer_evidence, frame.enclosing_resume)
+
+    def _handle_request(self, frame, computation):
         clause, forwarding = frame.clauses[computation.operation]
         parameters = ()
         if clause[0] == 'clause':
@@ -751,7 +744,7 @@ class _Machine:
             if not resumed and not abandoned:
                 abandoned = True
                 self.events.append(('abandon', frame.name))
-                computation.abandon()
+                return computation.abandon()
 
         def evaluate_clause():
             result = self.evaluate(clause, clause_environment, frame.outer_evidence,
@@ -764,24 +757,53 @@ class _Machine:
             return result
         return _protect_call(lambda: _bind(evaluate_clause(), completed), abandon)
 
+    def spawn(self, function):
+        baseline = self.tasks.current_group.handler_evidence
+        frames = []
+        seen = set()
+        pending = [(frame, False) for frame in reversed(tuple(baseline.values())) if frame.inheritable]
+        while pending:
+            frame, visited = pending.pop()
+            if frame in seen:
+                continue
+            if visited:
+                seen.add(frame)
+                frames.append(frame)
+            else:
+                pending.append((frame, True))
+                pending.extend((outer, False) for outer in reversed(tuple(frame.outer_evidence.values()))
+                               if outer not in seen and outer.inheritable)
+        copies = {frame: replace(frame, original=frame.original or frame,
+                                 captures={name: replace(slot) for name, slot in frame.captures.items()})
+                  for frame in frames}
+        for frame, copied in copies.items():
+            copied.outer_evidence = {key: copies[outer] for key, outer in frame.outer_evidence.items() if outer in copies}
+        inherited = {key: copies[frame] for key, frame in baseline.items() if frame in copies}
+        def child():
+            result = self.invoke(function, inherited, [])
+            for frame in reversed(frames):
+                result = self.handle(copies[frame], result)
+            return result
+        handle = self.tasks.spawn(child)
+        handle.handler_copies = {frame.original or frame: copied for frame, copied in copies.items()}
+        return handle
+
     def evaluate_arguments(self, arguments, environment, evidence, resume, then):
         values = []
         def argument(index):
-            while index < len(arguments):
-                result = self.evaluate(arguments[index], environment, evidence, resume)
-                if isinstance(result, _Request):
-                    def accept(retained):
-                        values.append(retained)
-                        return argument(index + 1)
-                    return _bind(result, accept)
-                values.append(result)
-                index += 1
-            return then(values)
+            if index == len(arguments):
+                return then(values)
+            def accept(retained):
+                values.append(retained)
+                return argument(index + 1)
+            return _bind(self.evaluate(arguments[index], environment, evidence, resume), accept)
         return argument(0)
 
     def evaluate(self, term, environment, evidence, resume=None):
-        # ponytail: recursive continuation closures suffice for these finite
-        # examples; an explicit machine stack is needed for unbounded programs.
+        from eldude.runtime.control import Call
+        return Call(self._evaluate, (term, environment, evidence, resume))
+
+    def _evaluate(self, term, environment, evidence, resume=None):
         match term:
             case ('int' | 'bool', number):
                 return number
@@ -794,19 +816,9 @@ class _Machine:
                                                              environment, evidence, resume))
             case ('while', condition, body):
                 def after_test(test):
-                    if test:
-                        return _bind(self.evaluate(body, environment, evidence, resume), lambda _: loop())
-                    return None
+                    return _bind(self.evaluate(body, environment, evidence, resume), lambda _: loop()) if test else None
                 def loop():
-                    while True:
-                        test = self.evaluate(condition, environment, evidence, resume)
-                        if isinstance(test, _Request):
-                            return _bind(test, after_test)
-                        if not test:
-                            return None
-                        result = self.evaluate(body, environment, evidence, resume)
-                        if isinstance(result, _Request):
-                            return _bind(result, lambda _: loop())
+                    return _bind(self.evaluate(condition, environment, evidence, resume), after_test)
                 return loop()
             case ('unit',):
                 return None
@@ -823,13 +835,13 @@ class _Machine:
             case ('unpack', pattern, initial, body):
                 def enter_tuple(retained):
                     local = dict(environment)
-                    def bind(pattern, retained):
-                        if isinstance(pattern, tuple):
-                            for p, item in zip(pattern, retained):
-                                bind(p, item)
+                    pending = [(pattern, retained)]
+                    while pending:
+                        item, retained = pending.pop()
+                        if isinstance(item, tuple):
+                            pending.extend(reversed(tuple(zip(item, retained))))
                         else:
-                            local[pattern] = _Slot(retained)
-                    bind(pattern, retained)
+                            local[item] = _Slot(retained)
                     return self.evaluate(body, local, evidence, resume)
                 return _bind(self.evaluate(initial, environment, evidence, resume), enter_tuple)
             case ('var', name):
@@ -863,8 +875,8 @@ class _Machine:
             case ('invoke', name, supplied_evidence, arguments):
                 function = _read(name, environment)
                 passed = self.evaluate(supplied_evidence, environment, evidence, resume)
-                return self.evaluate_arguments(arguments, environment, evidence, resume,
-                                               lambda values: self.invoke(function, passed, values))
+                return _bind(passed, lambda selected: self.evaluate_arguments(
+                    arguments, environment, evidence, resume, lambda values: self.invoke(function, selected, values)))
             case ('dispatch', selected, operation, arguments):
                 return self.evaluate_arguments(arguments, environment, evidence, resume,
                                                lambda values: self.dispatch(selected, operation, evidence, values))
@@ -872,13 +884,13 @@ class _Machine:
                 if resume is None:
                     raise RuntimeError('No runtime resumption capability')
                 return _bind(self.evaluate(supplied, environment, evidence, resume), resume)
-            case ('install', selected, name, captures, body, clauses, result_name, result_body):
+            case ('install', selected, name, captures, body, clauses, result_name, result_body, inheritable):
                 from eldude.core.declarations import GlobalSlot
                 retained = {n: environment[n] if isinstance(environment[n], GlobalSlot) else _Slot(_read(n, environment))
                             for n in captures if n in environment}
                 frame = _Handler(selected, str(name), retained, evidence,
                                  {op: (clause, forwarding) for op, clause, forwarding in clauses},
-                                 result_name, result_body, resume)
+                                 result_name, result_body, resume, inheritable)
                 inner = evidence | {selected: frame, Evidence(selected.family): frame}
                 return self.handle(frame, self.evaluate(body, environment, inner, resume))
             case _:
@@ -893,13 +905,10 @@ def run(program):
         raise InferenceError('Execution requires closed handler evidence')
     machine = _Machine(program.operations)
     try:
-        result = machine.evaluate(program.core, {}, {})
+        result = machine.tasks.run(machine.evaluate(program.core, {}, {}))
     except Defect as error:
         error.events = tuple(machine.events)
         raise
-    if isinstance(result, _Request):
-        result.abandon()
-        raise RuntimeError('Unhandled runtime evidence target')
     if any(not resource.closed for resource in machine.resources):
         raise RuntimeError('An owned resource was leaked')
     return Execution(result, tuple(machine.events))

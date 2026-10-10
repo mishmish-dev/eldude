@@ -9,7 +9,7 @@ from eldude.runtime.features import ListValue, list_next
 class ListStorageTests(unittest.TestCase):
     def test_large_list_construction_uses_constant_stack(self):
         machine = handlers._Machine({})
-        values = machine.evaluate(('list_values', None, tuple(('int', n) for n in range(4096))), {}, {})
+        values = machine.tasks.run(machine.evaluate(('list_values', None, tuple(('int', n) for n in range(4096))), {}, {}))
         self.assertEqual(list(values), list(range(4096)))
 
     def test_append_and_next_share_storage_without_rescanning_elements(self):

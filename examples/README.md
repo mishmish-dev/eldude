@@ -6,7 +6,7 @@
 
 [Positive programs](#positive-programs) · [Source fixtures](#executable-source-fixtures) · [Test host](#fixture-host-profile) · [Rejections](#rejection-targets) · [Handler counterexamples](#enforced-source-rejections)
 
-All **118 positive examples** execute through the source checker and interpreter. The repository root is the Eldude project, with positive programs under [src/](src) and application/test targets declared in [eldude.toml](../eldude.toml). Its `source-dir = "examples/src"` keeps the programs here; build output goes to the repository's `build/` directory.
+All **133 positive examples** execute through the source checker and interpreter. The repository root is the Eldude project, with positive programs under [src/](src) and application/test targets declared in [eldude.toml](../eldude.toml). Its `source-dir = "examples/src"` keeps the programs here; build output goes to the repository's `build/` directory.
 
 From the repository root:
 
@@ -36,7 +36,7 @@ The fixture runner still prints individual `main` results:
 
 ```sh
 uv run python -m eldude.tooling.run --examples --strict
-# 118 passed, 0 unsupported, 0 failed
+# 133 passed, 0 unsupported, 0 failed
 ```
 
 [manifest.json](manifest.json) records independently specified expected values for every positive file. Corpus execution fails for wrong values, unexpected diagnostics, missing manifest entries, or regressions. `--strict` also rejects pending implementation limits; there are currently none in this corpus. Rejection fixtures are checked separately by the test suite.
@@ -44,11 +44,11 @@ uv run python -m eldude.tooling.run --examples --strict
 | Stage | Runnable | Capabilities exercised |
 | --- | ---: | --- |
 | [1. Values](src/01_values) | 14 / 14 | Arithmetic, closures, generics, records, tuples, enums and startup |
-| [2. Ownership](src/02_ownership) | 26 / 26 | Linear nominal types, capture contracts, inspection, recursion and trait erasure |
-| [3. Results](src/03_results) | 6 / 6 | Library imports, matching, `?` and `try` |
-| [4. Effects](src/04_effects) | 6 / 6 | Generic instances, handlers, forwarding and `Result` payloads |
+| [2. Ownership](src/02_ownership) | 28 / 28 | Linear nominal types, capture contracts, inspection, recursion and trait erasure |
+| [3. Results](src/03_results) | 7 / 7 | Library imports, matching, `?` and `try` |
+| [4. Effects](src/04_effects) | 9 / 9 | Generic instances, handlers, forwarding and `Result` payloads |
 | [5. State and collections](src/05_state_and_collections) | 35 / 35 | Regions, captured callbacks, collection primitives, iteration and cleanup traits |
-| [6. Tasks](src/06_tasks) | 11 / 11 | Cooperative scheduling, task groups, spawn/await and library join |
+| [6. Tasks](src/06_tasks) | 20 / 20 | Cooperative scheduling, task groups, spawn/await and library join |
 | [7. Source pipeline](src/07_source_pipeline) | 17 / 17 | Handler evidence, ownership, resumption and cleanup regressions |
 | [8. Formatting](src/08_formatting) | 1 / 1 | Source formatting preserves field evaluation order, handlers and precedence |
 | [9. Project tooling](src/09_tooling) | 2 / 2 | Explicit application entries and process-status test runners |
@@ -164,6 +164,26 @@ Stages 1–6 introduce the language features below. Stage 7 contains the focused
 | 6 | [library spawn region outer](src/06_tasks/library_spawn_region_outer.eld) | `42` | Discarded child completes inside its enclosing region |
 
 | 6 | [library spawn handler baseline](src/06_tasks/library_spawn_handler_baseline.eld) | `42` | Children retain the taskgroup handler environment across transient parent handlers |
+
+| Stage | Program | Expected value | Capability |
+| --- | --- | --- | --- |
+| 2 | [runtime recursion](src/02_ownership/runtime_recursion.eld) | `2048` | 2048 nested calls with work after each return |
+| 2 | [runtime structural values](src/02_ownership/runtime_structural_values.eld) | `2048` | Build and structurally traverse 2048 recursive enum values |
+| 3 | [runtime cleanup propagation](src/03_results/runtime_cleanup_propagation.eld) | `42` | Return and Result propagation finish 2049 suspending cleanup actions |
+| 4 | [runtime abandon cleanup](src/04_effects/runtime_abandon_cleanup.eld) | `42` | Affine abandonment unwinds 2049 resource scopes exactly once |
+| 4 | [runtime fixed recursion](src/04_effects/runtime_fixed_recursion.eld) | `42` | Recursive handler entry preserves a callback’s lexical instance |
+| 4 | [runtime resumptions](src/04_effects/runtime_resumptions.eld) | `2048` | 4096 tail/once operations retain post-resume work |
+| 6 | [runtime await dependency](src/06_tasks/runtime_await_dependency.eld) | `42` | A sibling awaits an already-started suspended predecessor |
+| 6 | [runtime cancel await](src/06_tasks/runtime_cancel_await.eld) | `42` | Cancellation interrupts an await and drains nested cleanup |
+| 6 | [runtime cancel shutdown](src/06_tasks/runtime_cancel_shutdown.eld) | `42` | Pending cancellation waits for a child’s group shutdown |
+| 6 | [runtime defect cleanup](src/06_tasks/runtime_defect_cleanup.eld) | `42` | Suspending cleanup runs after a child result; tests also exercise its defect path |
+| 6 | [runtime inherited return](src/06_tasks/runtime_inherited_return.eld) | `42` | Inherited return clauses run even when an operation is skipped |
+| 6 | [runtime nested groups](src/06_tasks/runtime_nested_groups.eld) | `42` | 2048 nested task dependencies drain without recursive stepping |
+| 6 | [runtime parent handler](src/06_tasks/runtime_parent_handler.eld) | `42` | An unrelated answer-changing handler remains on the parent |
+| 6 | [runtime yields](src/06_tasks/runtime_yields.eld) | `4096` | Two children complete 4096 cooperative yields |
+| 6 | [runtime inherited closure](src/06_tasks/runtime_inherited_closure.eld) | `42` | A callback returned through a child and grandchild keeps its lexical handler |
+
+The [runtime continuation tests](../tests/source/test_runtime_continuations.py) also sample Python stack depth, preserve artifact behavior, and check source cancellation/ownership diagnostics.
 
 ## Executable source fixtures
 
@@ -372,6 +392,11 @@ The argument fixtures under `reject/semantics/operation_arguments` are also vali
 | [abandonment](reject/semantics/operation_arguments/abandonment.eld) | Argument evaluation may suspend while an unprotected resource remains live |
 
 The 29 [multi-operation rejection fixtures](reject/semantics/multi_operations) cover incomplete/duplicate/unknown declarations and handler entries; call/clause arity and scalar types; mode-specific results; same-family sibling dispatch; explicit tail, missing/repeated once and escaping resumes; transferred frame use; undisposed clause locals; unsafe affine exit; skipped outside consumption/enclosing resume; post-resume outward abandonment; and argument effects. Each `/*error*/` marker immediately precedes the required diagnostic location; tests assert filename, offset, line, column and related ownership notes.
+
+| Rejection | Required diagnostic boundary |
+| --- | --- |
+| [cancel then await](reject/semantics/runtime_cancel_then_await.eld) | Cancellation consumes the only observation authority |
+| [recursive suspension owner](reject/semantics/runtime_recursive_suspension_owner.eld) | Recursive code still cannot suspend with a naked linear obligation |
 
 In particular, [sibling residual](reject/semantics/multi_operations/sibling_residual.eld) rejects the earlier resume because a sibling clause can perform an outward affine operation during deep re-entry. [Opaque family call](reject/semantics/multi_operations/opaque_affine_family.eld) rejects a source function call whose admitted family includes `affine`, even though its body currently invokes only `tail read`. These fail statically, before the interpreter runs.
 
