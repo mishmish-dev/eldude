@@ -423,7 +423,7 @@ From the repository root:
 ```sh
 uv run python -m eldude.source.grammar --write
 uv run python -m eldude.source.grammar
-uv run python -m unittest discover -s tests -p 'test_grammar*.py'
+uv run python -m unittest discover -s python-impl/tests -p 'test_grammar*.py'
 ```
 
 The first command regenerates this document and the JSON export; the specification chapters are inputs and are not rewritten. The second rejects undefined symbols, duplicate productions, malformed EBNF, reserved-word drift, or stale generated publications. Tests cover accepted/rejected syntax, source/interface separation, JSON consumption, and stale-publication detection. Edit the EBNF or originating specification clauses, then regenerate; do not edit generated presentations directly.

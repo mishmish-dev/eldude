@@ -539,7 +539,7 @@ Resume<mode, OperationResult, HandlerOutput, FrameUsage>
 
 The capability cannot escape the clause.
 
-The non-normative [`src/eldude/core/handlers.py`](../../src/eldude/core/handlers.py) experiment checks a restricted annotated expression fragment for these rules and lowers it to explicit handler evidence for execution in a small interpreter. Its [cases](../../tests/core/test_handlers.py) cover implicit tail resumption after local cleanup, ownership transfer across deep once resumption, affine segment discharge, and forwarding to outer instances. The [implementation guide](../implementation.md#handler-and-resumption-experiment) records its conservative restrictions and runtime limits; the experiment is not a complete implementation of these judgments.
+The non-normative [`python-impl/src/eldude/core/handlers.py`](../../python-impl/src/eldude/core/handlers.py) experiment checks a restricted annotated expression fragment for these rules and lowers it to explicit handler evidence for execution in a small interpreter. Its [cases](../../python-impl/tests/core/test_handlers.py) cover implicit tail resumption after local cleanup, ownership transfer across deep once resumption, affine segment discharge, and forwarding to outer instances. The [implementation guide](../implementation.md#handler-and-resumption-experiment) records its conservative restrictions and runtime limits; the experiment is not a complete implementation of these judgments.
 
 ## 65. Captured continuation segment
 

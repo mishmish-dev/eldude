@@ -16,11 +16,11 @@ requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/eldude"]
+packages = ["python-impl/src/eldude"]
 
 [tool.hatch.build.targets.wheel.force-include]
 "docs/eldude.ebnf" = "eldude/eldude.ebnf"
-"stdlib" = "eldude/stdlib"
+"eldude-stdlib" = "eldude/stdlib"
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "tests", "docs", "examples", "stdlib", "README.md", "AGENTS.md", "eldude.toml", "eldude.lock", ".python-version", "uv.lock"]
+include = ["python-impl", "docs", "eldude-program-examples", "eldude-stdlib", "README.md", "AGENTS.md", "eldude.toml", "eldude.lock", ".python-version", "uv.lock"]

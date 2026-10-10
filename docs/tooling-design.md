@@ -69,7 +69,7 @@ hello/
   eldude.lock          # generated on first dependency resolution
   src/
     main.eld
-  tests/               # present when a test runner is created
+  python-impl/tests/               # present when a test runner is created
   build/               # generated and ignored by version control
 ```
 
@@ -497,7 +497,7 @@ Acceptance is defined by observable behavior and independent expected results. T
 | Formatter writes | Syntax failure before writing changes nothing; permissions and unchanged files survive; detected stale bytes, changed permissions, and symlinks reject replacement; partial I/O failures are accurately reported. |
 | Tests and diagnostics | Test hosts are explicit; runner outcomes and empty selection are reported accurately; terminal and machine diagnostics describe the same obligations and scope. |
 
-For every implemented language or library capability needed by tooling, first add small `.eld` acceptance programs and run them through the source parser, checker, and interpreter. Expected results come from the language contract. Ownership, lifetime, effect, and constraint boundaries require rejection programs that reach the intended diagnostic. Retain these in the [example corpus](../examples/README.md) and its tests. Python-only checks or `pending` examples do not establish completion.
+For every implemented language or library capability needed by tooling, first add small `.eld` acceptance programs and run them through the source parser, checker, and interpreter. Expected results come from the language contract. Ownership, lifetime, effect, and constraint boundaries require rejection programs that reach the intended diagnostic. Retain these in the [example corpus](../eldude-program-examples/README.md) and its tests. Python-only checks or `pending` examples do not establish completion.
 
 Project and filesystem behavior additionally needs temporary-project CLI tests. Native backends require the same relevant source programs to execute through the native path, including result/event/cleanup comparisons where applicable. Formatting continues to use the existing before/after execution and rejection checks. Cache tests inspect actual reuse/invalidation as well as final results, so a correct result obtained by rechecking everything does not satisfy the incremental contract.
 

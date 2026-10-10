@@ -1,6 +1,6 @@
 # Eldude
 
-Eldude is a strict, statically typed functional language design with explicit ownership, effects, and structured concurrency. This repository contains its specification, grammar recognizer, experimental interpreter, example programs, and initial standard-library API. The interpreter implements a subset of the language.
+Eldude is a strict, statically typed functional language design with explicit ownership, effects, and structured concurrency. This repository contains its specification, grammar recognizer, [experimental Python interpreter](python-impl/src/eldude/), [example programs](eldude-program-examples/README.md), and [initial standard-library API](eldude-stdlib/README.md). The interpreter implements a subset of the language.
 
 **Start with the [documentation and project map](docs/index.md)** to find the rules, implementation files, and tests for your task. The [manifesto](docs/index.md#the-eldude-manifesto) explains the design goals.
 
@@ -13,20 +13,20 @@ Run from the repository root:
 ```sh
 uv sync --locked
 uv run eldude test
-# 84 tests executed; 0 failed
+# 133 tests executed; 0 failed
 uv run eldude run --app source_pipeline_combined
 ```
 
 `run` reports the application name and its exit status on stderr. The example
 applications call `verify()`, which checks the expected result and exits with
 status `0` when it matches. To print an example's `main()` result instead, use
-`uv run eldude-run examples/src/04_effects/handler.eld` (prints `42`).
+`uv run eldude-run eldude-program-examples/src/04_effects/handler.eld` (prints `42`).
 
 ## Project CLI
 
 The installed `eldude` command provides the project workflow from
 [the tooling design](docs/tooling-design.md). `uv sync` installs the package from
-`src/eldude/` and its commands into the pinned Python environment:
+`python-impl/src/eldude/` and its commands into the pinned Python environment:
 
 ```sh
 uv run eldude --help
@@ -34,11 +34,11 @@ uv run eldude new /tmp/hello --lib
 uv run eldude check --manifest-path /tmp/hello/eldude.toml
 uv run eldude fmt --manifest-path /tmp/hello/eldude.toml
 uv run eldude metadata --manifest-path /tmp/hello/eldude.toml
-uv run eldude check examples/src/09_tooling/application.eld
+uv run eldude check eldude-program-examples/src/09_tooling/application.eld
 ```
 
 Commands discover the nearest `eldude.toml`, or accept `--manifest-path`.
-The repository's [eldude.toml](eldude.toml) uses `examples/src` as its source root
+The repository's [eldude.toml](eldude.toml) uses `eldude-program-examples/src` as its source root
 and registers every positive program as an application and isolated result-checking
 test; `eldude test` runs them all from the repository root.
 Workspaces support `--package NAME` and `--workspace`, share a root lockfile, and
@@ -117,7 +117,7 @@ spelling, contracts, and evaluation order, including code outside the interprete
 supported subset. It does not require imports to resolve or type checking to pass.
 
 ```sh
-uv run eldude-format examples/src/08_formatting/semantics.eld
+uv run eldude-format eldude-program-examples/src/08_formatting/semantics.eld
 uv run eldude-format --check path/to/file.eld
 uv run eldude-format --write path/to/file.eld
 ```
@@ -143,13 +143,13 @@ checking, formatting, and building user programs.
 ```sh
 uv run python -m eldude.tooling.check_docs
 uv run python -m eldude.source.grammar
-uv run python -m unittest discover -s tests -p 'test_*.py'
+uv run python -m unittest discover -s python-impl/tests -p 'test_*.py'
 uv run eldude test
 uv run eldude-run --examples --strict
 git diff --check
 ```
 
-The documentation check verifies local links and fragment anchors, chapter/code map coverage, and example tables against [manifest.json](examples/manifest.json). The grammar check verifies syntax and generated publications. The tests check static diagnostics and execution; the strict corpus run executes every positive example. See the [example guide](examples/README.md) for expected values and rejection fixtures.
+The documentation check verifies local links and fragment anchors, chapter/code map coverage, and example tables against [manifest.json](eldude-program-examples/manifest.json). The grammar check verifies syntax and generated publications. The tests check static diagnostics and execution; the strict corpus run executes every positive example. See the [example guide](eldude-program-examples/README.md) for expected values and rejection fixtures.
 
 After editing [eldude.ebnf](docs/eldude.ebnf) or the originating parsing/interface clauses, regenerate the Markdown and JSON grammar publications with `uv run python -m eldude.source.grammar --write`. The [editing guide](docs/index.md#editing-and-checking) identifies the source files.
 

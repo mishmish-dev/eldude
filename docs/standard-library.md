@@ -1,6 +1,6 @@
 # Eldude Standard Library
 
-[Documentation and project map](index.md) · [Module/API map](../stdlib/README.md)
+[Documentation and project map](index.md) · [Module/API map](../eldude-stdlib/README.md)
 
 **Status:** working library profile, partially implemented.
 
@@ -22,11 +22,11 @@ Owning overlapping immutable slices may be added with explicit usage bounds, ord
 
 ## Implementation order
 
-The initial sequence was values and pure transformations, consuming sequences, regional state, cleanup, then structured concurrency. The corresponding [examples](../examples/README.md) now execute. Expand the API from concrete program needs; hash collections, text segmentation, streams, timers, native IO, and concurrent mapping remain later work.
+The initial sequence was values and pure transformations, consuming sequences, regional state, cleanup, then structured concurrency. The corresponding [examples](../eldude-program-examples/README.md) now execute. Expand the API from concrete program needs; hash collections, text segmentation, streams, timers, native IO, and concurrent mapping remain later work.
 
 ## Initial API and builtin bindings
 
-The [stdlib module map](../stdlib/README.md) distinguishes checked source bodies from explicit runtime primitives. Bundled `Option`/`Result` transformations, `LinkedList` methods, `Ref::set`, and `task::join2` execute through the ordinary source pipeline. All declared `List` methods have runtime bindings, and `task::yield` binds to the scheduler. The experimental `List` shares fixed ranges into append-only storage: append reuses the backing array at its end, branching append copies the visible range, and iteration advances a range boundary without copying elements. See the [implementation limits](implementation.md#implementation-limits) for storage retention and interpreter bounds. The bundled profile uses these canonical identities for existing language hooks:
+The [stdlib module map](../eldude-stdlib/README.md) distinguishes checked source bodies from explicit runtime primitives. Bundled `Option`/`Result` transformations, `LinkedList` methods, `Ref::set`, and `task::join2` execute through the ordinary source pipeline. All declared `List` methods have runtime bindings, and `task::yield` binds to the scheduler. The experimental `List` shares fixed ranges into append-only storage: append reuses the backing array at its end, branching append copies the visible range, and iteration advances a range boundary without copying elements. See the [implementation limits](implementation.md#implementation-limits) for storage retention and interpreter bounds. The bundled profile uses these canonical identities for existing language hooks:
 
 | Language hook | Library identity |
 | --- | --- |

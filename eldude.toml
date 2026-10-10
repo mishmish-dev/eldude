@@ -3,7 +3,7 @@ manifest-version = 1
 [package]
 name = "examples"
 version = "0.1.0"
-source-dir = "examples/src"
+source-dir = "eldude-program-examples/src"
 host = "python::experimental"
 
 [[app]]

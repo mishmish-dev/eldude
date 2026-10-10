@@ -2,7 +2,7 @@
 
 [Specification index](../language-specification.md)
 
-The canonical examples now live beside their related rules. Their B numbers remain stable so earlier references still identify the same example. These are illustrative snippets, including deliberately rejected or schematic cases; the [staged source programs](../../examples/README.md) record executable coverage.
+The canonical examples now live beside their related rules. Their B numbers remain stable so earlier references still identify the same example. These are illustrative snippets, including deliberately rejected or schematic cases; the [staged source programs](../../eldude-program-examples/README.md) record executable coverage.
 
 | Example | Chapter |
 |---|---|

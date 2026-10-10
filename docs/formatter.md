@@ -48,7 +48,7 @@ source tool's scope.
 
 ## API and command
 
-`src/eldude/tooling/format.py` exposes `eldude.tooling.format.format_source(text, filename='<source>') -> str`.
+`python-impl/src/eldude/tooling/format.py` exposes `eldude.tooling.format.format_source(text, filename='<source>') -> str`.
 Syntax failures use the existing located `Diagnostic` type. Invalid syntax is
 never partially formatted. The CLI accepts one file or stdin for stdout output,
 and one or more explicit files with `--check` or `--write`. `--check` returns 1
